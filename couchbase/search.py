@@ -62,7 +62,8 @@ __all__ = [
     'WildcardQuery',
 ]
 
-from couchbase.common import options
+from typing import TYPE_CHECKING
+
 from couchbase.common._supportability import Supportability
 from couchbase.common.search import DateFacet  # noqa: F401
 from couchbase.common.search import Facet  # noqa: F401
@@ -110,19 +111,6 @@ from couchbase.common.search_queries import TermQuery  # noqa: F401
 from couchbase.common.search_queries import TermRangeQuery  # noqa: F401
 from couchbase.common.search_queries import WildcardQuery  # noqa: F401
 from couchbase.common.search_request import SearchRequest  # noqa: F401
-from couchbase.exceptions import NoChildrenException  # noqa: F401
-from couchbase.protocol.classic._search import SearchQueryBuilder  # noqa: F401
 
-"""
-** DEPRECATION NOTICE **
-
-The classes below are deprecated for 3.x compatibility.  They should not be used.
-Instead use:
-    * All options should be imported from `couchbase.options`.
-
-"""
-
-
-@Supportability.import_deprecated('couchbase.search', 'couchbase.options')
-class SearchOptions(options.SearchOptions):  # noqa: F811
-    pass
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

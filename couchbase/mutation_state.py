@@ -23,5 +23,10 @@ __all__ = [
     'MutationState',
 ]
 
+from typing import TYPE_CHECKING
+
+from couchbase.common._supportability import Supportability
 from couchbase.common.mutation_state import MutationState  # noqa: F401
-from couchbase.common.result import MutationToken  # noqa: F401
+
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

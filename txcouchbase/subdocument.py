@@ -44,12 +44,13 @@ __all__ = [
     'with_expiry',
 ]
 
-from couchbase.common.subdocument import ArrayValues  # noqa: F401
+from typing import TYPE_CHECKING
+
+from couchbase.common._supportability import Supportability
 from couchbase.common.subdocument import LookupInMacro  # noqa: F401
 from couchbase.common.subdocument import MutationMacro  # noqa: F401
 from couchbase.common.subdocument import Spec  # noqa: F401
 from couchbase.common.subdocument import StoreSemantics  # noqa: F401
-from couchbase.common.subdocument import SubDocOp  # noqa: F401
 from couchbase.common.subdocument import SubDocStatus  # noqa: F401
 from couchbase.common.subdocument import array_addunique  # noqa: F401
 from couchbase.common.subdocument import array_append  # noqa: F401
@@ -68,3 +69,6 @@ from couchbase.common.subdocument import remove  # noqa: F401
 from couchbase.common.subdocument import replace  # noqa: F401
 from couchbase.common.subdocument import upsert  # noqa: F401
 from couchbase.common.subdocument import with_expiry  # noqa: F401
+
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

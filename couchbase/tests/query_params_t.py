@@ -22,12 +22,15 @@ import pytest
 
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.mutation_state import MutationState
-from couchbase.n1ql import (N1QLQuery,
-                            QueryProfile,
-                            QueryScanConsistency)
+from couchbase.n1ql import QueryProfile, QueryScanConsistency
 from couchbase.options import QueryOptions
+from couchbase.protocol.classic._n1ql import N1QLQuery
 from couchbase.result import MutationToken
 from couchbase.serializer import DefaultJsonSerializer
+from tests.test_features import TestProtocol
+
+# Each request here is built by classic's request builder.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
 
 class QueryParamsUnitTests:

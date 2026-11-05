@@ -1,0 +1,141 @@
+{
+  "couchbase.collection.Collection": [
+    "couchbase.collection.CBCollection"
+  ],
+  "couchbase.exceptions.InvalidArgumentException": [
+    "couchbase.options.InvalidArgumentException"
+  ],
+  "couchbase.exceptions.NoChildrenException": [
+    "couchbase.search.NoChildrenException"
+  ],
+  "couchbase.n1ql.QueryProfile": [
+    "couchbase.cluster.QueryProfile"
+  ],
+  "couchbase.n1ql.QueryScanConsistency": [
+    "couchbase.cluster.QueryScanConsistency"
+  ],
+  "couchbase.observability.metrics.Meter": [
+    "couchbase.metrics.CouchbaseMeter"
+  ],
+  "couchbase.observability.metrics.ValueRecorder": [
+    "couchbase.metrics.CouchbaseValueRecorder"
+  ],
+  "couchbase.observability.tracing.RequestSpan": [
+    "couchbase.tracing.CouchbaseSpan"
+  ],
+  "couchbase.observability.tracing.RequestTracer": [
+    "couchbase.tracing.CouchbaseTracer"
+  ],
+  "couchbase.options.AnalyticsOptions": [
+    "couchbase.analytics.AnalyticsOptions"
+  ],
+  "couchbase.options.AppendOptions": [
+    "couchbase.collection.AppendOptions"
+  ],
+  "couchbase.options.ClusterOptions": [
+    "couchbase.cluster.ClusterOptions"
+  ],
+  "couchbase.options.ClusterTimeoutOptions": [
+    "couchbase.cluster.ClusterTimeoutOptions"
+  ],
+  "couchbase.options.ClusterTracingOptions": [
+    "couchbase.cluster.ClusterTracingOptions"
+  ],
+  "couchbase.options.Compression": [
+    "couchbase.cluster.Compression"
+  ],
+  "couchbase.options.ConstrainedInt": [
+    "couchbase.collection.ConstrainedInt"
+  ],
+  "couchbase.options.DecrementOptions": [
+    "couchbase.collection.DecrementOptions"
+  ],
+  "couchbase.options.DeltaValue": [
+    "couchbase.collection.DeltaValue"
+  ],
+  "couchbase.options.DiagnosticsOptions": [
+    "couchbase.cluster.DiagnosticsOptions"
+  ],
+  "couchbase.options.ExistsOptions": [
+    "couchbase.collection.ExistsOptions"
+  ],
+  "couchbase.options.GetAllReplicasOptions": [
+    "couchbase.collection.GetAllReplicasOptions"
+  ],
+  "couchbase.options.GetAndLockOptions": [
+    "couchbase.collection.GetAndLockOptions"
+  ],
+  "couchbase.options.GetAndTouchOptions": [
+    "couchbase.collection.GetAndTouchOptions"
+  ],
+  "couchbase.options.GetAnyReplicaOptions": [
+    "couchbase.collection.GetAnyReplicaOptions"
+  ],
+  "couchbase.options.GetOptions": [
+    "couchbase.collection.GetOptions"
+  ],
+  "couchbase.options.IncrementOptions": [
+    "couchbase.collection.IncrementOptions"
+  ],
+  "couchbase.options.InsertOptions": [
+    "couchbase.collection.InsertOptions"
+  ],
+  "couchbase.options.LookupInOptions": [
+    "couchbase.collection.LookupInOptions"
+  ],
+  "couchbase.options.MutateInOptions": [
+    "couchbase.subdocument.MutateInOptions"
+  ],
+  "couchbase.options.PingOptions": [
+    "couchbase.bucket.PingOptions"
+  ],
+  "couchbase.options.PrependOptions": [
+    "couchbase.collection.PrependOptions"
+  ],
+  "couchbase.options.QueryOptions": [
+    "couchbase.cluster.QueryOptions"
+  ],
+  "couchbase.options.RemoveOptions": [
+    "couchbase.collection.RemoveOptions"
+  ],
+  "couchbase.options.ReplaceOptions": [
+    "couchbase.collection.ReplaceOptions"
+  ],
+  "couchbase.options.SearchOptions": [
+    "couchbase.search.SearchOptions"
+  ],
+  "couchbase.options.SignedInt64": [
+    "couchbase.collection.SignedInt64"
+  ],
+  "couchbase.options.TouchOptions": [
+    "couchbase.collection.TouchOptions"
+  ],
+  "couchbase.options.UnlockOptions": [
+    "couchbase.collection.UnlockOptions"
+  ],
+  "couchbase.options.UpsertOptions": [
+    "couchbase.collection.UpsertOptions"
+  ],
+  "couchbase.options.ViewOptions": [
+    "couchbase.bucket.ViewOptions"
+  ],
+  "couchbase.result.MutationToken": [
+    "couchbase.mutation_state.MutationToken"
+  ],
+  "couchbase.scope.Scope": [
+    "couchbase.collection.Scope"
+  ],
+  "couchbase.serializer.DefaultJsonSerializer": [
+    "couchbase.options.DefaultJsonSerializer",
+    "couchbase.transcoder.DefaultJsonSerializer"
+  ],
+  "couchbase.views.ViewErrorMode": [
+    "couchbase.bucket.ViewErrorMode"
+  ],
+  "couchbase.views.ViewOrdering": [
+    "couchbase.bucket.ViewOrdering"
+  ],
+  "couchbase.views.ViewScanConsistency": [
+    "couchbase.bucket.ViewScanConsistency"
+  ]
+}

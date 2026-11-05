@@ -30,9 +30,12 @@ import pytest
 import couchbase.common.search as common_search
 import couchbase.common.search_queries as common_queries
 import couchbase.search as search
-from couchbase.exceptions import FeatureUnavailableException, InvalidArgumentException
+from couchbase.exceptions import (FeatureUnavailableException,
+                                  InvalidArgumentException,
+                                  NoChildrenException)
 from couchbase.mutation_state import MutationState
 from couchbase.options import SearchOptions, VectorSearchOptions
+from couchbase.protocol.classic._search import SearchQueryBuilder
 from couchbase.result import MutationToken
 from couchbase.search import (HighlightStyle,
                               MatchOperator,
@@ -47,11 +50,14 @@ from couchbase.vector_search import (VectorQuery,
                                      VectorSearch)
 from tests.test_features import TestProtocol
 
+# Each request here is built by classic's request builder.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+
 # A label rather than a claim about a cluster: nothing here connects.
 INDEX_NAME = 'test-search-index'
 
 
-def _encode(builder: search.SearchQueryBuilder) -> dict[str, Any]:
+def _encode(builder: SearchQueryBuilder) -> dict[str, Any]:
     # `as_encodable()` serializes the query, the facets and the sort specs to JSON text, so
     # comparing the raw result would depend on key order and float formatting.  `facets` is
     # a dict of name to JSON string and `sort_specs` a list of them, so neither is the
@@ -70,15 +76,15 @@ def _encode(builder: search.SearchQueryBuilder) -> dict[str, Any]:
 def _encoded(query: search.SearchQuery,
              options: SearchOptions | None = None) -> dict[str, Any]:
     if options is None:
-        builder = search.SearchQueryBuilder.create_search_query_object(INDEX_NAME, query)
+        builder = SearchQueryBuilder.create_search_query_object(INDEX_NAME, query)
     else:
-        builder = search.SearchQueryBuilder.create_search_query_object(INDEX_NAME, query, options)
+        builder = SearchQueryBuilder.create_search_query_object(INDEX_NAME, query, options)
     return _encode(builder)
 
 
 def _params(query: search.SearchQuery,
-            options: SearchOptions) -> search.SearchQueryBuilder:
-    return search.SearchQueryBuilder.create_search_query_object(INDEX_NAME, query, options)
+            options: SearchOptions) -> SearchQueryBuilder:
+    return SearchQueryBuilder.create_search_query_object(INDEX_NAME, query, options)
 
 
 def _expected_request(query_body: Any, **overrides: Any) -> dict[str, Any]:
@@ -150,7 +156,7 @@ class SearchParamsUnitTests:
     def test_conjunction_query(self) -> None:
         # A conjunction with no children cannot encode, and says so at encode time rather than
         # at construction: the children can still be added after the object exists.
-        with pytest.raises(search.NoChildrenException):
+        with pytest.raises(NoChildrenException):
             _encoded(search.ConjunctionQuery())
 
         conjuncts = {'conjuncts': [{'prefix': 'somePrefix'}, {'term': 'sand'}]}
@@ -230,7 +236,7 @@ class SearchParamsUnitTests:
     def test_disjunction_query(self) -> None:
         q = search.DisjunctionQuery()
         assert q.min == 1
-        with pytest.raises(search.NoChildrenException):
+        with pytest.raises(NoChildrenException):
             _encoded(q)
 
         disjuncts = {'disjuncts': [{'prefix': 'somePrefix'}, {'term': 'sand'}], 'min': 1}
@@ -254,7 +260,7 @@ class SearchParamsUnitTests:
         _assert_query_repr(q, encoded)
 
     def test_docid_query(self) -> None:
-        with pytest.raises(search.NoChildrenException):
+        with pytest.raises(NoChildrenException):
             _encoded(search.DocIdQuery([]))
 
         expected = _expected_request({'ids': ['foo', 'bar', 'baz']})
@@ -1002,7 +1008,7 @@ class SearchQueryShapeUnitTests:
     def test_repr_of_an_invalid_compound_does_not_raise(self) -> None:
         q = search.ConjunctionQuery()
         assert repr(q) == 'ConjunctionQuery(query={\'conjuncts\': []})'
-        with pytest.raises(search.NoChildrenException):
+        with pytest.raises(NoChildrenException):
             q.encodable
 
     def test_sort_and_facet_set_prop_is_sent_over_the_fields(self) -> None:
@@ -1070,7 +1076,7 @@ class VectorSearchParamsUnitTests:
     TEST_VECTOR_BASE64 = 'SSdtIGp1c3QgYSB0ZXN0IHN0cmluZw=='
 
     def _encoded_request(self, request: SearchRequest) -> dict[str, Any]:
-        builder = search.SearchQueryBuilder.create_search_query_from_request(INDEX_NAME, request)
+        builder = SearchQueryBuilder.create_search_query_from_request(INDEX_NAME, request)
         return _encode(builder)
 
     def _expected(self, *vector_queries: dict[str, Any], **overrides: Any) -> dict[str, Any]:
@@ -1159,7 +1165,7 @@ class VectorSearchParamsUnitTests:
     def test_vector_search_with_scoring(self) -> None:
         request = SearchRequest.create(search.MatchQuery('salty beers')).with_vector_search(
             VectorSearch.from_vector_query(VectorQuery('vector_field', self.TEST_VECTOR)))
-        builder = search.SearchQueryBuilder.create_search_query_from_request(
+        builder = SearchQueryBuilder.create_search_query_from_request(
             INDEX_NAME, request, SearchOptions(scoring=ReciprocalRankFusion(rank_constant=60)))
         assert _encode(builder) == self._expected(
             {'field': 'vector_field', 'vector': self.TEST_VECTOR, 'k': 3},
@@ -1167,7 +1173,7 @@ class VectorSearchParamsUnitTests:
             scoring={'scoring_type': 'reciprocal_rank_fusion', 'rank_constant': 60})
 
         # The conflict is checked on the request path as well as the query path.
-        _rejects(search.SearchQueryBuilder.create_search_query_from_request,
+        _rejects(SearchQueryBuilder.create_search_query_from_request,
                  INDEX_NAME, request, SearchOptions(scoring=ScoringNone(), disable_scoring=True))
 
     def test_vector_query_combination_reads_back(self) -> None:
@@ -1178,14 +1184,14 @@ class VectorSearchParamsUnitTests:
             request = SearchRequest.create(
                 VectorSearch([VectorQuery('vector_field', self.TEST_VECTOR)],
                              VectorSearchOptions(vector_query_combination=combination)))
-            builder = search.SearchQueryBuilder.create_search_query_from_request(INDEX_NAME,
-                                                                                 request)
+            builder = SearchQueryBuilder.create_search_query_from_request(INDEX_NAME,
+                                                                          request)
             assert builder.vector_query_combination == combination
 
             builder.highlight_style = HighlightStyle.Ansi
             assert builder.vector_query_combination == combination
 
-        absent = search.SearchQueryBuilder.create_search_query_from_request(
+        absent = SearchQueryBuilder.create_search_query_from_request(
             INDEX_NAME,
             SearchRequest.create(VectorSearch.from_vector_query(
                 VectorQuery('vector_field', self.TEST_VECTOR))))
@@ -1225,10 +1231,7 @@ class VectorSearchParamsUnitTests:
                 encoded_query, encoded_query, vector_query_combination=expected)
 
 
-@pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 class ClassicSearchParamsUnitTests:
-    # Its classic imports are inside the tests: at module level they would tie the shared tests above
-    # to classic too.
 
     def test_params_scoring_matches_generated_bindings(self) -> None:
         # Holds the public scoring types to the generated core binding: each must encode as

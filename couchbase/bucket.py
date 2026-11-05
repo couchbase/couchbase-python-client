@@ -209,27 +209,5 @@ class Bucket:
         return ViewIndexManager(self._impl.view_index_mgmt())
 
 
-"""
-** DEPRECATION NOTICE **
-
-The classes below are deprecated for 3.x compatibility.  They should not be used.
-Instead use:
-    * All options should be imported from `couchbase.options`.
-    * All view Enums should be imported from `couchbase.views`.
-
-"""
-
-
-@Supportability.import_deprecated('couchbase.bucket', 'couchbase.options')  # noqa: F811
-class PingOptions(options.PingOptions):  # noqa: F811
-    pass
-
-
-@Supportability.import_deprecated('couchbase.bucket', 'couchbase.options')  # noqa: F811
-class ViewOptions(options.ViewOptions):  # noqa: F811
-    pass
-
-
-from couchbase.views import ViewScanConsistency  # nopep8 # isort:skip # noqa: E402, F401
-from couchbase.views import ViewOrdering  # nopep8 # isort:skip # noqa: E402, F401
-from couchbase.views import ViewErrorMode  # nopep8 # isort:skip # noqa: E402, F401
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

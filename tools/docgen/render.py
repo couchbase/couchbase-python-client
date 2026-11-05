@@ -9,7 +9,9 @@ describes its own results and links to ``couchbase.result`` for the ones it shar
 same object when they lead to one definition, following re-exports, so this needs no native binding.
 
 It also renders the table of deprecated import paths that the migration guide includes: each compat name,
-and what to import instead.
+and what to import instead, as the inventory says.  And, for the docs build, the map from each documented
+object to the compat names it replaces, from which ``docs/old_import_paths.py`` warns on the object's own
+entry.
 
 A documented name cannot open its docstring with ``**INTERNAL**``.  The docs build leaves such members
 out, so on a public name the marker contradicts the inventory, which says it is public.
@@ -17,10 +19,12 @@ out, so on a public name the marker contradicts the inventory, which says it is 
 
 from __future__ import annotations
 
+import collections
 import dataclasses
 import enum
 import importlib
 import inspect
+import json
 import pathlib
 import typing
 
@@ -40,14 +44,14 @@ from tools.check_public_api import (APIS,
 from tools.docgen.layout import (COMMON,
                                  SYNC,
                                  Layout,
-                                 Page,
-                                 Replacement)
+                                 Page)
 
 TEMPLATES = pathlib.Path(__file__).parent / 'templates'
 # Heading underlines, by depth below the page title.
 RULES = '=-~^'
 # Included by the migration guide, so it is not a page of its own.
 DEPRECATED = 'deprecated_paths.inc'
+OLD_PATHS = 'old_import_paths.json'
 INTERNAL = '**INTERNAL**'
 
 
@@ -91,7 +95,6 @@ class Reference:
                                keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
         self.canonical: dict[tuple[str, str], str] = {}
         self._described: set[int] | None = None
-        self._by_identity: dict[int, str] | None = None
         for section, pages in ((SYNC, layout.apis), (COMMON, layout.common),
                                *((api, layout.apis) for api in APIS)):
             for page in layout.pages(pages):
@@ -127,19 +130,8 @@ class Reference:
         files = {f'{docname}.rst': text for docname, text in self._pages().items()}
         files[f'{self.layout.output}/{DEPRECATED}'] = self.env.get_template('deprecated.rst.jinja2').render(
             rows=self._deprecated())
+        files[f'{self.layout.output}/{OLD_PATHS}'] = json.dumps(self._old_paths(), indent=2, sort_keys=True) + '\n'
         return files
-
-    def replacement_problems(self) -> list[str]:
-        """The compat names whose replacement the layout gives when it need not, or omits when it must."""
-        found = []
-        for path in self._compat():
-            module, _, name = path.rpartition('.')
-            if path in self.layout.replacements:
-                if self._found(module, name):
-                    found.append(f'replacements: {path} resolves to {self._found(module, name)}; remove it')
-            elif not self._found(module, name):
-                found.append(f'replacements: {path} has no documented counterpart; say what replaces it')
-        return found
 
     def internal_problems(self) -> list[str]:
         """The documented names whose docstring says they are internal."""
@@ -151,33 +143,34 @@ class Reference:
         return sorted(f'{module}.{name}' for module, entry in self.inventory.items() for name in entry.compat)
 
     def _found(self, module: str, name: str) -> str | None:
-        """The documented name a compat name is, or the one a deprecated subclass of it wraps.
+        """Where the documented object that replaces a compat name is described, if it is."""
+        use = self.inventory[module].compat[name].use
+        if use is None:
+            return None
+        return self.canonical.get(self.key(*use.rsplit('.', 1)))
 
-        Only classes and functions are matched by identity: two equal constants may be one object.
-        """
-        if self._by_identity is None:
-            objects = ((target, _resolve(target)) for target in self.canonical.values())
-            self._by_identity = {id(obj): target for target, obj in objects
-                                 if inspect.isclass(obj) or inspect.isfunction(obj)}
-        obj = _resolve(f'{module}.{name}')
-        found = self._by_identity.get(id(obj)) if inspect.isclass(obj) or inspect.isfunction(obj) else None
-        if found is None and inspect.isclass(obj) and len(obj.__bases__) == 1:
-            found = self._by_identity.get(id(obj.__bases__[0]))
-        return found
+    def _old_paths(self) -> dict[str, list[str]]:
+        """Each documented object that replaces a compat name, and those compat names."""
+        found: dict[str, list[str]] = collections.defaultdict(list)
+        for path in self._compat():
+            module, _, name = path.rpartition('.')
+            target = self._found(module, name)
+            if target:
+                found[target].append(path)
+        return dict(found)
 
     def _deprecated(self) -> list[Row]:
-        documented = set(self.canonical.values())
         rows = []
         for path in self._compat():
             module, _, name = path.rpartition('.')
+            compat = self.inventory[module].compat[name]
             found = self._found(module, name)
-            replacement = Replacement(found) if found else self.layout.replacements.get(path, Replacement(None))
-            if replacement.use is None:
-                instead = f'Nothing: {replacement.reason}'
-            elif replacement.use in documented:
-                instead = f':py:obj:`{replacement.use}`'
+            if found:
+                instead = f':py:obj:`{found}`'
+            elif compat.use:
+                instead = f'``{compat.use}``'
             else:
-                instead = f'``{replacement.use}``'
+                instead = f'Nothing: {compat.reason}'
             rows.append(Row(path, instead))
         return rows
 

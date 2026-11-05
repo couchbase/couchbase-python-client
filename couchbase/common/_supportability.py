@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import importlib
 import sys
 import warnings
 from collections.abc import Callable
@@ -23,6 +24,7 @@ from typing import (Any,
                     NoReturn,
                     TypeVar)
 
+from couchbase.common._deprecated_paths import PATHS
 from couchbase.common.warnings import CouchbaseDeprecationWarning
 
 _SDK_PACKAGES = frozenset(('couchbase', 'acouchbase', 'txcouchbase'))
@@ -61,22 +63,25 @@ def _caller_stacklevel() -> int:
 
 
 class Supportability:
-    @classmethod
-    def import_deprecated(cls, old_path: str, new_path: str) -> Callable[[type[_T]], type[_T]]:
-        def decorator(cls: type[_T]) -> type[_T]:
-            old_init = cls.__init__
+    @staticmethod
+    def deprecated_paths(module: str) -> Callable[[str], Any]:
+        """The ``__getattr__`` that serves ``module``'s deprecated import paths, warning on each access.
 
-            def new_init(self: Any, *args: Any, **kwargs: Any) -> None:
-                msg = (f"Importing {cls.__name__} from {old_path} is deprecated "
-                       "and will be removed in a future release. "
-                       f" Import {cls.__name__} from {new_path} instead.")
-                warnings.warn(msg, CouchbaseDeprecationWarning, stacklevel=_caller_stacklevel())
-                old_init(self, *args, **kwargs)
+        The names are not bound in the module, so the warning comes at the ``import`` line, on every
+        path, whatever the name is.  The module installs it under ``if not TYPE_CHECKING:``, so a type
+        checker does not see it.
+        """
+        paths = PATHS[module]
 
-            # setattr because a type checker refuses replacing a method by assignment.
-            setattr(cls, '__init__', new_init)
-            return cls
-        return decorator
+        def __getattr__(name: str) -> Any:
+            if name not in paths:
+                raise AttributeError(f'module {module!r} has no attribute {name!r}')
+            origin, advice = paths[name]
+            msg = f'Importing {name} from {module} is deprecated and will be removed in a future release. {advice}'
+            warnings.warn(msg, CouchbaseDeprecationWarning, stacklevel=_caller_stacklevel())
+            return getattr(importlib.import_module(origin), name)
+
+        return __getattr__
 
     @classmethod
     def class_deprecated(cls, use_instead: str) -> Callable[[type[_T]], type[_T]]:

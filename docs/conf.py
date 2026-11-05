@@ -62,6 +62,7 @@ extensions = [
     'enum_tools.autoenum',
     'type_checking_names',
     'internal_members',
+    'old_import_paths',
 ]
 
 intersphinx_mapping = {

@@ -3,9 +3,9 @@
 The API reference under `docs/reference/` is generated, and the generated pages are committed:
 
 ```
-tools/public_api.yaml           which modules are documented (`docs: true`), and what each API has at a path
-tools/docgen/config/layout.yaml each page's title and order, the groups a long page splits into, members left out,
-                                and what replaces a compat name the generator cannot place
+tools/public_api.yaml           which modules are documented (`docs: true`), what each API has at a path,
+                                and what replaces each compat name
+tools/docgen/config/layout.yaml each page's title and order, the groups a long page splits into, members left out
 docs/reference/                 generated, tracked, do not edit
 docs/*.rst                      the guide and the front page, hand-written
 ```
@@ -73,7 +73,11 @@ A new public name in a module with `groups` has to go in one of them; `check` na
 import instead, included by `docs/migration.rst`. It is an include rather than a page, so it has no
 title and no place in a toctree.
 
-A compat name that is a documented object, or a deprecated subclass of exactly one, as the options
-classes at `couchbase.cluster` are, finds its replacement by itself. Every other one needs an entry in
-`replacements` in `layout.yaml`: `use: <path>` for what to import instead, or `none: <reason>`. `check`
-fails on a compat name with neither, and on an entry the generator would have found by itself.
+What replaces each compat name is in its inventory entry, the same one the SDK's import warning is
+rendered from, so the table and the warning cannot disagree.
+
+The compat names whose replacement is documented are warned about on the replacement's own entry too.
+`docs/reference/old_import_paths.json` maps each documented object to them, and
+`docs/old_import_paths.py` puts a warning naming them after the object's summary, so a reader who
+imports it from an old path learns that on the page they are reading. Nothing in a docstring says
+where to import from.

@@ -21,9 +21,14 @@ __all__ = [
     'ViewScanConsistency',
 ]
 
+from typing import TYPE_CHECKING
+
+from couchbase.common._supportability import Supportability
 from couchbase.common.views import ViewErrorMode  # noqa: F401
 from couchbase.common.views import ViewMetaData  # noqa: F401
 from couchbase.common.views import ViewOrdering  # noqa: F401
 from couchbase.common.views import ViewRow  # noqa: F401
 from couchbase.common.views import ViewScanConsistency  # noqa: F401
-from couchbase.protocol.classic._views import ViewQuery  # noqa: F401
+
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

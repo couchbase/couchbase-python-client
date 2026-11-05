@@ -4,9 +4,17 @@ A module is public when no part of its dotted path starts with an underscore, ou
 inventory lists every one, and under it two lists of names:
 
 * ``public``: the supported API at that path, published as the module's ``__all__``.
-* ``compat``: a name the module keeps bound so code that imports it keeps working, which is not
-  supported and is not in ``__all__``.  The list only shrinks, and removing a name is a deliberate
-  edit.
+* ``compat``: a deprecated path, a name the module still serves so code that imports it keeps
+  working, which is not supported and is not in ``__all__``.  Each says where it is served from and
+  what replaces it: ``Name: <module>``, a public module publishing the same object, or
+  ``Name: {from: <module>, use: <path>}`` or ``{from: <module>, none: <reason>}``.  The list only
+  shrinks, and removing a name is a deliberate edit.
+
+A compat name is not bound in its module.  ``--write`` renders the compat entries into
+``couchbase/common/_deprecated_paths.py``, and the module's ``__getattr__``,
+``Supportability.deprecated_paths``, serves each from there with a ``CouchbaseDeprecationWarning`` at
+the import that names the replacement.  The module installs it under ``if not TYPE_CHECKING:``, so a
+type checker does not see the old paths.
 
 A name in neither list is private, or bound only because the module uses it, and is not a promise.
 Private names are not listed: the underscore is the record.
@@ -17,7 +25,10 @@ The check fails on:
 2. **An ``__all__`` that differs from the public list**, or a module with no ``__all__``.
 3. **A listed name the module does not bind.**  A name the module serves from the native binding
    through its ``__getattr__`` counts as bound where the binding is absent, as in the pre-commit
-   environment, since the name exists wherever the binding does.
+   environment, since the name exists wherever the binding does.  A compat name must be served and
+   not bound: bound at import, it could not warn.  It must be the object its origin binds, served
+   with the warning, and what replaces it must be a public name.  ``_deprecated_paths.py`` must be
+   what the inventory renders.
 4. **A name defined in a public ``couchbase/common/`` module that the inventory does not list**, by
    class, function or assignment at the top level, without an underscore.  So a ``common/`` module
    holds listed names and underscored names and nothing between, and a new public name enters
@@ -69,7 +80,7 @@ Run directly, or via the ``check-public-api`` pre-commit hook::
 
     python tools/check_public_api.py
 
-After editing a shim's inventory entry, render the shims again::
+After editing a shim's inventory entry, or any compat entry, render the shims and the table again::
 
     python tools/check_public_api.py --write
 
@@ -87,6 +98,7 @@ import pathlib
 import subprocess
 import sys
 import textwrap
+import warnings
 from collections.abc import Iterable
 from typing import NamedTuple
 
@@ -100,15 +112,48 @@ BINDING = 'couchbase.protocol.classic._pycbc_core'
 EXCLUDED_DIRS = frozenset({'tests', '_generated'})
 EXAMPLES = 'examples'
 ALLOWED_OUTSIDE_COMMON = frozenset({'couchbase._version'})
+DEPRECATED_PATHS = 'couchbase/common/_deprecated_paths.py'
+SUPPORTABILITY = 'couchbase.common._supportability'
+
+
+class Compat(NamedTuple):
+    """What a deprecated path serves, and what replaces it.
+
+    ``origin`` is the module the path serves the name from.  ``use`` is the dotted path to import
+    instead, and ``reason`` says why nothing does when ``use`` is ``None``.
+    """
+    origin: str
+    use: str | None
+    reason: str | None = None
+
+    @property
+    def advice(self) -> str:
+        """What the warning tells a caller to do instead."""
+        if self.use is None:
+            return f'Nothing replaces it: {self.reason}.'
+        module, _, name = self.use.rpartition('.')
+        return f'Import {name} from {module} instead.'
 
 
 class Entry(NamedTuple):
     public: tuple[str, ...]
-    compat: tuple[str, ...]
+    compat: dict[str, Compat]
     docs: bool = False
 
     def tiers(self) -> dict[str, tuple[str, ...]]:
-        return {'public': self.public, 'compat': self.compat}
+        return {'public': self.public, 'compat': tuple(self.compat)}
+
+
+def _compat(where: str, name: str, raw: object) -> Compat:
+    """A compat entry: ``<module>``, which publishes the name, ``{from: <module>, use: <path>}``, or
+    ``{from: <module>, none: <reason>}``."""
+    if isinstance(raw, str):
+        return Compat(raw, f'{raw}.{name}')
+    if isinstance(raw, dict) and len(raw) == 2 and 'from' in raw and ('use' in raw or 'none' in raw):
+        if all(isinstance(v, str) and v.strip() for v in raw.values()):
+            return Compat(raw['from'], raw.get('use'), raw.get('none'))
+    raise ValueError(f'{where}.{name}: write <module>, or {{from: <module>, use: <path>}}, '
+                     'or {from: <module>, none: <reason>}')
 
 
 def module_name(path: str) -> str:
@@ -148,7 +193,12 @@ def read_inventory(path: pathlib.Path) -> dict[str, Entry]:
             raise ValueError(f'{path.name}: {module} has unknown keys {unknown}')
         if lists.get('docs', True) is not True:
             raise ValueError(f'{path.name}: {module} docs is {lists["docs"]!r}; write true, or leave it out')
-        entry = Entry(tuple(lists['public'] or ()), tuple(lists['compat'] or ()), 'docs' in lists)
+        compat = lists['compat'] or {}
+        if not isinstance(compat, dict):
+            raise ValueError(f'{path.name}: {module} compat is a mapping from each name to where it is served from')
+        entry = Entry(tuple(lists['public'] or ()),
+                      {name: _compat(f'{path.name}: {module}', name, raw) for name, raw in compat.items()},
+                      'docs' in lists)
         for tier, names in entry.tiers().items():
             if list(names) != sorted(set(names)):
                 raise ValueError(f'{path.name}: {module} {tier} is not sorted, or holds a name twice')
@@ -246,13 +296,48 @@ def module_problems(name: str, entry: Entry) -> list[str]:
         details = [f'{label} {names}' for label, names in (('not public', extra), ('missing', missing),
                                                            ('twice', twice)) if names]
         found.append(f'{name}: __all__ differs from the public list: {"; ".join(details)}')
-    found += [f'{name}.{n}: listed as {tier} and not bound' for tier, names in entry.tiers().items()
-              for n in names if not binds(module, n)]
+    found += [f'{name}.{n}: listed as public and not bound' for n in entry.public if not binds(module, n)]
+    return found + compat_problems(name, module, entry)
+
+
+def compat_problems(name: str, module: object, entry: Entry) -> list[str]:
+    """Each compat name is served on access, with a warning, as the object its origin binds."""
+    found = []
+    for n, compat in entry.compat.items():
+        where = f'{name}.{n}'
+        if n in vars(module):
+            found.append(f'{where}: bound at import, so importing it cannot warn; leave it to {DEPRECATED_PATHS}')
+            continue
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter('always')
+            served = getattr(module, n, None)
+        if served is None:
+            found.append(f'{where}: listed as compat and not served; the module needs the __getattr__ '
+                         f'{DEPRECATED_PATHS} gives it')
+        elif served is not getattr(importlib.import_module(compat.origin), n, None):
+            found.append(f'{where}: is not the object {compat.origin}.{n} is')
+        elif not any(str(w.message).startswith(f'Importing {n} from {name} is deprecated') for w in caught):
+            found.append(f'{where}: served without the deprecation warning')
+    return found
+
+
+def replacement_problems(inventory: dict[str, Entry]) -> list[str]:
+    """What replaces each compat name is a public name, and an entry is short wherever it can be."""
+    found = []
+    for module, entry in sorted(inventory.items()):
+        for n, compat in entry.compat.items():
+            if compat.origin == module:
+                found.append(f'{module}.{n}: served from its own module, which cannot then warn')
+            if compat.use is None:
+                continue
+            target, _, short = compat.use.rpartition('.')
+            if target not in inventory or short not in inventory[target].public:
+                found.append(f'{module}.{n}: use {compat.use}, which is not a public name')
     return found
 
 
 def common_problems(name: str, source: str, entry: Entry | None) -> list[str]:
-    listed = set(entry.public + entry.compat) if entry else set()
+    listed = {*entry.public, *entry.compat} if entry else set()
     return [f'{name}.{n}: defined in common/ and not in the inventory; list it as public, or underscore it'
             for n in sorted(defined_names(source) - listed)]
 
@@ -445,7 +530,7 @@ def _origins(tree: Tree, counterparts: dict[str, dict[str, str]], api: str, modu
 
     plain: dict[str, list[str]] = {}
     guarded: dict[str, dict[str, list[str]]] = {}
-    for name in sorted(entry.public + entry.compat):
+    for name in sorted(entry.public):
         guard = found[name].guard if name in found else None
         (guarded.setdefault(guard, {}) if guard else plain).setdefault(origin(name), []).append(name)
     for guard in guarded:
@@ -490,13 +575,49 @@ def render_shim(tree: Tree, counterparts: dict[str, dict[str, str]], api: str, m
     else:
         published = '__all__: list[str] = []'
     out = [LICENSE, _docstring(api, module, entry, facades), '', published]
-    body = _imports(plain, used=frozenset(guarded))
+    used = set(guarded)
+    if entry.compat:
+        out += ['', 'from typing import TYPE_CHECKING']
+        plain.setdefault(SUPPORTABILITY, []).append('Supportability')
+        used.add('Supportability')
+    body = _imports(plain, used=frozenset(used))
     if body:
         out += ['', *body]
     for guard, lines in sorted(guarded.items()):
         added = sorted(n for o in lines.values() for n in o if n in entry.public)
         out += ['', f'if {guard}:', f'    __all__ += {added!r}', *_imports(lines, '    ')]
+    if entry.compat:
+        out += ['', 'if not TYPE_CHECKING:', '    __getattr__ = Supportability.deprecated_paths(__name__)']
     return '\n'.join(out) + '\n'
+
+
+def render_deprecated_paths(inventory: dict[str, Entry]) -> str:
+    """The table ``Supportability.deprecated_paths`` serves each module's compat names from."""
+    out = [LICENSE,
+           '"""Each deprecated import path: the module it serves the name from, and what to do instead.',
+           '',
+           'Rendered from the compat entries in ``tools/public_api.yaml`` by',
+           '``python tools/check_public_api.py --write``; do not edit.',
+           '"""',
+           '',
+           'PATHS: dict[str, dict[str, tuple[str, str]]] = {']
+    for module, entry in sorted(inventory.items()):
+        if not entry.compat:
+            continue
+        out.append(f'    {module!r}: {{')
+        for name, compat in entry.compat.items():
+            line = f'        {name!r}: ({compat.origin!r}, {compat.advice!r}),'
+            out += [line] if len(line) <= 120 else [f'        {name!r}: (', f'            {compat.origin!r},',
+                                                    f'            {compat.advice!r},', '        ),']
+        out.append('    },')
+    return '\n'.join([*out, '}']) + '\n'
+
+
+def deprecated_paths_problems(root: pathlib.Path, inventory: dict[str, Entry]) -> list[str]:
+    path = root / DEPRECATED_PATHS
+    if path.is_file() and path.read_text() == render_deprecated_paths(inventory):
+        return []
+    return [f'{DEPRECATED_PATHS}: is not what the inventory renders; run with --write']
 
 
 def coverage_problems(inventory: dict[str, Entry], counterparts: dict[str, dict[str, str]]) -> list[str]:
@@ -670,7 +791,9 @@ def main(argv: list[str]) -> int:
     counterparts = read_counterparts(INVENTORY)
     if '--write' in argv:
         print(f'Wrote {write_shims(root, inventory, counterparts)} shim(s).')
-    found = problems(root, inventory) + counterpart_problems(root, inventory, counterparts)
+        (root / DEPRECATED_PATHS).write_text(render_deprecated_paths(inventory))
+    found = deprecated_paths_problems(root, inventory) + replacement_problems(inventory)
+    found += problems(root, inventory) + counterpart_problems(root, inventory, counterparts)
     if not found:
         public = sum(len(e.public) for e in inventory.values())
         compat = sum(len(e.compat) for e in inventory.values())

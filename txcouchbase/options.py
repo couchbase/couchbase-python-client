@@ -100,6 +100,9 @@ __all__ = [
     'WanDevelopmentProfile',
 ]
 
+from typing import TYPE_CHECKING
+
+from couchbase.common._supportability import Supportability
 from couchbase.common.config_profiles import CONFIG_PROFILES  # noqa: F401
 from couchbase.common.config_profiles import ConfigProfile  # noqa: F401
 from couchbase.common.config_profiles import ConfigProfiles  # noqa: F401
@@ -178,6 +181,6 @@ from couchbase.common.options import UpsertOptions  # noqa: F401
 from couchbase.common.options import VectorSearchOptions  # noqa: F401
 from couchbase.common.options import ViewOptions  # noqa: F401
 from couchbase.common.options import WaitUntilReadyOptions  # noqa: F401
-from couchbase.protocol.classic._wire import forward_args  # noqa: F401
-from couchbase.protocol.classic._wire import get_valid_args  # noqa: F401
-from couchbase.protocol.classic._wire import get_valid_multi_args  # noqa: F401
+
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

@@ -1,18 +1,21 @@
 import pathlib
 import sys
 import types
+import warnings
 
 import pytest
 
 from tools.check_public_api import (BINDING,
                                     INVENTORY,
                                     Binding,
+                                    Compat,
                                     Entry,
                                     Tree,
                                     agreement_problems,
                                     bindings,
                                     binds,
                                     common_problems,
+                                    compat_problems,
                                     coverage_problems,
                                     defined_names,
                                     docs_problems,
@@ -26,7 +29,9 @@ from tools.check_public_api import (BINDING,
                                     module_problems,
                                     read_counterparts,
                                     read_inventory,
+                                    render_deprecated_paths,
                                     render_shim,
+                                    replacement_problems,
                                     runtime_imports,
                                     twin_problems)
 
@@ -60,18 +65,28 @@ def _write(tmp_path: pathlib.Path, text: str) -> pathlib.Path:
     return path
 
 
+def test_read_inventory_reads_each_compat_form(tmp_path: pathlib.Path) -> None:
+    path = _write(tmp_path, 'modules:\n  a.b:\n    public: []\n    compat:\n      X: a.c\n'
+                            '      Y: {from: a._d, use: a.c.Z}\n      Z: {from: a._d, none: internal}\n')
+    assert read_inventory(path)['a.b'].compat == {'X': Compat('a.c', 'a.c.X'), 'Y': Compat('a._d', 'a.c.Z'),
+                                                  'Z': Compat('a._d', None, 'internal')}
+
+
 def test_read_inventory(tmp_path: pathlib.Path) -> None:
     path = _write(tmp_path, 'modules:\n  a.b:\n    public:\n      - X\n      - Y\n    compat: []\n')
-    assert read_inventory(path) == {'a.b': Entry(('X', 'Y'), ())}
+    assert read_inventory(path) == {'a.b': Entry(('X', 'Y'), {})}
     path = _write(tmp_path, 'modules:\n  a.b:\n    docs: true\n    public:\n      - X\n    compat: []\n')
-    assert read_inventory(path) == {'a.b': Entry(('X',), (), docs=True)}
+    assert read_inventory(path) == {'a.b': Entry(('X',), {}, docs=True)}
 
 
 @pytest.mark.parametrize('lists, message', [
     ('public:\n      - Y\n      - X\n    compat: []', 'not sorted'),
     ('public:\n      - X\n      - X\n    compat: []', 'not sorted'),
     ('public:\n      - _X\n    compat: []', 'underscored'),
-    ('public:\n      - X\n    compat:\n      - X', 'both public and compat'),
+    ('public:\n      - X\n    compat:\n      X: a.c', 'both public and compat'),
+    ('public: []\n    compat:\n      - X', 'compat is a mapping'),
+    ('public: []\n    compat:\n      X: {from: a.c}', r'a.b.X: write <module>'),
+    ('public: []\n    compat:\n      X: {from: a.c, use: a.d.X, none: gone}', r'a.b.X: write <module>'),
     ('doc: true\n    public: []\n    compat: []', r"unknown keys \['doc'\]"),
     ('docs: false\n    public: []\n    compat: []', 'docs is False; write true, or leave it out'),
     ('docs: 1\n    public: []\n    compat: []', 'docs is 1'),
@@ -134,39 +149,95 @@ def test_a_name_served_from_an_absent_binding_counts_as_bound() -> None:
         binds(_module(__getattr__=broken), 'get_metadata')
 
 
+ORIGIN = '_public_api_origin'
+KEPT = {'Kept': Compat(ORIGIN, f'{ORIGIN}.Kept')}
+
+
+def _serving(module: types.ModuleType, served: object, warn: bool = True) -> None:
+    def __getattr__(name: str) -> object:
+        if name != 'Kept':
+            raise AttributeError(name)
+        if warn:
+            warnings.warn(f'Importing Kept from {module.__name__} is deprecated', UserWarning)
+        return served
+    module.__getattr__ = __getattr__  # type: ignore[attr-defined]
+
+
 @pytest.fixture
 def fake(monkeypatch: pytest.MonkeyPatch) -> types.ModuleType:
-    module = _module(Public=1, Kept=2, Used=3)
+    module = _module(Public=1, Used=3)
+    origin = types.ModuleType(ORIGIN)
+    origin.Kept = object()  # type: ignore[attr-defined]
+    _serving(module, origin.Kept)  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, module.__name__, module)
+    monkeypatch.setitem(sys.modules, ORIGIN, origin)
     return module
 
 
 def test_a_module_that_agrees_has_no_problems(fake: types.ModuleType) -> None:
     fake.__all__ = ['Public']  # type: ignore[attr-defined]
-    assert module_problems(fake.__name__, Entry(('Public',), ('Kept',))) == []
+    assert module_problems(fake.__name__, Entry(('Public',), KEPT)) == []
+
+
+def test_a_compat_name_bound_at_import_cannot_warn(fake: types.ModuleType) -> None:
+    fake.Kept = sys.modules[ORIGIN].Kept  # type: ignore[attr-defined]
+    [problem] = compat_problems(fake.__name__, fake, Entry((), KEPT))
+    assert problem.startswith(f'{fake.__name__}.Kept: bound at import, so importing it cannot warn')
+
+
+def test_a_compat_name_served_as_another_object_fails(fake: types.ModuleType) -> None:
+    _serving(fake, object())
+    assert compat_problems(fake.__name__, fake, Entry((), KEPT)) == [
+        f'{fake.__name__}.Kept: is not the object {ORIGIN}.Kept is']
+
+
+def test_a_compat_name_served_without_a_warning_fails(fake: types.ModuleType) -> None:
+    _serving(fake, sys.modules[ORIGIN].Kept, warn=False)  # type: ignore[attr-defined]
+    assert compat_problems(fake.__name__, fake, Entry((), KEPT)) == [
+        f'{fake.__name__}.Kept: served without the deprecation warning']
+
+
+def test_replacement_problems_name_a_replacement_that_is_not_public_and_a_path_serving_itself() -> None:
+    inventory = {'a.b': Entry(('X',), {}),
+                 'a.c': Entry((), {'X': Compat('a.b', 'a.b.X'), 'Y': Compat('a._d', 'a.b.Y'),
+                                   'Z': Compat('a.c', None, 'gone')})}
+    assert replacement_problems(inventory) == ['a.c.Y: use a.b.Y, which is not a public name',
+                                               'a.c.Z: served from its own module, which cannot then warn']
+
+
+def test_render_deprecated_paths_gives_each_name_its_origin_and_advice() -> None:
+    inventory = {'a.b': Entry((), {'X': Compat('a.c', 'a.c.X'), 'Y': Compat('a._d', None, 'internal')}),
+                 'a.c': Entry(('X',), {})}
+    text = render_deprecated_paths(inventory)
+    assert ("    'a.b': {\n"
+            "        'X': ('a.c', 'Import X from a.c instead.'),\n"
+            "        'Y': ('a._d', 'Nothing replaces it: internal.'),\n"
+            "    },\n}\n") in text
+    assert "'a.c': {" not in text
 
 
 def test_a_module_without_all_fails(fake: types.ModuleType) -> None:
-    assert module_problems(fake.__name__, Entry(('Public',), ())) == [
+    assert module_problems(fake.__name__, Entry(('Public',), {})) == [
         f'{fake.__name__}: has no __all__; write it from the public list']
 
 
 def test_an_all_that_differs_names_each_difference(fake: types.ModuleType) -> None:
     fake.__all__ = ['Kept', 'Used', 'Used']  # type: ignore[attr-defined]
-    [problem] = module_problems(fake.__name__, Entry(('Public', 'Used'), ('Kept',)))
+    [problem] = module_problems(fake.__name__, Entry(('Public', 'Used'), KEPT))
     assert problem.endswith("not public ['Kept']; missing ['Public']; twice ['Used']")
 
 
 def test_a_listed_name_the_module_does_not_bind_fails(fake: types.ModuleType) -> None:
     fake.__all__ = ['Public', 'Gone']  # type: ignore[attr-defined]
-    assert module_problems(fake.__name__, Entry(('Gone', 'Public'), ('Lost',))) == [
+    assert module_problems(fake.__name__, Entry(('Gone', 'Public'), {'Lost': Compat(ORIGIN, None, 'x')})) == [
         f'{fake.__name__}.Gone: listed as public and not bound',
-        f'{fake.__name__}.Lost: listed as compat and not bound']
+        f'{fake.__name__}.Lost: listed as compat and not served; the module needs the __getattr__ '
+        'couchbase/common/_deprecated_paths.py gives it']
 
 
 def test_a_common_name_the_inventory_does_not_list_fails() -> None:
     source = 'class Listed: ...\nclass Kept: ...\nclass Leaked: ...\nclass _Private: ...\n'
-    assert common_problems('m', source, Entry(('Listed',), ('Kept',))) == [
+    assert common_problems('m', source, Entry(('Listed',), KEPT)) == [
         'm.Leaked: defined in common/ and not in the inventory; list it as public, or underscore it']
     assert len(common_problems('m', source, None)) == 3
 
@@ -254,7 +325,7 @@ def test_defined_in_follows_re_exports_and_shared_means_defined_in_common(tmp_pa
     assert tree.defined_in('couchbase.facade', 'Shared') == 'couchbase.common.thing'
     assert tree.defined_in('couchbase.thing', 'SyncOnly') == 'couchbase.thing'
     assert tree.defined_in('couchbase.thing', 'Missing') is None
-    entry = Entry(('Facade', 'Shared', 'SyncOnly', 'Wrapper'), ())
+    entry = Entry(('Facade', 'Shared', 'SyncOnly', 'Wrapper'), {})
     assert tree.shared('couchbase.thing', entry) == ('Shared', 'Wrapper')
 
 
@@ -265,23 +336,26 @@ def test_render_shim_takes_shared_names_from_common_and_the_rest_from_the_apis_o
     counterparts = {'couchbase.thing': {'acouchbase': 'shim', 'txcouchbase': 'none: no'},
                     'couchbase.facade': {'acouchbase': 'own', 'txcouchbase': 'none: no'}}
     text = render_shim(tree, counterparts, 'acouchbase', 'couchbase.thing',
-                       Entry(('Facade', 'Shared', long, 'Wrapper'), ('SyncOnly',)))
+                       Entry(('Facade', 'Shared', long, 'Wrapper'), {'SyncOnly': Compat('couchbase.thing', None, 'x')}))
     body = text.split('"""', 2)[2]
     assert "__all__ = [\n    'Facade',\n    'Shared',\n    '" + long + "',\n]" in body
     assert 'from acouchbase.facade import Facade  # noqa: F401\n' in body
     assert 'from couchbase.common.otel import _HAS_OTEL\n' in body
     assert 'from couchbase.common.thing import Shared  # noqa: F401\n' in body
-    assert 'from couchbase.thing import SyncOnly  # noqa: F401\n' in body
+    assert 'SyncOnly' not in body
+    assert 'from typing import TYPE_CHECKING\n\nfrom acouchbase.facade' in body
+    assert 'from couchbase.common._supportability import Supportability\n' in body
     assert f'from couchbase.common.thing import (  # nopep8 # isort:skip # noqa: F401\n    {long},\n)' in body
     assert body.endswith("if _HAS_OTEL:\n    __all__ += ['Wrapper']\n"
-                         '    from couchbase.common.otel import Wrapper  # noqa: F401\n')
+                         '    from couchbase.common.otel import Wrapper  # noqa: F401\n'
+                         '\nif not TYPE_CHECKING:\n    __getattr__ = Supportability.deprecated_paths(__name__)\n')
     assert "the rest are asyncio's own, from `acouchbase.facade`" in ' '.join(text.split())
 
 
 def test_render_shim_refuses_a_name_the_couchbase_module_does_not_bind(tmp_path: pathlib.Path) -> None:
     tree = _tree(tmp_path, TREE)
     with pytest.raises(ValueError, match='acouchbase.thing.Gone: couchbase.thing does not bind it'):
-        render_shim(tree, {}, 'acouchbase', 'couchbase.thing', Entry(('Gone',), ()))
+        render_shim(tree, {}, 'acouchbase', 'couchbase.thing', Entry(('Gone',), {}))
 
 
 @pytest.mark.parametrize('apis, message', [
@@ -296,7 +370,7 @@ def test_read_counterparts_refuses_a_malformed_entry(tmp_path: pathlib.Path, api
 
 
 def test_coverage_problems_name_every_module_the_section_does_not_account_for() -> None:
-    empty = Entry((), ())
+    empty = Entry((), {})
     inventory = {m: empty for m in ('couchbase.a', 'couchbase.b', 'couchbase.common.c', 'acouchbase.a',
                                     'acouchbase.stray', 'txcouchbase.b')}
     counterparts = {'couchbase.a': {'acouchbase': 'own', 'txcouchbase': 'shim'},
@@ -324,25 +398,25 @@ def test_agreement_problems_require_every_shared_name_as_the_same_object(monkeyp
     vars(theirs).update(Shared=copy)
     for module in (ours, theirs):
         monkeypatch.setitem(sys.modules, module.__name__, module)
-    assert agreement_problems(ours.__name__, theirs.__name__, ['Shared', 'Other'], Entry(('Shared',), ())) == [
+    assert agreement_problems(ours.__name__, theirs.__name__, ['Shared', 'Other'], Entry(('Shared',), {})) == [
         "_public_api_theirs: does not publish what it shares with _public_api_ours: ['Other']",
         '_public_api_theirs.Shared: is not the object _public_api_ours.Shared is']
     theirs.Shared = shared  # type: ignore[attr-defined]
-    assert agreement_problems(ours.__name__, theirs.__name__, ['Shared'], Entry(('Shared',), ())) == []
+    assert agreement_problems(ours.__name__, theirs.__name__, ['Shared'], Entry(('Shared',), {})) == []
 
 
 def test_twin_problems_name_a_common_twins_public_name_bound_and_not_listed(tmp_path: pathlib.Path) -> None:
     tree = _tree(tmp_path, TREE)
-    inventory = {'couchbase.common.thing': Entry(('Shared', 'Unbound'), ()),
-                 'couchbase.thing': Entry(('SyncOnly',), ())}
+    inventory = {'couchbase.common.thing': Entry(('Shared', 'Unbound'), {}),
+                 'couchbase.thing': Entry(('SyncOnly',), {})}
     assert twin_problems(tree, inventory) == [
         "couchbase.thing: binds ['Shared'], public on couchbase.common.thing, and does not list them"]
-    inventory['couchbase.thing'] = Entry(('SyncOnly',), ('Shared',))
+    inventory['couchbase.thing'] = Entry(('SyncOnly',), {'Shared': Compat('couchbase.common.thing', None, 'x')})
     assert twin_problems(tree, inventory) == []
 
 
 def test_docs_problems_name_a_flag_where_no_page_belongs() -> None:
-    page, plain = Entry(('X',), (), docs=True), Entry(('X',), ())
+    page, plain = Entry(('X',), {}, docs=True), Entry(('X',), {})
     inventory = {'couchbase.a': page, 'acouchbase.a': page, 'txcouchbase.a': page,
                  'couchbase.b': page, 'acouchbase.b': plain,
                  'couchbase.c': plain, 'txcouchbase.c': page,
@@ -368,8 +442,8 @@ def test_docs_problems_name_a_flag_where_no_page_belongs() -> None:
 
 def test_documented_follows_each_flagged_name_to_its_definition(tmp_path: pathlib.Path) -> None:
     tree = _tree(tmp_path, TREE)
-    inventory = {'couchbase.thing': Entry(('Shared', 'SyncOnly', 'Served'), ('Kept',), docs=True),
-                 'couchbase.facade': Entry(('Facade', 'Shared'), ())}
+    inventory = {'couchbase.thing': Entry(('Shared', 'SyncOnly', 'Served'), KEPT, docs=True),
+                 'couchbase.facade': Entry(('Facade', 'Shared'), {})}
     assert documented(tree, inventory) == {('couchbase.common.thing', 'Shared'),
                                            ('couchbase.thing', 'SyncOnly'), ('couchbase.thing', 'Served')}
 
@@ -385,13 +459,14 @@ def test_example_api(path: str, expected: str) -> None:
 
 
 EXAMPLE_INVENTORY = {
-    'couchbase.options': Entry(('GetOptions',), ()),
-    'couchbase.collection': Entry(('Collection',), ('GetOptions',)),
-    'couchbase.subdocument': Entry(('upsert',), ()),
-    'couchbase.otel_tracer': Entry(('OtelTracer',), ()),
-    'acouchbase': Entry((), ()),
-    'acouchbase.options': Entry(('GetOptions',), ()),
-    'acouchbase.subdocument': Entry(('upsert',), ()),
+    'couchbase.options': Entry(('GetOptions',), {}),
+    'couchbase.collection': Entry(('Collection',),
+                                  {'GetOptions': Compat('couchbase.options', 'couchbase.options.GetOptions')}),
+    'couchbase.subdocument': Entry(('upsert',), {}),
+    'couchbase.otel_tracer': Entry(('OtelTracer',), {}),
+    'acouchbase': Entry((), {}),
+    'acouchbase.options': Entry(('GetOptions',), {}),
+    'acouchbase.subdocument': Entry(('upsert',), {}),
 }
 
 

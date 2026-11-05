@@ -108,18 +108,6 @@ class _ScanCanceller(Protocol):
     def cancel_scan(self) -> None: ...
 
 
-class HttpResult:
-    """An HTTP response.
-
-    .. deprecated:: 4.7.0
-        Nothing in the SDK returns one.
-    """
-
-    def __init__(self, orig: object) -> None:
-        Supportability.type_deprecated('HttpResult', message='Nothing in the SDK returns one.')
-        self._orig = orig
-
-
 class _ScanResultIterable:
     def __init__(self, rows: object, executor: _ScanCanceller) -> None:
         self._request = rows
@@ -325,3 +313,7 @@ class ViewResult(_ViewResult):
 
     def __iter__(self) -> RowIterator[ViewRow, ViewMetaData]:
         return self._request.__iter__()
+
+
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

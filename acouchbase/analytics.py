@@ -28,10 +28,15 @@ __all__ = [
     'AnalyticsWarning',
 ]
 
+from typing import TYPE_CHECKING
+
+from couchbase.common._supportability import Supportability
 from couchbase.common.analytics import AnalyticsError  # noqa: F401
 from couchbase.common.analytics import AnalyticsMetaData  # noqa: F401
 from couchbase.common.analytics import AnalyticsMetrics  # noqa: F401
 from couchbase.common.analytics import AnalyticsScanConsistency  # noqa: F401
 from couchbase.common.analytics import AnalyticsStatus  # noqa: F401
 from couchbase.common.analytics import AnalyticsWarning  # noqa: F401
-from couchbase.protocol.classic._analytics import AnalyticsQuery  # noqa: F401
+
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

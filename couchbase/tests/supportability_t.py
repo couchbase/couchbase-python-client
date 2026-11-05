@@ -33,9 +33,11 @@ from couchbase import subdocument
 from couchbase.collection import Collection
 from couchbase.common._capabilities import Capability
 from couchbase.common._cluster_settings import build_tracing_and_orphan_options
+from couchbase.common._deprecated_paths import PATHS
 from couchbase.common._option_args import resolve_deprecated
 from couchbase.common._option_spec import BLOCKS
 from couchbase.common._supportability import DURABILITY_LEVEL_READ, Supportability
+from couchbase.common._tracing import CouchbaseTracer
 from couchbase.common.warnings import CouchbaseDeprecationWarning
 from couchbase.diagnostics import EndpointDiagnosticsReport
 from couchbase.exceptions import CouchbaseException, FeatureUnavailableException
@@ -52,7 +54,6 @@ from couchbase.result import (CounterResult,
                               ValueResult)
 from couchbase.scope import Scope
 from couchbase.search import TermRangeQuery
-from couchbase.tracing import CouchbaseTracer
 from couchbase.transcoder import JSONTranscoder
 from tests.test_features import TestProtocol
 
@@ -210,25 +211,38 @@ class SupportabilityUnitTests:
         proc = subprocess.run([sys.executable, '-c', statement], env=env, capture_output=True, text=True, timeout=120)
         assert proc.returncode == 0, proc.stderr
 
-    def test_scope_from_collection_warns_on_construction(self) -> None:
-        from couchbase.collection import Scope as DeprecatedScope
-        bucket: Any = SimpleNamespace(_impl=SimpleNamespace(scope=lambda name: SimpleNamespace(name=name)))
+    @pytest.mark.parametrize('module, name', [(m, n) for m, names in PATHS.items() for n in names])
+    def test_a_deprecated_path_warns_where_it_is_imported(self, module: str, name: str) -> None:
+        imported = importlib.import_module(module)
+        origin, advice = PATHS[module][name]
 
         with warnings.catch_warnings(record=True) as recorded:
             warnings.simplefilter('always')
             line = next_line()
-            scope = DeprecatedScope(bucket, 'test-scope')
+            served = getattr(imported, name)
 
         warned = deprecations(recorded)
         assert [str(w.message) for w in warned] == [
-            'Importing Scope from couchbase.collection is deprecated and will be removed in a future release. '
-            ' Import Scope from couchbase.scope instead.']
+            f'Importing {name} from {module} is deprecated and will be removed in a future release. {advice}']
         assert warned[0].lineno == line
-        assert isinstance(scope, Scope)
-        assert scope.name == 'test-scope'
+        assert served is getattr(importlib.import_module(origin), name)
+
+    def test_a_deprecated_path_warns_on_every_import(self) -> None:
+        with warnings.catch_warnings(record=True) as recorded:
+            warnings.simplefilter('always')
+            from couchbase.collection import Scope as Again
+            from couchbase.collection import Scope as DeprecatedScope
+
+        assert len(deprecations(recorded)) == 2
+        assert DeprecatedScope is Again is Scope
+
+    def test_a_name_the_module_does_not_serve_is_an_attribute_error(self) -> None:
+        import couchbase.cluster
+        with pytest.raises(AttributeError, match="module 'couchbase.cluster' has no attribute 'Nope'"):
+            getattr(couchbase.cluster, 'Nope')
 
     def test_http_result_warns_on_construction(self) -> None:
-        from couchbase.result import HttpResult
+        from couchbase._legacy import HttpResult
         orig = object()
 
         with warnings.catch_warnings(record=True) as recorded:

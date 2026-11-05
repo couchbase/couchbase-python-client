@@ -15,10 +15,14 @@
 
 """The `couchbase.metrics` import path, which publishes nothing.
 
-The deprecated classes it binds are declared in `couchbase.common._metrics`.
+It serves the deprecated classes declared in `couchbase.common._metrics`, warning on each import.
 """
 
 __all__: list[str] = []
 
-from couchbase.common._metrics import CouchbaseMeter  # noqa: F401
-from couchbase.common._metrics import CouchbaseValueRecorder  # noqa: F401
+from typing import TYPE_CHECKING
+
+from couchbase.common._supportability import Supportability
+
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

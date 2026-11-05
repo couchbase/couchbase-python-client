@@ -163,7 +163,6 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from couchbase.common._observability import TracerProtocol
     from couchbase.common._utils import JSONType, ScopeKeyspace
     from couchbase.common.analytics import AnalyticsScanConsistency
     from couchbase.common.auth import Authenticator
@@ -173,7 +172,7 @@ if TYPE_CHECKING:
     from couchbase.common.mutation_state import MutationState
     from couchbase.common.n1ql import QueryProfile, QueryScanConsistency
     from couchbase.common.observability.metrics import Meter
-    from couchbase.common.observability.tracing import RequestSpan
+    from couchbase.common.observability.tracing import RequestSpan, RequestTracer
     from couchbase.common.option_enums import (Compression,
                                                IpProtocol,
                                                LockMode,
@@ -222,10 +221,6 @@ class AnalyticsOptionsKwargs(TypedDict, total=False):
 class AnalyticsOptions(dict):
     """Available options for an analytics query.
 
-    .. warning::
-        Importing options from ``couchbase.analytics`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         client_context_id (str, optional): The returned client context id for this query. Defaults to a generated UUID.
         raw (dict[str, JSONType], optional): Specifies any additional parameters which should be passed to the query
@@ -273,10 +268,6 @@ class AppendOptionsKwargs(TypedDict, total=False):
 class AppendOptions(dict):
     """Available options for a binary append operation.
 
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
             :class:`~couchbase.options.ClusterTimeoutOptions`.
@@ -306,10 +297,6 @@ class DecrementOptionsKwargs(TypedDict, total=False):
 
 class DecrementOptions(dict):
     """Available options for a key-value decrement operation.
-
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         delta (:class:`~couchbase.options.DeltaValue`, optional): The amount to decrement the key. Defaults to 1.
@@ -349,10 +336,6 @@ class IncrementOptionsKwargs(TypedDict, total=False):
 class IncrementOptions(dict):
     """Available options for a binary increment operation.
 
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         delta (:class:`~couchbase.options.DeltaValue`, optional): The amount to increment the key. Defaults to 1.
         initial (:class:`~couchbase.options.SignedInt64`, optional): The initial value to use for the document if it
@@ -389,10 +372,6 @@ class PrependOptionsKwargs(TypedDict, total=False):
 class PrependOptions(dict):
     """Available options for a binary prepend operation.
 
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
             :class:`~couchbase.options.ClusterTimeoutOptions`.
@@ -427,9 +406,6 @@ class AppendMultiOptionsKwargs(TypedDict, total=False):
 
 class AppendMultiOptions(dict):
     """Available options for a binary multi-append operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Options can be set at a global level (i.e. for all append operations handled with this multi-append operation). Use
     *per_key_options* to set specific :class:`~couchbase.options.AppendOptions` for specific keys.
@@ -480,9 +456,6 @@ class DecrementMultiOptionsKwargs(TypedDict, total=False):
 
 class DecrementMultiOptions(dict):
     """Available options for a binary multi-decrement operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Options can be set at a global level (i.e. for all decrement operations handled with this multi-decrement
     operation). Use *per_key_options* to set specific :class:`~couchbase.options.DecrementOptions` for specific keys.
@@ -537,9 +510,6 @@ class IncrementMultiOptionsKwargs(TypedDict, total=False):
 class IncrementMultiOptions(dict):
     """Available options for a binary multi-increment operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Options can be set at a global level (i.e. for all increment operations handled with this multi-increment
     operation). Use *per_key_options* to set specific :class:`~couchbase.options.IncrementOptions` for specific keys.
 
@@ -592,9 +562,6 @@ class PrependMultiOptionsKwargs(TypedDict, total=False):
 class PrependMultiOptions(dict):
     """Available options for a binary multi-prepend operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Options can be set at a global level (i.e. for all prepend operations handled with this multi-prepend operation).
     Use *per_key_options* to set specific :class:`~couchbase.options.PrependOptions` for specific keys.
 
@@ -644,9 +611,6 @@ class ClusterMetricsOptionsKwargs(TypedDict, total=False):
 
 class ClusterMetricsOptions(dict):
     """Available metrics options to set when creating a cluster.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Args:
         enable_metrics (bool, optional): Set to False to disable default logging meter (enables no-op meter). Defaults
@@ -714,7 +678,7 @@ class ClusterOptionsKwargs(TypedDict, total=False):
     compression_min_size: int | None
     compression_min_ratio: float | None
     lockmode: LockMode | None
-    tracer: TracerProtocol | None
+    tracer: RequestTracer | None
     meter: Meter | None
     dns_nameserver: str | None
     dns_port: int | None
@@ -763,10 +727,6 @@ class ClusterKwargs(ClusterOptionsKwargs, total=False):
 
 class ClusterOptions(dict):
     """Available options to set when creating a cluster.
-
-    .. warning::
-        Importing options from ``couchbase.cluster`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Cluster options enable the configuration of various global cluster settings. Some options can be set globally for
     the cluster, but overridden for specific operations (i.e. ClusterTimeoutOptions)
@@ -837,7 +797,7 @@ class ClusterOptions(dict):
 
             .. deprecated:: 4.1.7
                 It has no effect.
-        tracer (:class:`~couchbase.common._observability.TracerProtocol`, optional): Set an external tracer. Defaults to
+        tracer (:class:`~couchbase.observability.tracing.RequestTracer`, optional): Set an external tracer. Defaults to
             None, enabling the `threshold_logging_tracer`. Note when this is set, all tracing_options (see
             :class:`~couchbase.options.ClusterTracingOptions`) and then `enable_tracing` option are ignored.
         meter (:class:`~couchbase.observability.metrics.Meter`, optional): Set an external meter. Defaults to None,
@@ -939,9 +899,6 @@ class ClusterOrphanReportingOptionsKwargs(TypedDict, total=False):
 class ClusterOrphanReportingOptions(dict):
     """Available orphan reporting options to set when creating a cluster.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Args:
         enable_orphan_reporting (bool, optional): Set to False to disable orphaned response reporting. Defaults to True
             (enabled).
@@ -994,10 +951,6 @@ class ClusterTimeoutOptionsKwargs(TypedDict, total=False):
 
 class ClusterTimeoutOptions(dict):
     """Available timeout options to set when creating a cluster.
-
-    .. warning::
-        Importing options from ``couchbase.cluster`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     These will set the default timeouts for operations for the cluster. Some operations allow the timeout to be
     overridden on a per operation basis.
@@ -1060,10 +1013,6 @@ class ClusterTracingOptionsKwargs(TypedDict, total=False):
 class ClusterTracingOptions(dict):
     """Available tracing options to set when creating a cluster.
 
-    .. warning::
-        Importing options from ``couchbase.cluster`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         enable_tracing (bool, optional): Set to False to disable default threshold log tracing (enables no-op tracer).
             Defaults to True (enabled).
@@ -1125,10 +1074,6 @@ class DiagnosticsOptionsKwargs(TypedDict, total=False):
 class DiagnosticsOptions(dict):
     """Available options for a diagnostics operation.
 
-    .. warning::
-        Importing options from ``couchbase.cluster`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         report_id (str, optional): A unique identifier for the report generated by this operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -1153,10 +1098,6 @@ class PingOptionsKwargs(TypedDict, total=False):
 
 class PingOptions(dict):
     """Available options for a ping operation.
-
-    .. warning::
-        Importing options from ``couchbase.bucket`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -1195,9 +1136,6 @@ class WaitUntilReadyKwargs(TypedDict, total=False):
 class WaitUntilReadyOptions(dict):
     """Available options for a wait until ready operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Args:
         desired_state (:class:`~couchbase.diagnostics.ClusterState`, optional): The desired state to wait for in order
             to determine the cluster or bucket is ready. Defaults to `Online`.
@@ -1231,10 +1169,6 @@ class ExistsOptionsKwargs(TypedDict, total=False):
 class ExistsOptions(dict):
     """Available options for a key-value exists operation.
 
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
             :class:`~couchbase.options.ClusterTimeoutOptions`.
@@ -1258,10 +1192,6 @@ class GetAllReplicasOptionsKwargs(TypedDict, total=False):
 
 class GetAllReplicasOptions(dict):
     """Available options for a key-value get-all-replicas operation.
-
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -1290,10 +1220,6 @@ class GetAndLockOptionsKwargs(TypedDict, total=False):
 class GetAndLockOptions(dict):
     """Available options for a key-value get and lock operation.
 
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
             :class:`~couchbase.options.ClusterTimeoutOptions`.
@@ -1318,10 +1244,6 @@ class GetAndTouchOptionsKwargs(TypedDict, total=False):
 
 class GetAndTouchOptions(dict):
     """Available options for a key-value get and touch operation.
-
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -1348,10 +1270,6 @@ class GetAnyReplicaOptionsKwargs(TypedDict, total=False):
 
 class GetAnyReplicaOptions(dict):
     """Available options for a key-value get-any-replica operation.
-
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -1381,10 +1299,6 @@ class GetOptionsKwargs(TypedDict, total=False):
 
 class GetOptions(dict):
     """Available options for a key-value get operation.
-
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         project (Iterable[str], optional): Specifies a list of fields within the document which should be fetched. This
@@ -1427,10 +1341,6 @@ class InsertOptionsKwargs(TypedDict, total=False):
 class InsertOptions(dict):
     """Available options for a key-value insert operation.
 
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
             :class:`~couchbase.options.ClusterTimeoutOptions`.
@@ -1465,10 +1375,6 @@ class RemoveOptionsKwargs(TypedDict, total=False):
 class RemoveOptions(dict):
     """Available options for a key-value remove operation.
 
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
             :class:`~couchbase.options.ClusterTimeoutOptions`.
@@ -1499,10 +1405,6 @@ class ReplaceOptionsKwargs(TypedDict, total=False):
 
 class ReplaceOptions(dict):
     """Available options for a key-value replace operation.
-
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -1547,9 +1449,6 @@ class ScanOptionsKwargs(TypedDict, total=False):
 class ScanOptions(dict):
     """Available options for a key-value scan operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
             :class:`~couchbase.options.ClusterTimeoutOptions`.
@@ -1584,10 +1483,6 @@ class TouchOptionsKwargs(TypedDict, total=False):
 class TouchOptions(dict):
     """Available options for a key-value touch operation.
 
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
             :class:`~couchbase.options.ClusterTimeoutOptions`.
@@ -1609,10 +1504,6 @@ class UnlockOptionsKwargs(TypedDict, total=False):
 
 class UnlockOptions(dict):
     """Available options for a key-value unlock operation.
-
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -1639,10 +1530,6 @@ class UpsertOptionsKwargs(TypedDict, total=False):
 
 class UpsertOptions(dict):
     """Available options for a key-value upsert operation.
-
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -1684,9 +1571,6 @@ class ExistsMultiOptionsKwargs(TypedDict, total=False):
 
 class ExistsMultiOptions(dict):
     """Available options for a key-value multi-exists operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Options can be set at a global level (i.e. for all exists operations handled with this multi-exists operation). Use
     *per_key_options* to set specific :class:`~couchbase.options.ExistsOptions` for specific keys.
@@ -1730,9 +1614,6 @@ class GetAllReplicasMultiOptionsKwargs(TypedDict, total=False):
 
 class GetAllReplicasMultiOptions(dict):
     """Available options for a key-value multi-get-all-replicas operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Options can be set at a global level (i.e. for all get operations handled with this multi-get-all-replicas
     operation). Use *per_key_options* to set specific :class:`~couchbase.options.GetAllReplicasOptions` for specific
@@ -1783,9 +1664,6 @@ class GetAndLockMultiOptionsKwargs(TypedDict, total=False):
 class GetAndLockMultiOptions(dict):
     """Available options for a key-value multi-lock operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Options can be set at a global level (i.e. for all lock operations handled with this multi-lock operation). Use
     *per_key_options* to set specific :class:`~couchbase.options.GetAndLockOptions` for specific keys.
 
@@ -1832,9 +1710,6 @@ class GetAnyReplicaMultiOptionsKwargs(TypedDict, total=False):
 
 class GetAnyReplicaMultiOptions(dict):
     """Available options for a key-value multi-get-any-replica operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Options can be set at a global level (i.e. for all get operations handled with this multi-get-any-replica
     operation). Use *per_key_options* to set specific :class:`~couchbase.options.GetAnyReplicaOptions` for specific
@@ -1886,9 +1761,6 @@ class GetMultiOptionsKwargs(TypedDict, total=False):
 
 class GetMultiOptions(dict):
     """Available options for a key-value multi-get operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Options can be set at a global level (i.e. for all get operations handled with this multi-get operation). Use
     *per_key_options* to set specific :class:`~couchbase.options.GetOptions` for specific keys.
@@ -1955,9 +1827,6 @@ class InsertMultiOptionsKwargs(TypedDict, total=False):
 class InsertMultiOptions(dict):
     """Available options for a key-value multi-insert operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Options can be set at a global level (i.e. for all insert operations handled with this multi-insert operation). Use
     *per_key_options* to set specific :class:`~couchbase.options.InsertOptions` for specific keys.
 
@@ -2015,9 +1884,6 @@ class RemoveMultiOptionsKwargs(TypedDict, total=False):
 class RemoveMultiOptions(dict):
     """Available options for a key-value multi-remove operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Options can be set at a global level (i.e. for all remove operations handled with this multi-remove operation). Use
     *per_key_options* to set specific :class:`~couchbase.options.RemoveOptions` for specific keys.
 
@@ -2074,9 +1940,6 @@ class ReplaceMultiOptionsKwargs(TypedDict, total=False):
 
 class ReplaceMultiOptions(dict):
     """Available options for a key-value multi-replace operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Options can be set at a global level (i.e. for all replace operations handled with this multi-replace operation).
     Use *per_key_options* to set specific :class:`~couchbase.options.ReplaceOptions` for specific keys.
@@ -2138,9 +2001,6 @@ class TouchMultiOptionsKwargs(TypedDict, total=False):
 class TouchMultiOptions(dict):
     """Available options for a key-value multi-touch operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Options can be set at a global level (i.e. for all touch operations handled with this multi-touch operation). Use
     *per_key_options* to set specific :class:`~couchbase.options.TouchOptions` for specific keys.
 
@@ -2182,9 +2042,6 @@ class UnlockMultiOptionsKwargs(TypedDict, total=False):
 
 class UnlockMultiOptions(dict):
     """Available options for a key-value multi-unlock operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Options can be set at a global level (i.e. for all unlock operations handled with this multi-unlock operation). Use
     *per_key_options* to set specific :class:`~couchbase.options.UnlockOptions` for specific keys.
@@ -2230,9 +2087,6 @@ class UpsertMultiOptionsKwargs(TypedDict, total=False):
 
 class UpsertMultiOptions(dict):
     """Available options for a key-value multi-upsert operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Options can be set at a global level (i.e. for all upsert operations handled with this multi-upsert operation). Use
     *per_key_options* to set specific :class:`~couchbase.options.UpsertOptions` for specific keys.
@@ -2314,10 +2168,6 @@ class QueryOptionsKwargs(TypedDict, total=False):
 
 class QueryOptions(dict):
     """Available options for a N1QL (SQL++) query.
-
-    .. warning::
-        Importing options from ``couchbase.cluster`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         client_context_id (str, optional): The returned client context id for this query. Defaults to a generated UUID.
@@ -2406,10 +2256,6 @@ class SearchOptionsKwargs(TypedDict, total=False):
 class SearchOptions(dict):
     """Available options for a search (FTS) query.
 
-    .. warning::
-        Importing options from ``couchbase.search`` is deprecated.
-        All options should be imported from ``couchbase.options``.
-
     Args:
         client_context_id (str, optional): The returned client context id for this query. Defaults to a generated UUID.
         raw (dict[str, JSONType], optional): Specifies any additional parameters which should be passed to the query
@@ -2472,9 +2318,6 @@ class VectorSearchOptionsKwargs(TypedDict, total=False):
 class VectorSearchOptions(dict):
     """Available options for a FTS vector search.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Args:
         vector_query_combination (:class:`~couchbase.vector_search.VectorQueryCombination`, optional): Specifies logical
             operation to use with multiple vector queries.
@@ -2501,9 +2344,6 @@ class LookupInAllReplicasOptionsKwargs(TypedDict, total=False):
 
 class LookupInAllReplicasOptions(dict):
     """Available options for a subdocument lookup-in-all-replicas operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -2533,9 +2373,6 @@ class LookupInAnyReplicaOptionsKwargs(TypedDict, total=False):
 class LookupInAnyReplicaOptions(dict):
     """Available options for a subdocument lookup-in-any-replica operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
             :class:`~couchbase.options.ClusterTimeoutOptions`.
@@ -2563,10 +2400,6 @@ class LookupInOptionsKwargs(TypedDict, total=False):
 
 class LookupInOptions(dict):
     """Available options for a subdocument lookup-in operation.
-
-    .. warning::
-        Importing options from ``couchbase.collection`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -2599,10 +2432,6 @@ class MutateInOptionsKwargs(TypedDict, total=False):
 
 class MutateInOptions(dict):
     """Available options for a subdocument mutate-in operation.
-
-    .. warning::
-        Importing options from ``couchbase.subdocument`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
@@ -2656,9 +2485,6 @@ class TransactionConfigKwargs(TypedDict, total=False):
 class TransactionConfig(dict):
     """The configuration of the transactions a cluster runs.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Set it through ``transaction_config`` on :class:`~couchbase.options.ClusterOptions`.
     :class:`~couchbase.options.TransactionOptions` overrides some of it for a single transaction.
 
@@ -2701,9 +2527,6 @@ class TransactionGetMultiOptionsKwargs(TypedDict, total=False):
 class TransactionGetMultiOptions(dict):
     """Available options for transaction get_multi operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Args:
         mode (:class:`~couchbase.transactions.TransactionGetMultiMode`, optional): Specifies the mode to use for this
             specific operation. Defaults to `PrioritiseLatency`.
@@ -2722,9 +2545,6 @@ class TransactionGetMultiReplicasFromPreferredServerGroupOptionsKwargs(TypedDict
 
 class TransactionGetMultiReplicasFromPreferredServerGroupOptions(dict):
     """Available options for transaction get_multi_replicas_from_preferred_server_group operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Args:
         mode (:class:`~couchbase.transactions.TransactionGetMultiReplicasFromPreferredServerGroupMode`, optional):
@@ -2745,9 +2565,6 @@ class TransactionGetOptionsKwargs(TypedDict, total=False):
 class TransactionGetOptions(dict):
     """Available options for transaction get operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Args:
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
             this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
@@ -2767,9 +2584,6 @@ class TransactionGetReplicaFromPreferredServerGroupOptionsKwargs(TypedDict, tota
 class TransactionGetReplicaFromPreferredServerGroupOptions(dict):
     """Available options for transaction get_replica_from_preferred_server_group operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Args:
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
             this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
@@ -2788,9 +2602,6 @@ class TransactionInsertOptionsKwargs(TypedDict, total=False):
 
 class TransactionInsertOptions(dict):
     """Available options for transaction insert operation.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Args:
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
@@ -2815,9 +2626,6 @@ class TransactionOptionsKwargs(TypedDict, total=False):
 
 class TransactionOptions(dict):
     """Available options for a single transaction.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Each one set here overrides the cluster's :class:`~couchbase.options.TransactionConfig` for this transaction.
 
@@ -2867,9 +2675,6 @@ class TransactionQueryOptionsKwargs(TypedDict, total=False):
 
 class TransactionQueryOptions(dict):
     """Available options for a query run inside a transaction.
-
-    .. note::
-        All options should be imported from ``couchbase.options``.
 
     Args:
         client_context_id (str, optional): The returned client context id for this query. Defaults to a generated UUID.
@@ -2929,9 +2734,6 @@ class TransactionReplaceOptionsKwargs(TypedDict, total=False):
 class TransactionReplaceOptions(dict):
     """Available options for transaction replace operation.
 
-    .. note::
-        All options should be imported from ``couchbase.options``.
-
     Args:
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
             this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
@@ -2949,9 +2751,6 @@ class TransactionReplaceOptions(dict):
 
 class ConstrainedInt:
     """An integer a subclass checks against the range it states.
-
-    .. note::
-        Import it from ``couchbase.options``.
 
     Args:
         value (:class:`~couchbase.options.AcceptableInts`): The value to initialise this with.
@@ -3046,10 +2845,6 @@ class ConstrainedInt:
 class DeltaValue(ConstrainedInt):
     """An integer between 0 and 0x7FFFFFFFFFFFFFFF inclusive.
 
-    .. warning::
-        Importing this class from ``couchbase.collection`` is deprecated.
-        Import it from ``couchbase.options``.
-
     Used as an argument for :meth:`~couchbase.binary_collection.BinaryCollection.increment` and
     :meth:`~couchbase.binary_collection.BinaryCollection.decrement`.
 
@@ -3082,9 +2877,6 @@ class DeltaValue(ConstrainedInt):
 class SignedInt64(ConstrainedInt):
     """An integer between -0x8000000000000000 and 0x7FFFFFFFFFFFFFFF inclusive.
 
-    .. note::
-        Import it from ``couchbase.options``.
-
     Args:
         value (:class:`~couchbase.options.AcceptableInts`): The value to initialise this with.
     """
@@ -3114,9 +2906,6 @@ class SignedInt64(ConstrainedInt):
 @Supportability.class_deprecated("an int")
 class UnsignedInt32(ConstrainedInt):
     """An integer between 0x00000000 and 0x80000000 inclusive.
-
-    .. note::
-        Import it from ``couchbase.options``.
 
     .. deprecated:: 4.7.0
         Use an int instead.
@@ -3149,9 +2938,6 @@ class UnsignedInt32(ConstrainedInt):
 
 class UnsignedInt64(ConstrainedInt):
     """An integer between 0x0000000000000000 and 0x8000000000000000 inclusive.
-
-    .. note::
-        Import it from ``couchbase.options``.
 
     Args:
         value (:class:`~couchbase.options.AcceptableInts`): The value to initialise this with.
@@ -3215,10 +3001,6 @@ class ViewOptionsKwargs(TypedDict, total=False):
 
 class ViewOptions(dict):
     """Available options for a view query.
-
-    .. warning::
-        Importing options from ``couchbase.bucket`` is deprecated.
-        All options should be imported from ``couchbase.options``.
 
     Args:
         client_context_id (str, optional): The returned client context id for this query. Defaults to a generated UUID.

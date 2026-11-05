@@ -66,6 +66,7 @@ from typing import (TYPE_CHECKING,
                     Protocol,
                     cast)
 
+from couchbase.common._metrics import CouchbaseMeter, CouchbaseValueRecorder
 from couchbase.common._observability import OpAttributeName
 from couchbase.common._observability._clock import now_ns
 from couchbase.common._observability.no_op import (NoOpMeter,
@@ -77,13 +78,12 @@ from couchbase.common._observability.threshold_logging import (_IGNORED_MULTI_OP
                                                                ThresholdLoggingSpanSnapshot,
                                                                ThresholdLoggingTracer)
 from couchbase.common._operations import Op, ServiceType
-from couchbase.metrics import CouchbaseMeter, CouchbaseValueRecorder
+from couchbase.common._tracing import CouchbaseSpan, CouchbaseTracer
 from couchbase.observability.metrics import ValueRecorder
 from couchbase.observability.tracing import (RequestSpan,
                                              RequestTracer,
                                              SpanAttributeValue,
                                              SpanStatusCode)
-from couchbase.tracing import CouchbaseSpan, CouchbaseTracer
 from tests.observability_ops import span_name
 
 if TYPE_CHECKING:

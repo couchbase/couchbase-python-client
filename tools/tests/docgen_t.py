@@ -1,11 +1,12 @@
 import collections
-import dataclasses
+import json
 import pathlib
 import re
 
 import pytest
 
 from tools.check_public_api import (INVENTORY,
+                                    Compat,
                                     Entry,
                                     read_counterparts,
                                     read_inventory)
@@ -15,20 +16,22 @@ from tools.docgen.layout import (LAYOUT,
                                  Layout,
                                  LayoutError,
                                  Page,
-                                 Replacement,
                                  Section,
                                  default_slug,
                                  load,
                                  problems)
-from tools.docgen.render import DEPRECATED, Reference
+from tools.docgen.render import (DEPRECATED,
+                                 OLD_PATHS,
+                                 Reference)
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 SECTIONS = {key: Section(key, '') for key in ('common', 'couchbase', 'acouchbase', 'txcouchbase')}
 INVENTORY_ = {
-    'couchbase.cluster': Entry(('Cluster',), (), True),
-    'couchbase.options': Entry(('GetOptions', 'UpsertOptions'), ('forward_args',), True),
-    'acouchbase.cluster': Entry(('AsyncCluster',), (), True),
-    'txcouchbase.cluster': Entry(('TxCluster',), (), True),
+    'couchbase.cluster': Entry(('Cluster',), {}, True),
+    'couchbase.options': Entry(('GetOptions', 'UpsertOptions'),
+                               {'forward_args': Compat('couchbase.protocol.classic._wire', None, 'internal')}, True),
+    'acouchbase.cluster': Entry(('AsyncCluster',), {}, True),
+    'txcouchbase.cluster': Entry(('TxCluster',), {}, True),
 }
 COUNTERPARTS = {
     'couchbase.cluster': {'acouchbase': 'own', 'txcouchbase': 'own'},
@@ -36,11 +39,11 @@ COUNTERPARTS = {
 }
 
 
-def layout(common=None, apis=None, exclude=None, replacements=None) -> Layout:
+def layout(common=None, apis=None, exclude=None) -> Layout:
     return Layout('docs', 'reference', SECTIONS,
                   tuple(common if common is not None else [Page('Options', 'options', ('couchbase.options',))]),
                   tuple(apis if apis is not None else [Page('Cluster', 'cluster', ('couchbase.cluster',))]),
-                  exclude or {}, replacements or {})
+                  exclude or {})
 
 
 @pytest.mark.parametrize('module, slug', [
@@ -83,14 +86,14 @@ def test_a_module_no_api_writes_cannot_be_under_apis():
 
 
 def test_an_undocumented_module_cannot_be_placed():
-    inventory = {**INVENTORY_, 'couchbase.views': Entry(('View',), ())}
+    inventory = {**INVENTORY_, 'couchbase.views': Entry(('View',), {})}
     common = [Page('Options', 'options', ('couchbase.options',)), Page('Views', 'views', ('couchbase.views',))]
     assert problems(layout(common=common), inventory, COUNTERPARTS) == [
         'couchbase.views: placed in common, and not a couchbase module with docs: true']
 
 
 def test_a_slug_used_twice_is_reported():
-    inventory = {**INVENTORY_, 'couchbase.views': Entry(('View',), (), True)}
+    inventory = {**INVENTORY_, 'couchbase.views': Entry(('View',), {}, True)}
     counterparts = {**COUNTERPARTS, 'couchbase.views': {'acouchbase': 'shim', 'txcouchbase': 'shim'}}
     common = [Page('Options', 'options', ('couchbase.options',)), Page('Views', 'options', ('couchbase.views',))]
     assert problems(layout(common=common), inventory, counterparts) == ["common: slug 'options' is used twice"]
@@ -122,20 +125,6 @@ def test_exclude_members_names_a_documented_object():
                      'exclude_members: couchbase.cluster.Nope is not a public name of a documented couchbase module']
 
 
-@pytest.mark.parametrize('replacements, expected', [
-    ({'couchbase.options.forward_args': Replacement(None, 'internal')}, []),
-    ({'couchbase.options.forward_args': Replacement('couchbase.options.GetOptions')}, []),
-    ({'couchbase.options.GetOptions': Replacement(None, 'internal')},
-     ['replacements: couchbase.options.GetOptions is not a compat name']),
-    ({'couchbase.options.forward_args': Replacement('couchbase.options.Nope')},
-     ['replacements: couchbase.options.forward_args uses couchbase.options.Nope, which is not a public name']),
-    ({'couchbase.options.forward_args': Replacement(None)},
-     ['replacements: couchbase.options.forward_args has none, and no reason']),
-])
-def test_replacements_name_a_compat_name_and_a_public_one(replacements, expected):
-    assert problems(layout(replacements=replacements), INVENTORY_, COUNTERPARTS) == expected
-
-
 @pytest.mark.parametrize('text, complaint', [
     ('docs: docs\n', 'missing keys'),
     ('docs: docs\noutput: r\nsections: {}\ncommon: []\napis: []\nextra: 1\n', 'unknown keys'),
@@ -144,16 +133,6 @@ def test_load_rejects_a_malformed_layout(tmp_path, text, complaint):
     path = tmp_path / 'layout.yaml'
     path.write_text(text)
     with pytest.raises(LayoutError, match=complaint):
-        load(path)
-
-
-@pytest.mark.parametrize('value', ['{use: a, none: b}', '{instead: a}', 'a'])
-def test_load_rejects_a_malformed_replacement(tmp_path, value):
-    sections = ''.join(f'  {k}: {{title: T, intro: I}}\n' for k in SECTIONS)
-    path = tmp_path / 'layout.yaml'
-    path.write_text(f'docs: docs\noutput: r\nsections:\n{sections}common: []\napis: []\n'
-                    f'replacements:\n  couchbase.options.forward_args: {value}\n')
-    with pytest.raises(LayoutError, match='use: <path> or none: <reason>'):
         load(path)
 
 
@@ -180,22 +159,28 @@ def pages(reference):
     return reference.render(), reference.inventory
 
 
-def test_every_compat_name_has_a_replacement_given_only_where_needed(reference):
-    assert reference.replacement_problems() == []
-
-
 def test_the_deprecated_paths_table_has_a_row_per_compat_name(pages):
     rendered, inventory = pages
     rows = re.findall(r'^   \* - ``(\S+)``$', rendered[f'reference/{DEPRECATED}'], re.MULTILINE)
     assert rows == sorted(f'{m}.{n}' for m, e in inventory.items() for n in e.compat)
 
 
-def test_a_replacement_the_generator_finds_by_itself_is_reported(reference):
-    path = 'couchbase.cluster.ClusterOptions'
-    given = dataclasses.replace(reference.layout,
-                                replacements={**reference.layout.replacements, path: Replacement(None, 'x')})
-    found = Reference(ROOT, given, reference.inventory, reference.counterparts).replacement_problems()
-    assert found == [f'replacements: {path} resolves to couchbase.options.ClusterOptions; remove it']
+@pytest.mark.parametrize('path, instead', [
+    ('couchbase.cluster.ClusterOptions', ':py:obj:`couchbase.options.ClusterOptions`'),
+    ('couchbase.options.forward_args', 'Nothing: internal to the SDK'),
+])
+def test_a_row_links_the_replacement_or_says_why_there_is_none(pages, path, instead):
+    rendered, _ = pages
+    assert f'   * - ``{path}``\n     - {instead}\n' in rendered[f'reference/{DEPRECATED}']
+
+
+def test_the_old_paths_map_each_documented_object_to_the_compat_names_it_replaces(pages, reference):
+    rendered, inventory = pages
+    old_paths = json.loads(rendered[f'reference/{OLD_PATHS}'])
+    compat = {f'{m}.{n}' for m, e in inventory.items() for n in e.compat}
+    assert set(old_paths) <= set(reference.canonical.values())
+    assert all(set(paths) <= compat for paths in old_paths.values())
+    assert old_paths['couchbase.options.ClusterOptions'] == ['couchbase.cluster.ClusterOptions']
 
 
 def test_no_documented_name_is_marked_internal(reference):
@@ -236,11 +221,3 @@ def test_every_documented_name_is_described_once_or_linked(pages):
                and not any(m == module and t.endswith(f'.{name}') for m, t in linked)]
     assert missing == []
     assert all(target in described for _, target in linked)
-
-
-def test_a_compat_name_the_generator_cannot_place_needs_a_replacement(reference):
-    path = 'couchbase.options.forward_args'
-    given = dataclasses.replace(reference.layout,
-                                replacements={k: v for k, v in reference.layout.replacements.items() if k != path})
-    found = Reference(ROOT, given, reference.inventory, reference.counterparts).replacement_problems()
-    assert found == [f'replacements: {path} has no documented counterpart; say what replaces it']

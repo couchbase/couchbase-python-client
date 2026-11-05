@@ -100,11 +100,9 @@ __all__ = [
     'WanDevelopmentProfile',
 ]
 
-from couchbase.common._durability import DurabilityParser  # noqa: F401
-from couchbase.common._supportability import Supportability  # noqa: F401
-from couchbase.common._transforms import timedelta_as_milliseconds  # noqa: F401
-from couchbase.common._transforms import timedelta_as_timestamp  # noqa: F401
-from couchbase.common._transforms import validate_int  # noqa: F401
+from typing import TYPE_CHECKING
+
+from couchbase.common._supportability import Supportability as _Supportability
 from couchbase.common.config_profiles import CONFIG_PROFILES  # noqa: F401
 from couchbase.common.config_profiles import ConfigProfile  # noqa: F401
 from couchbase.common.config_profiles import ConfigProfiles  # noqa: F401
@@ -183,19 +181,18 @@ from couchbase.common.options import UpsertOptions  # noqa: F401
 from couchbase.common.options import VectorSearchOptions  # noqa: F401
 from couchbase.common.options import ViewOptions  # noqa: F401
 from couchbase.common.options import WaitUntilReadyOptions  # noqa: F401
-from couchbase.exceptions import InvalidArgumentException  # noqa: F401
-from couchbase.protocol.classic._wire import forward_args  # noqa: F401
-from couchbase.protocol.classic._wire import get_valid_args  # noqa: F401
-from couchbase.protocol.classic._wire import get_valid_multi_args  # noqa: F401
-from couchbase.serializer import DefaultJsonSerializer  # noqa: F401
 
 
 # Bases no operation takes or returns, kept so that importing them keeps working.
-@Supportability.class_deprecated("each operation's own options class")
+@_Supportability.class_deprecated("each operation's own options class")
 class DurabilityOptionBlock(dict):
     pass
 
 
-@Supportability.class_deprecated("each operation's own options class")
+@_Supportability.class_deprecated("each operation's own options class")
 class OptionsTimeout(dict):
     pass
+
+
+if not TYPE_CHECKING:
+    __getattr__ = _Supportability.deprecated_paths(__name__)

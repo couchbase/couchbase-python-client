@@ -726,43 +726,5 @@ class Cluster:
         return cluster
 
 
-"""
-** DEPRECATION NOTICE **
-
-The classes below are deprecated for 3.x compatibility.  They should not be used.
-Instead use:
-    * All options should be imported from `couchbase.options`.
-    * All options Enums should be imported from `couchbase.options`.
-    * All N1QL Enums should be imported from `couchbase.n1ql`.
-
-"""
-
-
-@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
-class ClusterOptions(options.ClusterOptions):  # noqa: F811
-    pass
-
-
-@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
-class ClusterTimeoutOptions(options.ClusterTimeoutOptions):
-    pass
-
-
-@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
-class ClusterTracingOptions(options.ClusterTracingOptions):
-    pass
-
-
-@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
-class DiagnosticsOptions(options.DiagnosticsOptions):  # noqa: F811
-    pass
-
-
-@Supportability.import_deprecated('couchbase.cluster', 'couchbase.options')  # noqa: F811
-class QueryOptions(options.QueryOptions):  # noqa: F811
-    pass
-
-
-from couchbase.n1ql import QueryScanConsistency  # nopep8 # isort:skip # noqa: E402, F401
-from couchbase.n1ql import QueryProfile  # nopep8 # isort:skip # noqa: E402, F401
-from couchbase.options import Compression  # nopep8 # isort:skip # noqa: E402, F401
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

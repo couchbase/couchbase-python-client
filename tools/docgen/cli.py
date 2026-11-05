@@ -114,11 +114,6 @@ def _expected() -> tuple[Layout, dict[pathlib.Path, str]]:
             click.echo(f'layout: {problem}', err=True)
         raise click.ClickException(f'{len(found)} disagreement(s) between {LAYOUT.name} and {INVENTORY.name}')
     reference = Reference(ROOT, layout, inventory, counterparts)
-    found = reference.replacement_problems()
-    if found:
-        for problem in found:
-            click.echo(f'layout: {problem}', err=True)
-        raise click.ClickException(f'{len(found)} compat name(s) with a wrong or missing replacement in {LAYOUT.name}')
     found = reference.internal_problems()
     if found:
         for problem in found:

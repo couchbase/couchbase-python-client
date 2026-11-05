@@ -68,6 +68,9 @@ __all__ = [
     'WildcardQuery',
 ]
 
+from typing import TYPE_CHECKING
+
+from couchbase.common._supportability import Supportability
 from couchbase.common.search import DateFacet  # noqa: F401
 from couchbase.common.search import Facet  # noqa: F401
 from couchbase.common.search import HighlightStyle  # noqa: F401
@@ -114,4 +117,6 @@ from couchbase.common.search_queries import TermQuery  # noqa: F401
 from couchbase.common.search_queries import TermRangeQuery  # noqa: F401
 from couchbase.common.search_queries import WildcardQuery  # noqa: F401
 from couchbase.common.search_request import SearchRequest  # noqa: F401
-from couchbase.protocol.classic._search import SearchQueryBuilder  # noqa: F401
+
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

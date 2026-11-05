@@ -8,14 +8,14 @@ Migration
 Import paths
 ============
 
-Every public name has one import path, the module its reference page documents.  Some names are also
-still bound at an older path, so that code written against it keeps working.  Those paths are kept only
-for that code: new code should use the path in the right-hand column below, and none of the old paths
-will gain anything new.
+Every public name has one import path, the module its reference page documents.  Some names can also
+still be imported from an older path, so that code written against it keeps working.  Those paths are
+kept only for that code: new code should use the path in the right-hand column below, and none of the
+old paths will gain anything new.
 
-Where an old path binds a deprecated subclass, as the options classes at ``couchbase.cluster`` and
-``couchbase.collection`` do, creating one emits a :class:`~couchbase.warnings.CouchbaseDeprecationWarning`
-naming the path to use.  To find them all in a test run, turn the warning into an error:
+Importing a name from an old path emits a :class:`~couchbase.warnings.CouchbaseDeprecationWarning` that
+points at the import and says what to use instead.  The SDK's type information leaves the old paths out,
+so a type checker reports them too.  To find them all in a test run, turn the warning into an error:
 
 .. code-block:: python
 
@@ -25,7 +25,7 @@ naming the path to use.  To find them all in a test run, turn the warning into a
 
     warnings.simplefilter('error', CouchbaseDeprecationWarning)
 
-The table lists every old path the SDK still binds.  "Nothing" marks a name that was never meant for
+The table lists every old path the SDK still serves.  "Nothing" marks a name that was never meant for
 applications, or one with no replacement.
 
 .. include:: reference/deprecated_paths.inc

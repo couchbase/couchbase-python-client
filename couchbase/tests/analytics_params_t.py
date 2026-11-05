@@ -20,11 +20,14 @@ from typing import Any
 
 import pytest
 
-from couchbase.analytics import (AnalyticsQuery,
-                                 AnalyticsScanConsistency,
-                                 AnalyticsStatus)
+from couchbase.analytics import AnalyticsScanConsistency, AnalyticsStatus
 from couchbase.options import AnalyticsOptions
+from couchbase.protocol.classic._analytics import AnalyticsQuery
 from couchbase.serializer import DefaultJsonSerializer
+from tests.test_features import TestProtocol
+
+# Each request here is built by classic's request builder.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
 
 class AnalyticsParamsUnitTests:

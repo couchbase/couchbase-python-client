@@ -287,13 +287,7 @@ class QueryMetaData:
 
 
 class QueryScanConsistency(Enum):
-    """Represents the various scan consistency options that are available when querying against the query service.
-
-    .. warning::
-        Importing :class:`.QueryScanConsistency` from ``couchbase.cluster`` is deprecated.
-        :class:`.QueryScanConsistency` should be imported from ``couchbase.n1ql``.
-
-    """
+    """Represents the various scan consistency options that are available when querying against the query service."""
 
     NOT_BOUNDED = "not_bounded"
     REQUEST_PLUS = "request_plus"
@@ -301,13 +295,7 @@ class QueryScanConsistency(Enum):
 
 
 class QueryProfile(Enum):
-    """Specifies the profiling mode for a query.
-
-    .. warning::
-        Importing :class:`.QueryProfile` from ``couchbase.cluster`` is deprecated.
-        :class:`.QueryProfile` should be imported from ``couchbase.n1ql``.
-
-    """
+    """Specifies the profiling mode for a query."""
 
     OFF = "off"
     PHASES = "phases"

@@ -25,11 +25,15 @@ from couchbase.common._utils import JSONType
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.management.views import DesignDocumentNamespace
 from couchbase.options import ViewOptions
+from couchbase.protocol.classic._views import ViewQuery
 from couchbase.serializer import DefaultJsonSerializer
 from couchbase.views import (ViewErrorMode,
                              ViewOrdering,
-                             ViewQuery,
                              ViewScanConsistency)
+from tests.test_features import TestProtocol
+
+# Each request here is built by classic's request builder.
+pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
 # Labels rather than claims about a cluster: nothing here connects, and all three appear in
 # the request verbatim.

@@ -28,16 +28,15 @@ __all__ = [
     'Transcoder',
 ]
 
-from couchbase.common.constants import FMT_BYTES  # noqa: F401
-from couchbase.common.constants import FMT_COMMON_MASK  # noqa: F401
-from couchbase.common.constants import FMT_JSON  # noqa: F401
-from couchbase.common.constants import FMT_LEGACY_MASK  # noqa: F401
-from couchbase.common.constants import FMT_PICKLE  # noqa: F401
-from couchbase.common.constants import FMT_UTF8  # noqa: F401
-from couchbase.common.serializer import DefaultJsonSerializer  # noqa: F401
+from typing import TYPE_CHECKING
+
+from couchbase.common._supportability import Supportability
 from couchbase.common.transcoder import JSONTranscoder  # noqa: F401
 from couchbase.common.transcoder import LegacyTranscoder  # noqa: F401
 from couchbase.common.transcoder import RawBinaryTranscoder  # noqa: F401
 from couchbase.common.transcoder import RawJSONTranscoder  # noqa: F401
 from couchbase.common.transcoder import RawStringTranscoder  # noqa: F401
 from couchbase.common.transcoder import Transcoder  # noqa: F401
+
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)

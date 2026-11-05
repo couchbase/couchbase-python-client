@@ -1,6 +1,8 @@
 # The public inventory: per public module, its public names and its compat names.
 # docs: true marks a user-facing module, whose public names get a reference page.
-# Public is written to the module's __all__. Compat stays bound at that path and only shrinks.
+# Public is written to the module's __all__. Compat is a deprecated path, served with a warning, and
+# only shrinks: `Name: <module>` where that public module has the same object, otherwise
+# `{from: <module>, use: <path>}` or `{from: <module>, none: <reason>}`.
 # A name in neither list is private or bound only for the module's own use.
 # tools/check_public_api.py holds the tree to it.
 # counterparts, at the end, says what acouchbase and txcouchbase have at each couchbase path.
@@ -15,7 +17,7 @@ modules:
       - get_event_loop
       - get_metadata
       - get_transactions_protocol
-    compat: []
+    compat: {}
   acouchbase.analytics:
     public:
       - AnalyticsError
@@ -25,7 +27,7 @@ modules:
       - AnalyticsStatus
       - AnalyticsWarning
     compat:
-      - AnalyticsQuery
+      AnalyticsQuery: {from: couchbase.protocol.classic._analytics, none: internal to the SDK}
   acouchbase.auth:
     public:
       - AuthDomain
@@ -33,31 +35,31 @@ modules:
       - CertificateAuthenticator
       - JwtAuthenticator
       - PasswordAuthenticator
-    compat: []
+    compat: {}
   acouchbase.binary_collection:
     docs: true
     public:
       - BinaryCollection
-    compat: []
+    compat: {}
   acouchbase.bucket:
     docs: true
     public:
       - AsyncBucket
       - Bucket
-    compat: []
+    compat: {}
   acouchbase.cluster:
     docs: true
     public:
       - AsyncCluster
       - Cluster
       - get_event_loop
-    compat: []
+    compat: {}
   acouchbase.collection:
     docs: true
     public:
       - AsyncCollection
       - Collection
-    compat: []
+    compat: {}
   acouchbase.constants:
     public:
       - FMT_BYTES
@@ -66,7 +68,7 @@ modules:
       - FMT_LEGACY_MASK
       - FMT_PICKLE
       - FMT_UTF8
-    compat: []
+    compat: {}
   acouchbase.datastructures:
     docs: true
     public:
@@ -74,7 +76,7 @@ modules:
       - CouchbaseMap
       - CouchbaseQueue
       - CouchbaseSet
-    compat: []
+    compat: {}
   acouchbase.diagnostics:
     public:
       - ClusterState
@@ -83,7 +85,7 @@ modules:
       - EndpointState
       - PingState
       - ServiceType
-    compat: []
+    compat: {}
   acouchbase.durability:
     public:
       - ClientDurability
@@ -94,7 +96,7 @@ modules:
       - PersistToExtended
       - ReplicateTo
       - ServerDurability
-    compat: []
+    compat: {}
   acouchbase.encryption:
     public:
       - CryptoManager
@@ -103,31 +105,31 @@ modules:
       - EncryptionResult
       - Key
       - Keyring
-    compat: []
+    compat: {}
   acouchbase.encryption.crypto_manager:
     public:
       - CryptoManager
-    compat: []
+    compat: {}
   acouchbase.encryption.decrypter:
     public:
       - Decrypter
-    compat: []
+    compat: {}
   acouchbase.encryption.encrypter:
     public:
       - Encrypter
-    compat: []
+    compat: {}
   acouchbase.encryption.encryption_result:
     public:
       - EncryptionResult
-    compat: []
+    compat: {}
   acouchbase.encryption.key:
     public:
       - Key
-    compat: []
+    compat: {}
   acouchbase.encryption.keyring:
     public:
       - Keyring
-    compat: []
+    compat: {}
   acouchbase.exceptions:
     public:
       - AlreadyQueriedException
@@ -248,7 +250,7 @@ modules:
       - XattrNoAccessException
       - XattrUnknownMacroException
       - XattrUnknownVirtualAttributeException
-    compat: []
+    compat: {}
   acouchbase.kv_range_scan:
     public:
       - PrefixScan
@@ -256,10 +258,10 @@ modules:
       - SamplingScan
       - ScanTerm
       - ScanType
-    compat: []
+    compat: {}
   acouchbase.management:
     public: []
-    compat: []
+    compat: {}
   acouchbase.management.analytics:
     docs: true
     public:
@@ -274,7 +276,7 @@ modules:
       - CouchbaseAnalyticsEncryptionSettings
       - CouchbaseRemoteAnalyticsLink
       - S3ExternalAnalyticsLink
-    compat: []
+    compat: {}
   acouchbase.management.buckets:
     docs: true
     public:
@@ -288,7 +290,7 @@ modules:
       - EjectionMethod
       - EvictionPolicyType
       - StorageBackend
-    compat: []
+    compat: {}
   acouchbase.management.collections:
     docs: true
     public:
@@ -297,7 +299,7 @@ modules:
       - CreateCollectionSettings
       - ScopeSpec
       - UpdateCollectionSettings
-    compat: []
+    compat: {}
   acouchbase.management.eventing:
     docs: true
     public:
@@ -323,7 +325,7 @@ modules:
       - EventingFunctionUrlNoAuth
       - EventingFunctionsStatus
       - ScopeEventingFunctionManager
-    compat: []
+    compat: {}
   acouchbase.management.options:
     public:
       - AllowQueryingSearchIndexOptions
@@ -400,21 +402,21 @@ modules:
       - UpsertSearchIndexOptions
       - UpsertUserOptions
       - WatchQueryIndexOptions
-    compat: []
+    compat: {}
   acouchbase.management.queries:
     docs: true
     public:
       - CollectionQueryIndexManager
       - QueryIndex
       - QueryIndexManager
-    compat: []
+    compat: {}
   acouchbase.management.search:
     docs: true
     public:
       - ScopeSearchIndexManager
       - SearchIndex
       - SearchIndexManager
-    compat: []
+    compat: {}
   acouchbase.management.users:
     docs: true
     public:
@@ -426,7 +428,7 @@ modules:
       - User
       - UserAndMetadata
       - UserManager
-    compat: []
+    compat: {}
   acouchbase.management.views:
     docs: true
     public:
@@ -434,11 +436,11 @@ modules:
       - DesignDocumentNamespace
       - View
       - ViewIndexManager
-    compat: []
+    compat: {}
   acouchbase.mutation_state:
     public:
       - MutationState
-    compat: []
+    compat: {}
   acouchbase.n1ql:
     public:
       - QueryError
@@ -449,29 +451,29 @@ modules:
       - QueryStatus
       - QueryWarning
     compat:
-      - N1QLQuery
+      N1QLQuery: {from: couchbase.protocol.classic._n1ql, none: internal to the SDK}
   acouchbase.observability:
     public:
       - get_otel_meter
       - get_otel_tracer
-    compat: []
+    compat: {}
   acouchbase.observability.metrics:
     public:
       - Meter
       - ValueRecorder
-    compat: []
+    compat: {}
   acouchbase.observability.otel_metrics:
     public:
       - OtelWrapperMeter
       - OtelWrapperValueRecorder
       - get_otel_meter
-    compat: []
+    compat: {}
   acouchbase.observability.otel_tracing:
     public:
       - OtelWrapperSpan
       - OtelWrapperTracer
       - get_otel_tracer
-    compat: []
+    compat: {}
   acouchbase.observability.tracing:
     public:
       - RequestSpan
@@ -479,7 +481,7 @@ modules:
       - SpanAttributeValue
       - SpanAttributes
       - SpanStatusCode
-    compat: []
+    compat: {}
   acouchbase.options:
     public:
       - AcceptableInts
@@ -561,24 +563,24 @@ modules:
       - WaitUntilReadyOptions
       - WanDevelopmentProfile
     compat:
-      - forward_args
-      - get_valid_args
-      - get_valid_multi_args
+      forward_args: {from: couchbase.protocol.classic._wire, none: internal to the SDK}
+      get_valid_args: {from: couchbase.protocol.classic._wire, none: internal to the SDK}
+      get_valid_multi_args: {from: couchbase.protocol.classic._wire, none: internal to the SDK}
   acouchbase.otel_tracer:
     public:
       - CouchbaseOtelSpan
       - CouchbaseOtelTracer
-    compat: []
+    compat: {}
   acouchbase.protocol:
     public: []
-    compat: []
+    compat: {}
   acouchbase.protocol.classic:
     public: []
-    compat: []
+    compat: {}
   acouchbase.replica_reads:
     public:
       - ReadPreference
-    compat: []
+    compat: {}
   acouchbase.result:
     docs: true
     public:
@@ -612,13 +614,13 @@ modules:
       - Result
       - ScanResult
       - ValueResult
-    compat: []
+    compat: {}
   acouchbase.scope:
     docs: true
     public:
       - AsyncScope
       - Scope
-    compat: []
+    compat: {}
   acouchbase.search:
     public:
       - BooleanFieldQuery
@@ -668,19 +670,19 @@ modules:
       - TermRangeQuery
       - WildcardQuery
     compat:
-      - SearchQueryBuilder
+      SearchQueryBuilder: {from: couchbase.protocol.classic._search, none: internal to the SDK}
   acouchbase.search_scoring:
     public:
       - ReciprocalRankFusion
       - RelativeScoreFusion
       - ScoringNone
       - SearchScoring
-    compat: []
+    compat: {}
   acouchbase.serializer:
     public:
       - DefaultJsonSerializer
       - Serializer
-    compat: []
+    compat: {}
   acouchbase.subdocument:
     public:
       - LookupInMacro
@@ -706,8 +708,8 @@ modules:
       - upsert
       - with_expiry
     compat:
-      - ArrayValues
-      - SubDocOp
+      ArrayValues: {from: couchbase.common.subdocument, none: internal to the SDK}
+      SubDocOp: {from: couchbase.common.subdocument, none: internal to the SDK}
   acouchbase.transactions:
     public:
       - AttemptContext
@@ -722,29 +724,29 @@ modules:
       - TransactionQueryResults
       - TransactionResult
       - Transactions
-    compat: []
+    compat: {}
   acouchbase.transactions.transaction_get_result:
     public:
       - TransactionGetResult
-    compat: []
+    compat: {}
   acouchbase.transactions.transaction_keyspace:
     public:
       - TransactionKeyspace
-    compat: []
+    compat: {}
   acouchbase.transactions.transaction_query_results:
     public:
       - TransactionQueryResults
-    compat: []
+    compat: {}
   acouchbase.transactions.transaction_result:
     public:
       - TransactionResult
-    compat: []
+    compat: {}
   acouchbase.transactions.transactions:
     docs: true
     public:
       - AttemptContext
       - Transactions
-    compat: []
+    compat: {}
   acouchbase.transactions.transactions_get_multi:
     public:
       - TransactionGetMultiMode
@@ -754,7 +756,7 @@ modules:
       - TransactionGetMultiResult
       - TransactionGetMultiSpec
       - TransactionMultiContentProxy
-    compat: []
+    compat: {}
   acouchbase.transcoder:
     public:
       - JSONTranscoder
@@ -763,13 +765,13 @@ modules:
       - RawJSONTranscoder
       - RawStringTranscoder
       - Transcoder
-    compat: []
+    compat: {}
   acouchbase.vector_search:
     public:
       - VectorQuery
       - VectorQueryCombination
       - VectorSearch
-    compat: []
+    compat: {}
   acouchbase.views:
     public:
       - ViewErrorMode
@@ -778,14 +780,14 @@ modules:
       - ViewRow
       - ViewScanConsistency
     compat:
-      - ViewQuery
+      ViewQuery: {from: couchbase.protocol.classic._views, none: internal to the SDK}
   acouchbase.warnings:
     public:
       - CouchbaseApplicabilityWarning
       - CouchbaseDeprecationWarning
       - CouchbaseOptionWarning
       - CouchbaseWarning
-    compat: []
+    compat: {}
   couchbase:
     docs: true
     public:
@@ -793,7 +795,7 @@ modules:
       - enable_protocol_logger_to_save_network_traffic_to_file
       - get_metadata
       - get_transactions_protocol
-    compat: []
+    compat: {}
   couchbase.analytics:
     docs: true
     public:
@@ -804,8 +806,8 @@ modules:
       - AnalyticsStatus
       - AnalyticsWarning
     compat:
-      - AnalyticsOptions
-      - AnalyticsQuery
+      AnalyticsOptions: couchbase.options
+      AnalyticsQuery: {from: couchbase.protocol.classic._analytics, none: internal to the SDK}
   couchbase.auth:
     docs: true
     public:
@@ -814,65 +816,65 @@ modules:
       - CertificateAuthenticator
       - JwtAuthenticator
       - PasswordAuthenticator
-    compat: []
+    compat: {}
   couchbase.binary_collection:
     docs: true
     public:
       - BinaryCollection
-    compat: []
+    compat: {}
   couchbase.bucket:
     docs: true
     public:
       - Bucket
     compat:
-      - PingOptions
-      - ViewErrorMode
-      - ViewOptions
-      - ViewOrdering
-      - ViewScanConsistency
+      PingOptions: couchbase.options
+      ViewErrorMode: couchbase.views
+      ViewOptions: couchbase.options
+      ViewOrdering: couchbase.views
+      ViewScanConsistency: couchbase.views
   couchbase.cluster:
     docs: true
     public:
       - Cluster
     compat:
-      - ClusterOptions
-      - ClusterTimeoutOptions
-      - ClusterTracingOptions
-      - Compression
-      - DiagnosticsOptions
-      - QueryOptions
-      - QueryProfile
-      - QueryScanConsistency
+      ClusterOptions: couchbase.options
+      ClusterTimeoutOptions: couchbase.options
+      ClusterTracingOptions: couchbase.options
+      Compression: couchbase.options
+      DiagnosticsOptions: couchbase.options
+      QueryOptions: couchbase.options
+      QueryProfile: couchbase.n1ql
+      QueryScanConsistency: couchbase.n1ql
   couchbase.collection:
     docs: true
     public:
       - Collection
     compat:
-      - AppendOptions
-      - CBCollection
-      - ConstrainedInt
-      - DecrementOptions
-      - DeltaValue
-      - ExistsOptions
-      - GetAllReplicasOptions
-      - GetAndLockOptions
-      - GetAndTouchOptions
-      - GetAnyReplicaOptions
-      - GetOptions
-      - IncrementOptions
-      - InsertOptions
-      - LookupInOptions
-      - PrependOptions
-      - RemoveOptions
-      - ReplaceOptions
-      - Scope
-      - SignedInt64
-      - TouchOptions
-      - UnlockOptions
-      - UpsertOptions
+      AppendOptions: couchbase.options
+      CBCollection: {from: couchbase._legacy, use: couchbase.collection.Collection}
+      ConstrainedInt: couchbase.options
+      DecrementOptions: couchbase.options
+      DeltaValue: couchbase.options
+      ExistsOptions: couchbase.options
+      GetAllReplicasOptions: couchbase.options
+      GetAndLockOptions: couchbase.options
+      GetAndTouchOptions: couchbase.options
+      GetAnyReplicaOptions: couchbase.options
+      GetOptions: couchbase.options
+      IncrementOptions: couchbase.options
+      InsertOptions: couchbase.options
+      LookupInOptions: couchbase.options
+      PrependOptions: couchbase.options
+      RemoveOptions: couchbase.options
+      ReplaceOptions: couchbase.options
+      Scope: couchbase.scope
+      SignedInt64: couchbase.options
+      TouchOptions: couchbase.options
+      UnlockOptions: couchbase.options
+      UpsertOptions: couchbase.options
   couchbase.common:
     public: []
-    compat: []
+    compat: {}
   couchbase.common.analytics:
     public:
       - AnalyticsError
@@ -882,7 +884,7 @@ modules:
       - AnalyticsScanConsistency
       - AnalyticsStatus
       - AnalyticsWarning
-    compat: []
+    compat: {}
   couchbase.common.auth:
     public:
       - AuthDomain
@@ -890,7 +892,7 @@ modules:
       - CertificateAuthenticator
       - JwtAuthenticator
       - PasswordAuthenticator
-    compat: []
+    compat: {}
   couchbase.common.config_profiles:
     public:
       - CONFIG_PROFILES
@@ -898,7 +900,7 @@ modules:
       - ConfigProfiles
       - KnownConfigProfiles
       - WanDevelopmentProfile
-    compat: []
+    compat: {}
   couchbase.common.constants:
     public:
       - FMT_BYTES
@@ -907,7 +909,7 @@ modules:
       - FMT_LEGACY_MASK
       - FMT_PICKLE
       - FMT_UTF8
-    compat: []
+    compat: {}
   couchbase.common.diagnostics:
     public:
       - ClusterState
@@ -916,7 +918,7 @@ modules:
       - EndpointState
       - PingState
       - ServiceType
-    compat: []
+    compat: {}
   couchbase.common.durability:
     public:
       - ClientDurability
@@ -927,7 +929,7 @@ modules:
       - PersistToExtended
       - ReplicateTo
       - ServerDurability
-    compat: []
+    compat: {}
   couchbase.common.encryption:
     public:
       - CryptoManager
@@ -936,31 +938,31 @@ modules:
       - EncryptionResult
       - Key
       - Keyring
-    compat: []
+    compat: {}
   couchbase.common.encryption.crypto_manager:
     public:
       - CryptoManager
-    compat: []
+    compat: {}
   couchbase.common.encryption.decrypter:
     public:
       - Decrypter
-    compat: []
+    compat: {}
   couchbase.common.encryption.encrypter:
     public:
       - Encrypter
-    compat: []
+    compat: {}
   couchbase.common.encryption.encryption_result:
     public:
       - EncryptionResult
-    compat: []
+    compat: {}
   couchbase.common.encryption.key:
     public:
       - Key
-    compat: []
+    compat: {}
   couchbase.common.encryption.keyring:
     public:
       - Keyring
-    compat: []
+    compat: {}
   couchbase.common.exceptions:
     public:
       - AlreadyQueriedException
@@ -1081,7 +1083,7 @@ modules:
       - XattrNoAccessException
       - XattrUnknownMacroException
       - XattrUnknownVirtualAttributeException
-    compat: []
+    compat: {}
   couchbase.common.kv_range_scan:
     public:
       - PrefixScan
@@ -1089,10 +1091,10 @@ modules:
       - SamplingScan
       - ScanTerm
       - ScanType
-    compat: []
+    compat: {}
   couchbase.common.management:
     public: []
-    compat: []
+    compat: {}
   couchbase.common.management.analytics:
     public:
       - AnalyticsDataType
@@ -1105,7 +1107,7 @@ modules:
       - CouchbaseAnalyticsEncryptionSettings
       - CouchbaseRemoteAnalyticsLink
       - S3ExternalAnalyticsLink
-    compat: []
+    compat: {}
   couchbase.common.management.buckets:
     public:
       - BucketDescribeResult
@@ -1119,14 +1121,14 @@ modules:
       - EjectionMethod
       - EvictionPolicyType
       - StorageBackend
-    compat: []
+    compat: {}
   couchbase.common.management.collections:
     public:
       - CollectionSpec
       - CreateCollectionSettings
       - ScopeSpec
       - UpdateCollectionSettings
-    compat: []
+    compat: {}
   couchbase.common.management.eventing:
     public:
       - EventingFunction
@@ -1149,7 +1151,7 @@ modules:
       - EventingFunctionUrlBinding
       - EventingFunctionUrlNoAuth
       - EventingFunctionsStatus
-    compat: []
+    compat: {}
   couchbase.common.management.options:
     public:
       - AllowQueryingSearchIndexOptions
@@ -1300,15 +1302,15 @@ modules:
       - UpsertUserOptionsKwargs
       - WatchQueryIndexOptions
       - WatchQueryIndexOptionsKwargs
-    compat: []
+    compat: {}
   couchbase.common.management.queries:
     public:
       - QueryIndex
-    compat: []
+    compat: {}
   couchbase.common.management.search:
     public:
       - SearchIndex
-    compat: []
+    compat: {}
   couchbase.common.management.users:
     public:
       - Group
@@ -1319,17 +1321,17 @@ modules:
       - SetInputType
       - User
       - UserAndMetadata
-    compat: []
+    compat: {}
   couchbase.common.management.views:
     public:
       - DesignDocument
       - DesignDocumentNamespace
       - View
-    compat: []
+    compat: {}
   couchbase.common.mutation_state:
     public:
       - MutationState
-    compat: []
+    compat: {}
   couchbase.common.n1ql:
     public:
       - QueryError
@@ -1340,29 +1342,29 @@ modules:
       - QueryScanConsistency
       - QueryStatus
       - QueryWarning
-    compat: []
+    compat: {}
   couchbase.common.observability:
     public:
       - get_otel_meter
       - get_otel_tracer
-    compat: []
+    compat: {}
   couchbase.common.observability.metrics:
     public:
       - Meter
       - ValueRecorder
-    compat: []
+    compat: {}
   couchbase.common.observability.otel_metrics:
     public:
       - OtelWrapperMeter
       - OtelWrapperValueRecorder
       - get_otel_meter
-    compat: []
+    compat: {}
   couchbase.common.observability.otel_tracing:
     public:
       - OtelWrapperSpan
       - OtelWrapperTracer
       - get_otel_tracer
-    compat: []
+    compat: {}
   couchbase.common.observability.tracing:
     public:
       - RequestSpan
@@ -1370,7 +1372,7 @@ modules:
       - SpanAttributeValue
       - SpanAttributes
       - SpanStatusCode
-    compat: []
+    compat: {}
   couchbase.common.option_enums:
     public:
       - Compression
@@ -1378,7 +1380,7 @@ modules:
       - LockMode
       - OptionValidationMode
       - TLSVerifyMode
-    compat: []
+    compat: {}
   couchbase.common.options:
     public:
       - AcceptableInts
@@ -1509,20 +1511,20 @@ modules:
       - WaitUntilReadyKwargs
       - WaitUntilReadyOptions
       - WaitUntilReadyOptionsKwargs
-    compat: []
+    compat: {}
   couchbase.common.otel_tracer:
     public:
       - CouchbaseOtelSpan
       - CouchbaseOtelTracer
-    compat: []
+    compat: {}
   couchbase.common.protocol:
     public:
       - CouchbaseProtocol
-    compat: []
+    compat: {}
   couchbase.common.replica_reads:
     public:
       - ReadPreference
-    compat: []
+    compat: {}
   couchbase.common.result:
     public:
       - ClusterInfoResult
@@ -1550,7 +1552,7 @@ modules:
       - Result
       - ScanResult
       - ValueResult
-    compat: []
+    compat: {}
   couchbase.common.search:
     public:
       - DateFacet
@@ -1575,7 +1577,7 @@ modules:
       - SortID
       - SortScore
       - TermFacet
-    compat: []
+    compat: {}
   couchbase.common.search_queries:
     public:
       - BooleanFieldQuery
@@ -1603,23 +1605,23 @@ modules:
       - TermQuery
       - TermRangeQuery
       - WildcardQuery
-    compat: []
+    compat: {}
   couchbase.common.search_request:
     public:
       - SearchRequest
-    compat: []
+    compat: {}
   couchbase.common.search_scoring:
     public:
       - ReciprocalRankFusion
       - RelativeScoreFusion
       - ScoringNone
       - SearchScoring
-    compat: []
+    compat: {}
   couchbase.common.serializer:
     public:
       - DefaultJsonSerializer
       - Serializer
-    compat: []
+    compat: {}
   couchbase.common.subdocument:
     public:
       - ArrayValues
@@ -1646,26 +1648,26 @@ modules:
       - replace
       - upsert
       - with_expiry
-    compat: []
+    compat: {}
   couchbase.common.transactions:
     public: []
-    compat: []
+    compat: {}
   couchbase.common.transactions.transaction_get_result:
     public:
       - TransactionGetResult
-    compat: []
+    compat: {}
   couchbase.common.transactions.transaction_keyspace:
     public:
       - TransactionKeyspace
-    compat: []
+    compat: {}
   couchbase.common.transactions.transaction_query_results:
     public:
       - TransactionQueryResults
-    compat: []
+    compat: {}
   couchbase.common.transactions.transaction_result:
     public:
       - TransactionResult
-    compat: []
+    compat: {}
   couchbase.common.transactions.transactions_get_multi:
     public:
       - TransactionGetMultiMode
@@ -1675,7 +1677,7 @@ modules:
       - TransactionGetMultiResult
       - TransactionGetMultiSpec
       - TransactionMultiContentProxy
-    compat: []
+    compat: {}
   couchbase.common.transcoder:
     public:
       - JSONTranscoder
@@ -1684,13 +1686,13 @@ modules:
       - RawJSONTranscoder
       - RawStringTranscoder
       - Transcoder
-    compat: []
+    compat: {}
   couchbase.common.vector_search:
     public:
       - VectorQuery
       - VectorQueryCombination
       - VectorSearch
-    compat: []
+    compat: {}
   couchbase.common.views:
     public:
       - ViewErrorMode
@@ -1698,14 +1700,14 @@ modules:
       - ViewOrdering
       - ViewRow
       - ViewScanConsistency
-    compat: []
+    compat: {}
   couchbase.common.warnings:
     public:
       - CouchbaseApplicabilityWarning
       - CouchbaseDeprecationWarning
       - CouchbaseOptionWarning
       - CouchbaseWarning
-    compat: []
+    compat: {}
   couchbase.constants:
     public:
       - FMT_BYTES
@@ -1714,7 +1716,7 @@ modules:
       - FMT_LEGACY_MASK
       - FMT_PICKLE
       - FMT_UTF8
-    compat: []
+    compat: {}
   couchbase.datastructures:
     docs: true
     public:
@@ -1722,7 +1724,7 @@ modules:
       - CouchbaseMap
       - CouchbaseQueue
       - CouchbaseSet
-    compat: []
+    compat: {}
   couchbase.diagnostics:
     docs: true
     public:
@@ -1732,7 +1734,7 @@ modules:
       - EndpointState
       - PingState
       - ServiceType
-    compat: []
+    compat: {}
   couchbase.durability:
     docs: true
     public:
@@ -1744,7 +1746,7 @@ modules:
       - PersistToExtended
       - ReplicateTo
       - ServerDurability
-    compat: []
+    compat: {}
   couchbase.encryption:
     docs: true
     public:
@@ -1754,31 +1756,31 @@ modules:
       - EncryptionResult
       - Key
       - Keyring
-    compat: []
+    compat: {}
   couchbase.encryption.crypto_manager:
     public:
       - CryptoManager
-    compat: []
+    compat: {}
   couchbase.encryption.decrypter:
     public:
       - Decrypter
-    compat: []
+    compat: {}
   couchbase.encryption.encrypter:
     public:
       - Encrypter
-    compat: []
+    compat: {}
   couchbase.encryption.encryption_result:
     public:
       - EncryptionResult
-    compat: []
+    compat: {}
   couchbase.encryption.key:
     public:
       - Key
-    compat: []
+    compat: {}
   couchbase.encryption.keyring:
     public:
       - Keyring
-    compat: []
+    compat: {}
   couchbase.exceptions:
     docs: true
     public:
@@ -1900,7 +1902,7 @@ modules:
       - XattrNoAccessException
       - XattrUnknownMacroException
       - XattrUnknownVirtualAttributeException
-    compat: []
+    compat: {}
   couchbase.kv_range_scan:
     docs: true
     public:
@@ -1909,10 +1911,10 @@ modules:
       - SamplingScan
       - ScanTerm
       - ScanType
-    compat: []
+    compat: {}
   couchbase.management:
     public: []
-    compat: []
+    compat: {}
   couchbase.management.analytics:
     docs: true
     public:
@@ -1927,7 +1929,7 @@ modules:
       - CouchbaseAnalyticsEncryptionSettings
       - CouchbaseRemoteAnalyticsLink
       - S3ExternalAnalyticsLink
-    compat: []
+    compat: {}
   couchbase.management.buckets:
     docs: true
     public:
@@ -1941,7 +1943,7 @@ modules:
       - EjectionMethod
       - EvictionPolicyType
       - StorageBackend
-    compat: []
+    compat: {}
   couchbase.management.collections:
     docs: true
     public:
@@ -1950,7 +1952,7 @@ modules:
       - CreateCollectionSettings
       - ScopeSpec
       - UpdateCollectionSettings
-    compat: []
+    compat: {}
   couchbase.management.eventing:
     docs: true
     public:
@@ -1976,7 +1978,7 @@ modules:
       - EventingFunctionUrlNoAuth
       - EventingFunctionsStatus
       - ScopeEventingFunctionManager
-    compat: []
+    compat: {}
   couchbase.management.options:
     docs: true
     public:
@@ -2054,21 +2056,21 @@ modules:
       - UpsertSearchIndexOptions
       - UpsertUserOptions
       - WatchQueryIndexOptions
-    compat: []
+    compat: {}
   couchbase.management.queries:
     docs: true
     public:
       - CollectionQueryIndexManager
       - QueryIndex
       - QueryIndexManager
-    compat: []
+    compat: {}
   couchbase.management.search:
     docs: true
     public:
       - ScopeSearchIndexManager
       - SearchIndex
       - SearchIndexManager
-    compat: []
+    compat: {}
   couchbase.management.users:
     docs: true
     public:
@@ -2080,7 +2082,7 @@ modules:
       - User
       - UserAndMetadata
       - UserManager
-    compat: []
+    compat: {}
   couchbase.management.views:
     docs: true
     public:
@@ -2088,18 +2090,18 @@ modules:
       - DesignDocumentNamespace
       - View
       - ViewIndexManager
-    compat: []
+    compat: {}
   couchbase.metrics:
     public: []
     compat:
-      - CouchbaseMeter
-      - CouchbaseValueRecorder
+      CouchbaseMeter: {from: couchbase.common._metrics, use: couchbase.observability.metrics.Meter}
+      CouchbaseValueRecorder: {from: couchbase.common._metrics, use: couchbase.observability.metrics.ValueRecorder}
   couchbase.mutation_state:
     docs: true
     public:
       - MutationState
     compat:
-      - MutationToken
+      MutationToken: couchbase.result
   couchbase.n1ql:
     docs: true
     public:
@@ -2111,31 +2113,31 @@ modules:
       - QueryStatus
       - QueryWarning
     compat:
-      - N1QLQuery
+      N1QLQuery: {from: couchbase.protocol.classic._n1ql, none: internal to the SDK}
   couchbase.observability:
     docs: true
     public:
       - get_otel_meter
       - get_otel_tracer
-    compat: []
+    compat: {}
   couchbase.observability.metrics:
     docs: true
     public:
       - Meter
       - ValueRecorder
-    compat: []
+    compat: {}
   couchbase.observability.otel_metrics:
     public:
       - OtelWrapperMeter
       - OtelWrapperValueRecorder
       - get_otel_meter
-    compat: []
+    compat: {}
   couchbase.observability.otel_tracing:
     public:
       - OtelWrapperSpan
       - OtelWrapperTracer
       - get_otel_tracer
-    compat: []
+    compat: {}
   couchbase.observability.tracing:
     docs: true
     public:
@@ -2144,7 +2146,7 @@ modules:
       - SpanAttributeValue
       - SpanAttributes
       - SpanStatusCode
-    compat: []
+    compat: {}
   couchbase.options:
     docs: true
     public:
@@ -2227,32 +2229,32 @@ modules:
       - WaitUntilReadyOptions
       - WanDevelopmentProfile
     compat:
-      - DefaultJsonSerializer
-      - DurabilityParser
-      - InvalidArgumentException
-      - Supportability
-      - forward_args
-      - get_valid_args
-      - get_valid_multi_args
-      - timedelta_as_milliseconds
-      - timedelta_as_timestamp
-      - validate_int
+      DefaultJsonSerializer: couchbase.serializer
+      DurabilityParser: {from: couchbase.common._durability, none: internal to the SDK}
+      InvalidArgumentException: couchbase.exceptions
+      Supportability: {from: couchbase.common._supportability, none: internal to the SDK}
+      forward_args: {from: couchbase.protocol.classic._wire, none: internal to the SDK}
+      get_valid_args: {from: couchbase.protocol.classic._wire, none: internal to the SDK}
+      get_valid_multi_args: {from: couchbase.protocol.classic._wire, none: internal to the SDK}
+      timedelta_as_milliseconds: {from: couchbase.common._transforms, none: internal to the SDK}
+      timedelta_as_timestamp: {from: couchbase.common._transforms, none: internal to the SDK}
+      validate_int: {from: couchbase.common._transforms, none: internal to the SDK}
   couchbase.otel_tracer:
     public:
       - CouchbaseOtelSpan
       - CouchbaseOtelTracer
-    compat: []
+    compat: {}
   couchbase.protocol:
     public: []
-    compat: []
+    compat: {}
   couchbase.protocol.classic:
     public: []
-    compat: []
+    compat: {}
   couchbase.replica_reads:
     docs: true
     public:
       - ReadPreference
-    compat: []
+    compat: {}
   couchbase.result:
     docs: true
     public:
@@ -2287,12 +2289,12 @@ modules:
       - ValueResult
       - ViewResult
     compat:
-      - HttpResult
+      HttpResult: {from: couchbase._legacy, none: nothing in the SDK returns one}
   couchbase.scope:
     docs: true
     public:
       - Scope
-    compat: []
+    compat: {}
   couchbase.search:
     docs: true
     public:
@@ -2343,9 +2345,9 @@ modules:
       - TermRangeQuery
       - WildcardQuery
     compat:
-      - NoChildrenException
-      - SearchOptions
-      - SearchQueryBuilder
+      NoChildrenException: couchbase.exceptions
+      SearchOptions: couchbase.options
+      SearchQueryBuilder: {from: couchbase.protocol.classic._search, none: internal to the SDK}
   couchbase.search_scoring:
     docs: true
     public:
@@ -2353,13 +2355,13 @@ modules:
       - RelativeScoreFusion
       - ScoringNone
       - SearchScoring
-    compat: []
+    compat: {}
   couchbase.serializer:
     docs: true
     public:
       - DefaultJsonSerializer
       - Serializer
-    compat: []
+    compat: {}
   couchbase.subdocument:
     docs: true
     public:
@@ -2386,14 +2388,14 @@ modules:
       - upsert
       - with_expiry
     compat:
-      - ArrayValues
-      - MutateInOptions
-      - SubDocOp
+      ArrayValues: {from: couchbase.common.subdocument, none: internal to the SDK}
+      MutateInOptions: couchbase.options
+      SubDocOp: {from: couchbase.common.subdocument, none: internal to the SDK}
   couchbase.tracing:
     public: []
     compat:
-      - CouchbaseSpan
-      - CouchbaseTracer
+      CouchbaseSpan: {from: couchbase.common._tracing, use: couchbase.observability.tracing.RequestSpan}
+      CouchbaseTracer: {from: couchbase.common._tracing, use: couchbase.observability.tracing.RequestTracer}
   couchbase.transactions:
     docs: true
     public:
@@ -2409,29 +2411,29 @@ modules:
       - TransactionQueryResults
       - TransactionResult
       - Transactions
-    compat: []
+    compat: {}
   couchbase.transactions.transaction_get_result:
     public:
       - TransactionGetResult
-    compat: []
+    compat: {}
   couchbase.transactions.transaction_keyspace:
     public:
       - TransactionKeyspace
-    compat: []
+    compat: {}
   couchbase.transactions.transaction_query_results:
     public:
       - TransactionQueryResults
-    compat: []
+    compat: {}
   couchbase.transactions.transaction_result:
     public:
       - TransactionResult
-    compat: []
+    compat: {}
   couchbase.transactions.transactions:
     docs: true
     public:
       - AttemptContext
       - Transactions
-    compat: []
+    compat: {}
   couchbase.transactions.transactions_get_multi:
     docs: true
     public:
@@ -2442,7 +2444,7 @@ modules:
       - TransactionGetMultiResult
       - TransactionGetMultiSpec
       - TransactionMultiContentProxy
-    compat: []
+    compat: {}
   couchbase.transcoder:
     docs: true
     public:
@@ -2453,20 +2455,20 @@ modules:
       - RawStringTranscoder
       - Transcoder
     compat:
-      - DefaultJsonSerializer
-      - FMT_BYTES
-      - FMT_COMMON_MASK
-      - FMT_JSON
-      - FMT_LEGACY_MASK
-      - FMT_PICKLE
-      - FMT_UTF8
+      DefaultJsonSerializer: couchbase.serializer
+      FMT_BYTES: couchbase.constants
+      FMT_COMMON_MASK: couchbase.constants
+      FMT_JSON: couchbase.constants
+      FMT_LEGACY_MASK: couchbase.constants
+      FMT_PICKLE: couchbase.constants
+      FMT_UTF8: couchbase.constants
   couchbase.vector_search:
     docs: true
     public:
       - VectorQuery
       - VectorQueryCombination
       - VectorSearch
-    compat: []
+    compat: {}
   couchbase.views:
     docs: true
     public:
@@ -2476,7 +2478,7 @@ modules:
       - ViewRow
       - ViewScanConsistency
     compat:
-      - ViewQuery
+      ViewQuery: {from: couchbase.protocol.classic._views, none: internal to the SDK}
   couchbase.warnings:
     docs: true
     public:
@@ -2484,7 +2486,7 @@ modules:
       - CouchbaseDeprecationWarning
       - CouchbaseOptionWarning
       - CouchbaseWarning
-    compat: []
+    compat: {}
   txcouchbase:
     docs: true
     public:
@@ -2492,7 +2494,7 @@ modules:
       - enable_protocol_logger_to_save_network_traffic_to_file
       - get_metadata
       - get_transactions_protocol
-    compat: []
+    compat: {}
   txcouchbase.analytics:
     public:
       - AnalyticsError
@@ -2501,7 +2503,7 @@ modules:
       - AnalyticsScanConsistency
       - AnalyticsStatus
       - AnalyticsWarning
-    compat: []
+    compat: {}
   txcouchbase.auth:
     public:
       - AuthDomain
@@ -2509,30 +2511,30 @@ modules:
       - CertificateAuthenticator
       - JwtAuthenticator
       - PasswordAuthenticator
-    compat: []
+    compat: {}
   txcouchbase.binary_collection:
     docs: true
     public:
       - BinaryCollection
-    compat: []
+    compat: {}
   txcouchbase.bucket:
     docs: true
     public:
       - Bucket
       - TxBucket
-    compat: []
+    compat: {}
   txcouchbase.cluster:
     docs: true
     public:
       - Cluster
       - TxCluster
-    compat: []
+    compat: {}
   txcouchbase.collection:
     docs: true
     public:
       - Collection
       - TxCollection
-    compat: []
+    compat: {}
   txcouchbase.constants:
     public:
       - FMT_BYTES
@@ -2541,7 +2543,7 @@ modules:
       - FMT_LEGACY_MASK
       - FMT_PICKLE
       - FMT_UTF8
-    compat: []
+    compat: {}
   txcouchbase.diagnostics:
     public:
       - ClusterState
@@ -2550,7 +2552,7 @@ modules:
       - EndpointState
       - PingState
       - ServiceType
-    compat: []
+    compat: {}
   txcouchbase.durability:
     public:
       - ClientDurability
@@ -2561,7 +2563,7 @@ modules:
       - PersistToExtended
       - ReplicateTo
       - ServerDurability
-    compat: []
+    compat: {}
   txcouchbase.encryption:
     public:
       - CryptoManager
@@ -2570,31 +2572,31 @@ modules:
       - EncryptionResult
       - Key
       - Keyring
-    compat: []
+    compat: {}
   txcouchbase.encryption.crypto_manager:
     public:
       - CryptoManager
-    compat: []
+    compat: {}
   txcouchbase.encryption.decrypter:
     public:
       - Decrypter
-    compat: []
+    compat: {}
   txcouchbase.encryption.encrypter:
     public:
       - Encrypter
-    compat: []
+    compat: {}
   txcouchbase.encryption.encryption_result:
     public:
       - EncryptionResult
-    compat: []
+    compat: {}
   txcouchbase.encryption.key:
     public:
       - Key
-    compat: []
+    compat: {}
   txcouchbase.encryption.keyring:
     public:
       - Keyring
-    compat: []
+    compat: {}
   txcouchbase.exceptions:
     public:
       - AlreadyQueriedException
@@ -2715,10 +2717,10 @@ modules:
       - XattrNoAccessException
       - XattrUnknownMacroException
       - XattrUnknownVirtualAttributeException
-    compat: []
+    compat: {}
   txcouchbase.management:
     public: []
-    compat: []
+    compat: {}
   txcouchbase.management.analytics:
     docs: true
     public:
@@ -2733,7 +2735,7 @@ modules:
       - CouchbaseAnalyticsEncryptionSettings
       - CouchbaseRemoteAnalyticsLink
       - S3ExternalAnalyticsLink
-    compat: []
+    compat: {}
   txcouchbase.management.buckets:
     docs: true
     public:
@@ -2747,7 +2749,7 @@ modules:
       - EjectionMethod
       - EvictionPolicyType
       - StorageBackend
-    compat: []
+    compat: {}
   txcouchbase.management.collections:
     docs: true
     public:
@@ -2756,7 +2758,7 @@ modules:
       - CreateCollectionSettings
       - ScopeSpec
       - UpdateCollectionSettings
-    compat: []
+    compat: {}
   txcouchbase.management.options:
     public:
       - AllowQueryingSearchIndexOptions
@@ -2833,20 +2835,20 @@ modules:
       - UpsertSearchIndexOptions
       - UpsertUserOptions
       - WatchQueryIndexOptions
-    compat: []
+    compat: {}
   txcouchbase.management.queries:
     docs: true
     public:
       - QueryIndex
       - QueryIndexManager
-    compat: []
+    compat: {}
   txcouchbase.management.search:
     docs: true
     public:
       - ScopeSearchIndexManager
       - SearchIndex
       - SearchIndexManager
-    compat: []
+    compat: {}
   txcouchbase.management.users:
     docs: true
     public:
@@ -2858,7 +2860,7 @@ modules:
       - User
       - UserAndMetadata
       - UserManager
-    compat: []
+    compat: {}
   txcouchbase.management.views:
     docs: true
     public:
@@ -2866,11 +2868,11 @@ modules:
       - DesignDocumentNamespace
       - View
       - ViewIndexManager
-    compat: []
+    compat: {}
   txcouchbase.mutation_state:
     public:
       - MutationState
-    compat: []
+    compat: {}
   txcouchbase.n1ql:
     public:
       - QueryError
@@ -2880,29 +2882,29 @@ modules:
       - QueryScanConsistency
       - QueryStatus
       - QueryWarning
-    compat: []
+    compat: {}
   txcouchbase.observability:
     public:
       - get_otel_meter
       - get_otel_tracer
-    compat: []
+    compat: {}
   txcouchbase.observability.metrics:
     public:
       - Meter
       - ValueRecorder
-    compat: []
+    compat: {}
   txcouchbase.observability.otel_metrics:
     public:
       - OtelWrapperMeter
       - OtelWrapperValueRecorder
       - get_otel_meter
-    compat: []
+    compat: {}
   txcouchbase.observability.otel_tracing:
     public:
       - OtelWrapperSpan
       - OtelWrapperTracer
       - get_otel_tracer
-    compat: []
+    compat: {}
   txcouchbase.observability.tracing:
     public:
       - RequestSpan
@@ -2910,7 +2912,7 @@ modules:
       - SpanAttributeValue
       - SpanAttributes
       - SpanStatusCode
-    compat: []
+    compat: {}
   txcouchbase.options:
     public:
       - AcceptableInts
@@ -2992,24 +2994,24 @@ modules:
       - WaitUntilReadyOptions
       - WanDevelopmentProfile
     compat:
-      - forward_args
-      - get_valid_args
-      - get_valid_multi_args
+      forward_args: {from: couchbase.protocol.classic._wire, none: internal to the SDK}
+      get_valid_args: {from: couchbase.protocol.classic._wire, none: internal to the SDK}
+      get_valid_multi_args: {from: couchbase.protocol.classic._wire, none: internal to the SDK}
   txcouchbase.otel_tracer:
     public:
       - CouchbaseOtelSpan
       - CouchbaseOtelTracer
-    compat: []
+    compat: {}
   txcouchbase.protocol:
     public: []
-    compat: []
+    compat: {}
   txcouchbase.protocol.classic:
     public: []
-    compat: []
+    compat: {}
   txcouchbase.replica_reads:
     public:
       - ReadPreference
-    compat: []
+    compat: {}
   txcouchbase.result:
     public:
       - AnalyticsResult
@@ -3041,13 +3043,13 @@ modules:
       - SearchResult
       - ValueResult
       - ViewResult
-    compat: []
+    compat: {}
   txcouchbase.scope:
     docs: true
     public:
       - Scope
       - TxScope
-    compat: []
+    compat: {}
   txcouchbase.search:
     public:
       - BooleanFieldQuery
@@ -3096,19 +3098,19 @@ modules:
       - TermQuery
       - TermRangeQuery
       - WildcardQuery
-    compat: []
+    compat: {}
   txcouchbase.search_scoring:
     public:
       - ReciprocalRankFusion
       - RelativeScoreFusion
       - ScoringNone
       - SearchScoring
-    compat: []
+    compat: {}
   txcouchbase.serializer:
     public:
       - DefaultJsonSerializer
       - Serializer
-    compat: []
+    compat: {}
   txcouchbase.subdocument:
     public:
       - LookupInMacro
@@ -3134,8 +3136,8 @@ modules:
       - upsert
       - with_expiry
     compat:
-      - ArrayValues
-      - SubDocOp
+      ArrayValues: {from: couchbase.common.subdocument, none: internal to the SDK}
+      SubDocOp: {from: couchbase.common.subdocument, none: internal to the SDK}
   txcouchbase.transcoder:
     public:
       - JSONTranscoder
@@ -3144,13 +3146,13 @@ modules:
       - RawJSONTranscoder
       - RawStringTranscoder
       - Transcoder
-    compat: []
+    compat: {}
   txcouchbase.vector_search:
     public:
       - VectorQuery
       - VectorQueryCombination
       - VectorSearch
-    compat: []
+    compat: {}
   txcouchbase.views:
     public:
       - ViewErrorMode
@@ -3158,14 +3160,14 @@ modules:
       - ViewOrdering
       - ViewRow
       - ViewScanConsistency
-    compat: []
+    compat: {}
   txcouchbase.warnings:
     public:
       - CouchbaseApplicabilityWarning
       - CouchbaseDeprecationWarning
       - CouchbaseOptionWarning
       - CouchbaseWarning
-    compat: []
+    compat: {}
 
 # Per public couchbase module outside common/, what each other API has at its path: own, a module
 # the API writes; shim, one tools/check_public_api.py --write renders from the entry above; or none,

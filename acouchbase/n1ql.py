@@ -28,6 +28,9 @@ __all__ = [
     'QueryWarning',
 ]
 
+from typing import TYPE_CHECKING
+
+from couchbase.common._supportability import Supportability
 from couchbase.common.n1ql import QueryError  # noqa: F401
 from couchbase.common.n1ql import QueryMetaData  # noqa: F401
 from couchbase.common.n1ql import QueryMetrics  # noqa: F401
@@ -35,4 +38,6 @@ from couchbase.common.n1ql import QueryProfile  # noqa: F401
 from couchbase.common.n1ql import QueryScanConsistency  # noqa: F401
 from couchbase.common.n1ql import QueryStatus  # noqa: F401
 from couchbase.common.n1ql import QueryWarning  # noqa: F401
-from couchbase.protocol.classic._n1ql import N1QLQuery  # noqa: F401
+
+if not TYPE_CHECKING:
+    __getattr__ = Supportability.deprecated_paths(__name__)
