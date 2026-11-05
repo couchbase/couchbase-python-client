@@ -3,7 +3,7 @@ from datetime import timedelta
 from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster, get_event_loop
 from acouchbase.durability import (ClientDurability,
-                                   Durability,
+                                   DurabilityLevel,
                                    PersistTo,
                                    ReplicateTo,
                                    ServerDurability)
@@ -66,19 +66,19 @@ async def main():
 
     try:
         # Replace document with CAS
-        result = await collection.get("document-key")
-        doc = result.content_as[dict]
+        get_result = await collection.get("document-key")
+        doc = get_result.content_as[dict]
         doc["bar"] = "baz"
-        opts = ReplaceOptions(cas=result.cas)
-        result = await collection.replace("document-key", doc, opts)
+        result = await collection.replace("document-key", doc, ReplaceOptions(cas=get_result.cas))
     except CouchbaseException as ex:
         print('Caught Couchbase exception: {}'.format(ex))
 
     try:
         # Upsert with Durability (Couchbase Server >= 6.5) level Majority
         document = dict(foo="bar", bar="foo")
-        opts = UpsertOptions(durability=ServerDurability(Durability.MAJORITY))
-        result = await collection.upsert("document-key", document, opts)
+        result = await collection.upsert("document-key",
+                                         document,
+                                         UpsertOptions(durability=ServerDurability(DurabilityLevel.MAJORITY)))
     except CouchbaseException as ex:
         print('Caught Couchbase exception: {}'.format(ex))
 
@@ -94,12 +94,11 @@ async def main():
     # except CouchbaseException as ex:
     #     print(ex)
 
-    result = await collection.get("document-key")
-    print(result.content_as[dict])
+    get_result = await collection.get("document-key")
+    print(get_result.content_as[dict])
 
-    opts = GetOptions(timeout=timedelta(seconds=5))
-    result = await collection.get("document-key", opts)
-    print(result.content_as[dict])
+    get_result = await collection.get("document-key", GetOptions(timeout=timedelta(seconds=5)))
+    print(get_result.content_as[dict])
 
     try:
         # remove document with options
@@ -108,7 +107,7 @@ async def main():
             RemoveOptions(
                 cas=12345,
                 durability=ServerDurability(
-                    Durability.MAJORITY)))
+                    DurabilityLevel.MAJORITY)))
     except CouchbaseException as ex:
         # we expect an exception here as the CAS value is chosen
         # for example purposes
@@ -116,10 +115,10 @@ async def main():
 
     result = await collection.touch("document-key", timedelta(seconds=10))
 
-    result = await collection.get("document-key", GetOptions(with_expiry=True))
-    print("Expiry of result: {}".format(result.expiryTime))
+    get_result = await collection.get("document-key", GetOptions(with_expiry=True))
+    print("Expiry of result: {}".format(get_result.expiry_time))
 
-    result = await collection.get_and_touch("document-key", timedelta(seconds=10))
+    get_result = await collection.get_and_touch("document-key", timedelta(seconds=10))
 
     # Increment binary value by 1
     await collection.binary().increment(

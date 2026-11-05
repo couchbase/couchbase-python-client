@@ -161,7 +161,7 @@ def _mutation_from_core(raw: CppUpsertResponse) -> _MutationRecord:
 
 def _counter_from_core(raw: CppIncrementResponse | CppDecrementResponse) -> _CounterRecord:
     return _CounterRecord(cas=raw.get('cas', 0),
-                          content=raw.get('content'),
+                          content=raw['content'],
                           mutation_token=_mutation_token_from_core(raw.get('token')))
 
 
@@ -189,9 +189,9 @@ def _mutate_in_from_core(raw: CppMutateInResponse, key: str | None) -> _MutateIn
 
 def _scan_item_from_core(raw: _CoreScanItem) -> _ScanItemRecord:
     """One item of a range scan. The core sends no ``body`` for a scan that asked for ids only."""
-    item = raw.get('scan_item') or {}
+    item = raw['scan_item']
     body = item.get('body')
-    return _ScanItemRecord(id=item.get('key'),
+    return _ScanItemRecord(id=item['key'],
                            body=None if body is None else _ScanItemBodyRecord(
                                cas=body['cas'],
                                value=body['value'],

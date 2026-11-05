@@ -2,7 +2,7 @@ import json
 import os
 import pathlib
 from time import sleep
-from typing import List, Optional
+from typing import List
 from uuid import uuid4
 
 import couchbase.search as search
@@ -36,9 +36,9 @@ TEST_SEARCH_VECTOR_PATH = os.path.join(TEST_PATH,
 def check_doc_count(sixm,
                     idx_name: str,
                     min_count: int,
-                    retries: Optional[int] = 20,
-                    delay: Optional[int] = 30
-                    ) -> bool:
+                    retries: int = 20,
+                    delay: int = 30
+                    ) -> int:
 
     indexed_docs = 0
     no_docs_cutoff = 300

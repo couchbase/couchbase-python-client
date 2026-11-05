@@ -126,7 +126,7 @@ class _MutationRecord:
 @dataclass(frozen=True)
 class _CounterRecord:
     cas: int
-    content: int | None
+    content: int
     mutation_token: _MutationTokenRecord | None
 
 
@@ -198,7 +198,7 @@ class _ScanItemBodyRecord:
 
 @dataclass(frozen=True)
 class _ScanItemRecord:
-    id: str | None
+    id: str
     body: _ScanItemBodyRecord | None
 
 
@@ -340,7 +340,7 @@ class Result:
         self._key = key
 
     @property
-    def value(self) -> Any | None:
+    def value(self) -> Any:
         """The content of the document, if it exists."""
         if self._decoded_value is None:
             self._decoded_value = self._decode_value()
@@ -352,7 +352,7 @@ class Result:
         return self._record.cas
 
     @property
-    def flags(self) -> int | None:
+    def flags(self) -> int:
         """The document's flags, which the transcoder reads to decode it."""
         # Only a response that carries a document carries its flags; the rest read 0.
         return 0
@@ -431,7 +431,7 @@ class GetReplicaResult(Result):
         super().__init__(record, transcoder=transcoder, key=key)
 
     @property
-    def flags(self) -> int | None:
+    def flags(self) -> int:
         """The document's flags, which the transcoder reads to decode it."""
         return self._record.flags
 
@@ -484,7 +484,7 @@ class GetResult(Result):
         super().__init__(record, transcoder=transcoder, key=key)
 
     @property
-    def flags(self) -> int | None:
+    def flags(self) -> int:
         """The document's flags, which the transcoder reads to decode it."""
         return self._record.flags
 
@@ -536,7 +536,7 @@ class ExistsResult(Result):
         super().__init__(record, key=key)
 
     @property
-    def flags(self) -> int | None:
+    def flags(self) -> int:
         """The document's flags, which the transcoder reads to decode it."""
         flags = self._record.flags
         return 0 if flags is None else flags
@@ -794,7 +794,7 @@ class CounterResult(MutationResult):
         return self._record.cas
 
     @property
-    def content(self) -> int | None:
+    def content(self) -> int:
         """The value of the document after the operation completed."""
         return self._record.content
 
@@ -816,7 +816,7 @@ class ScanResult(Result):
         self._ids_only = ids_only
 
     @property
-    def id(self) -> str | None:
+    def id(self) -> str:
         """The document's ID."""
         return self._record.id
 
@@ -835,7 +835,7 @@ class ScanResult(Result):
         return 0 if body is None else body.cas
 
     @property
-    def flags(self) -> int | None:
+    def flags(self) -> int:
         """The document's flags, which the transcoder reads to decode it."""
         body = self._record.body
         return 0 if body is None else body.flags
@@ -1119,7 +1119,7 @@ class _ClusterReport(Result):
         return None
 
     @property
-    def flags(self) -> int | None:
+    def flags(self) -> int:
         """Always 0.
 
         .. deprecated:: 4.7.0

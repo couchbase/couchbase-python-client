@@ -29,7 +29,7 @@ from datetime import timedelta
 from couchbase import configure_logging
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
-from couchbase.options import ClusterOptions
+from couchbase.options import ClusterMetricsOptions, ClusterOptions
 
 # Connection settings
 CONNECTION_STRING = 'couchbase://localhost'
@@ -133,7 +133,7 @@ try:
         PasswordAuthenticator(USERNAME, PASSWORD),
         tracing_threshold_kv=timedelta(milliseconds=10),  # 10ms threshold
         tracing_threshold_queue_flush_interval=timedelta(milliseconds=5000),  # Report every 5 seconds
-        metrics_emit_interval=timedelta(milliseconds=15000),  # Report every 15 seconds (faster for demo)
+        metrics_options=ClusterMetricsOptions(emit_interval=timedelta(milliseconds=15000)),  # Report every 15 seconds
     )
 
     cluster = Cluster(CONNECTION_STRING, opts)

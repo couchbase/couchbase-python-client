@@ -37,8 +37,11 @@ def main():
         for row in result.rows():
             print(f'Found row: {row}')
 
-        metrics = result.metadata().metrics()
-        print(f'Query execution time: {metrics.execution_time()}')
+        # The metadata, and the metrics in it, arrive once every row has been read.
+        metadata = result.metadata()
+        metrics = metadata.metrics() if metadata is not None else None
+        if metrics is not None:
+            print(f'Query execution time: {metrics.execution_time()}')
 
     except ParsingFailedException as ex:
         import traceback
@@ -77,8 +80,10 @@ def main():
     result = yield cluster.query("SELECT 1=1", QueryOptions(metrics=True))
     rows = [r for r in result]
 
-    print("Execution time: {}".format(
-        result.metadata().metrics().execution_time()))
+    metadata = result.metadata()
+    metrics = metadata.metrics() if metadata is not None else None
+    if metrics is not None:
+        print("Execution time: {}".format(metrics.execution_time()))
 
     # print scan consistency
     result = yield cluster.query(
@@ -119,9 +124,9 @@ def main():
         QueryOptions(read_only=True))
     rows = [r for r in result]
 
-    reactor.stop()
+    reactor.stop()  # type: ignore[attr-defined]
 
 
 if __name__ == "__main__":
     main()
-    reactor.run()
+    reactor.run()  # type: ignore[attr-defined]

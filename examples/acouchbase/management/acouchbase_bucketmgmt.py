@@ -57,10 +57,10 @@ async def main():
 
     # Creating a bucket can take some time depending on what
     # the cluster is doing, good to use retries
-    bucket = await retry(bucket_manager.get_bucket, "hello")
+    bucket_settings = await retry(bucket_manager.get_bucket, "hello")
 
-    bucket = await bucket_manager.get_bucket("hello")
-    print("Found bucket: {}".format(bucket.name))
+    bucket_settings = await bucket_manager.get_bucket("hello")
+    print("Found bucket: {}".format(bucket_settings.name))
 
     await bucket_manager.update_bucket(BucketSettings(name="hello", flush_enabled=True))
 

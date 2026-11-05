@@ -58,7 +58,7 @@ collection_spec = CollectionSpec(
     scope_name="example-scope")
 
 try:
-    collection = coll_manager.create_collection(collection_spec)
+    coll_manager.create_collection(collection_spec)
 except CollectionAlreadyExistsException as ex:
     print(ex)
 

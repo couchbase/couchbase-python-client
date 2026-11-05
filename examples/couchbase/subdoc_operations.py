@@ -2,7 +2,7 @@ import couchbase.subdocument as SD
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.durability import (ClientDurability,
-                                  Durability,
+                                  DurabilityLevel,
                                   PersistTo,
                                   ReplicateTo,
                                   ServerDurability)
@@ -171,7 +171,7 @@ try:
     collection.mutate_in(
         "customer123", [
             SD.array_addunique(
-                "purchases.complete", {"new": "object"})])
+                "purchases.complete", {"new": "object"})])  # type: ignore[arg-type]
 except SubdocCantInsertValueException as ex:
     print("Cannot add JSON value w/ array_addunique.", ex)
 
@@ -205,7 +205,7 @@ collection.mutate_in("array", [SD.array_append("", ["another", "array"])])
 collection.mutate_in("array", [SD.array_insert("[3][2]", "!")])
 
 
-result = collection.mutate_in("customer123", (SD.counter("logins", 1),))
+collection.mutate_in("customer123", (SD.counter("logins", 1),))
 num_logins = collection.get("customer123").content_as[dict]["logins"]
 print('Number of logins: {}.'.format(num_logins))
 # Number of logins: 1.
@@ -254,7 +254,7 @@ try:
     collection.mutate_in(
         "customer123", [SD.insert("username", "dreynholm")],
         MutateInOptions(durability=ServerDurability(
-                        Durability.MAJORITY)))
+                        DurabilityLevel.MAJORITY)))
 except DurabilityImpossibleException as ex:
     print('Need to have more than 1 node for durability')
     print(ex)

@@ -56,10 +56,10 @@ except BucketAlreadyExistsException:
 
 # Creating a bucket can take some time depending on what
 # the cluster is doing, good to use retries
-bucket = retry(bucket_manager.get_bucket, "hello")
+bucket_settings = retry(bucket_manager.get_bucket, "hello")
 
-bucket = bucket_manager.get_bucket("hello")
-print("Found bucket: {}".format(bucket.name))
+bucket_settings = bucket_manager.get_bucket("hello")
+print("Found bucket: {}".format(bucket_settings.name))
 
 bucket_manager.update_bucket(BucketSettings(name="hello", flush_enabled=True))
 

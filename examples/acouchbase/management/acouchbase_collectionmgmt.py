@@ -61,7 +61,7 @@ async def main():
         scope_name="example-scope")
 
     try:
-        collection = await coll_manager.create_collection(collection_spec)
+        await coll_manager.create_collection(collection_spec)
     except CollectionAlreadyExistsException as ex:
         print(ex)
 

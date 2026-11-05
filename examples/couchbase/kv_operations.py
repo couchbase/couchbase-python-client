@@ -3,7 +3,7 @@ from datetime import timedelta
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.durability import (ClientDurability,
-                                  Durability,
+                                  DurabilityLevel,
                                   PersistTo,
                                   ReplicateTo,
                                   ServerDurability)
@@ -62,19 +62,19 @@ except CASMismatchException as ex:
 
 try:
     # Replace document with CAS
-    result = collection.get("document-key")
-    doc = result.content_as[dict]
+    get_result = collection.get("document-key")
+    doc = get_result.content_as[dict]
     doc["bar"] = "baz"
-    opts = ReplaceOptions(cas=result.cas)
-    result = collection.replace("document-key", doc, opts)
+    result = collection.replace("document-key", doc, ReplaceOptions(cas=get_result.cas))
 except CouchbaseException as ex:
     print('Caught Couchbase exception: {}'.format(ex))
 
 try:
     # Upsert with Durability (Couchbase Server >= 6.5) level Majority
     document = dict(foo="bar", bar="foo")
-    opts = UpsertOptions(durability=ServerDurability(Durability.MAJORITY))
-    result = collection.upsert("document-key", document, opts)
+    result = collection.upsert("document-key",
+                               document,
+                               UpsertOptions(durability=ServerDurability(DurabilityLevel.MAJORITY)))
 except CouchbaseException as ex:
     print('Caught Couchbase exception: {}'.format(ex))
 
@@ -90,12 +90,11 @@ except CouchbaseException as ex:
 # except CouchbaseException as ex:
 #     print(ex)
 
-result = collection.get("document-key")
-print(result.content_as[dict])
+get_result = collection.get("document-key")
+print(get_result.content_as[dict])
 
-opts = GetOptions(timeout=timedelta(seconds=5))
-result = collection.get("document-key", opts)
-print(result.content_as[dict])
+get_result = collection.get("document-key", GetOptions(timeout=timedelta(seconds=5)))
+print(get_result.content_as[dict])
 
 try:
     # remove document with options
@@ -104,7 +103,7 @@ try:
         RemoveOptions(
             cas=12345,
             durability=ServerDurability(
-                Durability.MAJORITY)))
+                DurabilityLevel.MAJORITY)))
 except CouchbaseException as ex:
     # we expect an exception here as the CAS value is chosen
     # for example purposes
@@ -112,10 +111,10 @@ except CouchbaseException as ex:
 
 result = collection.touch("document-key", timedelta(seconds=10))
 
-result = collection.get("document-key", GetOptions(with_expiry=True))
-print("Expiry of result: {}".format(result.expiryTime))
+get_result = collection.get("document-key", GetOptions(with_expiry=True))
+print("Expiry of result: {}".format(get_result.expiry_time))
 
-result = collection.get_and_touch("document-key", timedelta(seconds=10))
+get_result = collection.get_and_touch("document-key", timedelta(seconds=10))
 
 # Increment binary value by 1
 collection.binary().increment(

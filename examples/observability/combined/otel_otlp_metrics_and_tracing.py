@@ -46,7 +46,7 @@ from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.observability.otel_metrics import get_otel_meter
-from couchbase.observability.otel_tracing import get_otel_tracer
+from couchbase.observability.otel_tracing import OtelWrapperSpan, get_otel_tracer
 from couchbase.options import (ClusterOptions,
                                GetOptions,
                                QueryOptions,
@@ -179,8 +179,10 @@ def perform_operations_with_parent(collection, cluster):
 
     print("\nExecuting workload (generating traces and metrics)...")
 
-    with app_tracer.start_as_current_span("process_batch") as parent_span:
-        parent_span.set_attribute("batch.size", len(docs))
+    with app_tracer.start_as_current_span("process_batch") as otel_span:
+        otel_span.set_attribute("batch.size", len(docs))
+        # The SDK takes its own span type as a parent, so wrap the OpenTelemetry span.
+        parent_span = OtelWrapperSpan(otel_span, "process_batch")
 
         for key, doc in docs.items():
             collection.upsert(key, doc, UpsertOptions(parent_span=parent_span))

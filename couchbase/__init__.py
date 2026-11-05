@@ -24,7 +24,7 @@ import platform
 from typing import TYPE_CHECKING, Any
 
 try:
-    from couchbase._version import __version__
+    from couchbase._version import __version__ as __version__
 except ImportError:
     __version__ = '0.0.0-could-not-find-version'
 

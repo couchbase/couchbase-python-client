@@ -9,7 +9,7 @@ from twisted.internet import defer, reactor
 from txcouchbase.auth import PasswordAuthenticator
 from txcouchbase.cluster import Cluster
 from txcouchbase.durability import (ClientDurability,
-                                    Durability,
+                                    DurabilityLevel,
                                     PersistTo,
                                     ReplicateTo,
                                     ServerDurability)
@@ -78,19 +78,19 @@ def main():
 
     try:
         # Replace document with CAS
-        result = yield collection.get("document-key")
-        doc = result.content_as[dict]
+        get_result = yield collection.get("document-key")
+        doc = get_result.content_as[dict]
         doc["bar"] = "baz"
-        opts = ReplaceOptions(cas=result.cas)
-        result = yield collection.replace("document-key", doc, opts)
+        result = yield collection.replace("document-key", doc, ReplaceOptions(cas=get_result.cas))
     except CouchbaseException as ex:
         print('Caught Couchbase exception: {}'.format(ex))
 
     try:
         # Upsert with Durability (Couchbase Server >= 6.5) level Majority
         document = dict(foo="bar", bar="foo")
-        opts = UpsertOptions(durability=ServerDurability(Durability.MAJORITY))
-        result = yield collection.upsert("document-key", document, opts)
+        result = yield collection.upsert("document-key",
+                                         document,
+                                         UpsertOptions(durability=ServerDurability(DurabilityLevel.MAJORITY)))
     except CouchbaseException as ex:
         print('Caught Couchbase exception: {}'.format(ex))
 
@@ -106,12 +106,11 @@ def main():
     # except CouchbaseException as ex:
     #     print(ex)
 
-    result = yield collection.get("document-key")
-    print(result.content_as[dict])
+    get_result = yield collection.get("document-key")
+    print(get_result.content_as[dict])
 
-    opts = GetOptions(timeout=timedelta(seconds=5))
-    result = yield collection.get("document-key", opts)
-    print(result.content_as[dict])
+    get_result = yield collection.get("document-key", GetOptions(timeout=timedelta(seconds=5)))
+    print(get_result.content_as[dict])
 
     try:
         # remove document with options
@@ -120,7 +119,7 @@ def main():
             RemoveOptions(
                 cas=12345,
                 durability=ServerDurability(
-                    Durability.MAJORITY)))
+                    DurabilityLevel.MAJORITY)))
     except CouchbaseException as ex:
         # we expect an exception here as the CAS value is chosen
         # for example purposes
@@ -128,10 +127,10 @@ def main():
 
     result = yield collection.touch("document-key", timedelta(seconds=10))
 
-    result = yield collection.get("document-key", GetOptions(with_expiry=True))
-    print("Expiry of result: {}".format(result.expiryTime))
+    get_result = yield collection.get("document-key", GetOptions(with_expiry=True))
+    print("Expiry of result: {}".format(get_result.expiry_time))
 
-    result = yield collection.get_and_touch("document-key", timedelta(seconds=10))
+    get_result = yield collection.get_and_touch("document-key", timedelta(seconds=10))
 
     # Increment binary value by 1
     yield collection.binary().increment(
@@ -159,9 +158,9 @@ def main():
             delta=DeltaValue(2),
             initial=SignedInt64(1000)))
 
-    reactor.stop()
+    reactor.stop()  # type: ignore[attr-defined]
 
 
 if __name__ == "__main__":
     main()
-    reactor.run()
+    reactor.run()  # type: ignore[attr-defined]

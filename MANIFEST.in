@@ -3,6 +3,7 @@ include couchbase-sdk-python-black-duck-manifest.yaml
 recursive-include couchbase *.py
 recursive-include acouchbase *.py
 recursive-include txcouchbase *.py
+include couchbase/py.typed acouchbase/py.typed txcouchbase/py.typed
 recursive-include src *.[ch]xx
 include deps/couchbase-cxx-client/CMakeLists.txt
 include deps/couchbase-cxx-client/couchbase-sdk-cxx-black-duck-manifest.yaml

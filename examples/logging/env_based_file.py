@@ -89,7 +89,7 @@ try:
     opts = ClusterOptions(
         PasswordAuthenticator(USERNAME, PASSWORD),
         tracing_threshold_kv=timedelta(milliseconds=10),  # 10ms threshold
-        tracing_threshold_query_flush_interval=timedelta(milliseconds=5000),  # Report every 5 seconds
+        tracing_threshold_queue_flush_interval=timedelta(milliseconds=5000),  # Report every 5 seconds
     )
 
     cluster = Cluster(CONNECTION_STRING, opts)

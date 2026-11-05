@@ -126,17 +126,17 @@ class EndpointDiagnosticsReport:
         return ServiceType(self._record.service_type)
 
     @property
-    def id(self) -> str | None:
+    def id(self) -> str:
         """The SDK's identifier for the endpoint's connection."""
         return self._record.id
 
     @property
-    def local(self) -> str | None:
+    def local(self) -> str:
         """The local address of the connection."""
         return self._record.local
 
     @property
-    def remote(self) -> str | None:
+    def remote(self) -> str:
         """The address of the node the endpoint connects to."""
         return self._record.remote
 
@@ -201,17 +201,17 @@ class EndpointPingReport:
         return ServiceType(self._record.service_type)
 
     @property
-    def id(self) -> str | None:
+    def id(self) -> str:
         """The SDK's identifier for the endpoint's connection."""
         return self._record.id
 
     @property
-    def local(self) -> str | None:
+    def local(self) -> str:
         """The local address of the connection."""
         return self._record.local
 
     @property
-    def remote(self) -> str | None:
+    def remote(self) -> str:
         """The address of the node the endpoint connects to."""
         return self._record.remote
 

@@ -22,8 +22,11 @@ def main():
         for row in result.rows():
             print(f'Found row: {row}')
 
-        metrics = result.metadata().metrics()
-        print(f'Query execution time: {metrics.execution_time()}')
+        # The metadata, and the metrics in it, arrive once every row has been read.
+        metadata = result.metadata()
+        metrics = metadata.metrics() if metadata is not None else None
+        if metrics is not None:
+            print(f'Query execution time: {metrics.execution_time()}')
 
     except ParsingFailedException as ex:
         import traceback
@@ -63,8 +66,10 @@ def main():
     # ignore results
     result.execute()
 
-    print("Execution time: {}".format(
-        result.metadata().metrics().execution_time()))
+    metadata = result.metadata()
+    metrics = metadata.metrics() if metadata is not None else None
+    if metrics is not None:
+        print("Execution time: {}".format(metrics.execution_time()))
 
     # print scan consistency
     result = cluster.query(

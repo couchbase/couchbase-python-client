@@ -27,6 +27,10 @@ __all__ = [
 ]
 
 from enum import IntEnum
+from typing import TYPE_CHECKING, overload
+
+if TYPE_CHECKING:
+    from typing_extensions import deprecated
 
 from couchbase.common._supportability import DURABILITY_LEVEL_READ, Supportability
 from couchbase.common._utils import fields_repr
@@ -167,8 +171,16 @@ class ServerDurability:
         level (:class:`DurabilityLevel`): How durable the server makes the mutation.
     """
 
-    def __init__(self, level: DurabilityLevel) -> None:
-        self._level = level
+    if TYPE_CHECKING:
+        @overload
+        def __init__(self, level: DurabilityLevel) -> None: ...
+
+        @overload
+        @deprecated('Durability is deprecated; pass a DurabilityLevel')
+        def __init__(self, level: Durability) -> None: ...
+
+    def __init__(self, level: DurabilityLevel | Durability) -> None:
+        self._level = DurabilityLevel(level)
 
     @property
     def level(self) -> DurabilityLevel:

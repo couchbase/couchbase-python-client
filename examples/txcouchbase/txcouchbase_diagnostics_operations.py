@@ -71,9 +71,9 @@ def main():
 
     print("Cluster state: {}".format(diag_result.state))
 
-    reactor.stop()
+    reactor.stop()  # type: ignore[attr-defined]
 
 
 if __name__ == "__main__":
     main()
-    reactor.run()
+    reactor.run()  # type: ignore[attr-defined]

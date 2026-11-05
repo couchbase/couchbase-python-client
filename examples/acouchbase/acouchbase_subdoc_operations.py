@@ -3,7 +3,7 @@ import acouchbase.subdocument as SD
 from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import Cluster, get_event_loop
 from acouchbase.durability import (ClientDurability,
-                                   Durability,
+                                   DurabilityLevel,
                                    PersistTo,
                                    ReplicateTo,
                                    ServerDurability)
@@ -175,7 +175,7 @@ async def main():
         await collection.mutate_in(
             "customer123", [
                 SD.array_addunique(
-                    "purchases.complete", {"new": "object"})])
+                    "purchases.complete", {"new": "object"})])  # type: ignore[arg-type]
     except SubdocCantInsertValueException as ex:
         print("Cannot add JSON value w/ array_addunique.", ex)
 
@@ -207,7 +207,7 @@ async def main():
     await collection.mutate_in("array", [SD.array_append("", ["another", "array"])])
     await collection.mutate_in("array", [SD.array_insert("[3][2]", "!")])
 
-    result = await collection.mutate_in("customer123", (SD.counter("logins", 1),))
+    await collection.mutate_in("customer123", (SD.counter("logins", 1),))
     customer_result = await collection.get("customer123")
     num_logins = customer_result.content_as[dict]["logins"]
     print('Number of logins: {}.'.format(num_logins))
@@ -257,7 +257,7 @@ async def main():
         await collection.mutate_in(
             "customer123", [SD.insert("username", "dreynholm")],
             MutateInOptions(durability=ServerDurability(
-                            Durability.MAJORITY)))
+                            DurabilityLevel.MAJORITY)))
     except DurabilityImpossibleException as ex:
         print('Need to have more than 1 node for durability')
         print(ex)

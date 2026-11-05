@@ -10,7 +10,7 @@ import txcouchbase.subdocument as SD
 from txcouchbase.auth import PasswordAuthenticator
 from txcouchbase.cluster import Cluster
 from txcouchbase.durability import (ClientDurability,
-                                    Durability,
+                                    DurabilityLevel,
                                     PersistTo,
                                     ReplicateTo,
                                     ServerDurability)
@@ -185,7 +185,7 @@ def main():
         yield collection.mutate_in(
             "customer123", [
                 SD.array_addunique(
-                    "purchases.complete", {"new": "object"})])
+                    "purchases.complete", {"new": "object"})])  # type: ignore[arg-type]
     except SubdocCantInsertValueException as ex:
         print("Cannot add JSON value w/ array_addunique.", ex)
 
@@ -267,14 +267,14 @@ def main():
         yield collection.mutate_in(
             "customer123", [SD.insert("username", "dreynholm")],
             MutateInOptions(durability=ServerDurability(
-                            Durability.MAJORITY)))
+                            DurabilityLevel.MAJORITY)))
     except CouchbaseException as ex:
         print('Need to have more than 1 node for durability')
         print(ex)
 
-    reactor.stop()
+    reactor.stop()  # type: ignore[attr-defined]
 
 
 if __name__ == "__main__":
     main()
-    reactor.run()
+    reactor.run()  # type: ignore[attr-defined]

@@ -132,7 +132,7 @@ class RoleAndDescription:
     """A role the cluster offers, with its description, as :meth:`.UserManager.get_roles` returns it."""
 
     def __init__(self,
-                 role: Role | None = None,
+                 role: Role,
                  display_name: str | None = None,
                  description: str | None = None,
                  ce: bool | None = None,
@@ -144,7 +144,7 @@ class RoleAndDescription:
         self._ce = ce
 
     @property
-    def role(self) -> Role | None:
+    def role(self) -> Role:
         """The role."""
         return self._role
 
@@ -206,17 +206,17 @@ class Origin:
 class RoleAndOrigins:
     """A role a user has, with every reason the user has it."""
 
-    def __init__(self, role: Role | None = None, origins: list[Origin] | None = None) -> None:
+    def __init__(self, role: Role, origins: list[Origin]) -> None:
         self._role = role
         self._origins = origins
 
     @property
-    def role(self) -> Role | None:
+    def role(self) -> Role:
         """The role."""
         return self._role
 
     @property
-    def origins(self) -> list[Origin] | None:
+    def origins(self) -> list[Origin]:
         """Every reason the user has the role."""
         return self._origins
 
@@ -367,12 +367,13 @@ class UserAndMetadata:
     """
 
     def __init__(self,
-                 domain: AuthDomain | None = None,
-                 user: User | None = None,
-                 effective_roles: list[RoleAndOrigins] | None = None,
+                 domain: AuthDomain,
+                 user: User,
+                 effective_roles: list[RoleAndOrigins],
                  password_changed: datetime | None = None,
                  external_groups: set[str] | None = None,
-                 **kwargs: Any
+                 *,
+                 raw_data: dict[str, Any],
                  ) -> None:
 
         self._domain = domain
@@ -380,15 +381,15 @@ class UserAndMetadata:
         self._effective_roles = effective_roles
         self._password_changed = password_changed
         self._external_groups = external_groups
-        self._raw_data = kwargs.get("raw_data", None)
+        self._raw_data = raw_data
 
     @property
-    def domain(self) -> AuthDomain | None:
+    def domain(self) -> AuthDomain:
         """Whether the user is local to the cluster or comes from an external directory."""
         return self._domain
 
     @property
-    def user(self) -> User | None:
+    def user(self) -> User:
         """A copy of the user.
 
         Changing the copy, to pass it to :meth:`.UserManager.upsert_user`, does not change this object.
@@ -396,7 +397,7 @@ class UserAndMetadata:
         return deepcopy(self._user)
 
     @property
-    def effective_roles(self) -> list[RoleAndOrigins] | None:
+    def effective_roles(self) -> list[RoleAndOrigins]:
         """Every role the user has, whether assigned directly or through a group."""
         return self._effective_roles
 
@@ -411,7 +412,7 @@ class UserAndMetadata:
         return self._external_groups
 
     @property
-    def raw_data(self) -> dict[str, Any] | None:
+    def raw_data(self) -> dict[str, Any]:
         """The server's description of the user, as it was received."""
         return self._raw_data
 
@@ -421,12 +422,8 @@ class UserAndMetadata:
         effective_roles = list(map(lambda r: RoleAndOrigins.create_role_and_origins(r),
                                    raw_data["effective_roles"]))
 
-        # RoleAndOrigins.role is Optional, so without the first clause this could admit a None
-        # into the user's roles.  create_role_and_origins always supplies one, so the guard never
-        # drops anything; it is here so the code holds to what the annotation says.
         user_roles = set(r.role for r in effective_roles
-                         if r.role is not None
-                         and (not r.origins or any(o.type == "user" for o in r.origins)))
+                         if not r.origins or any(o.type == "user" for o in r.origins))
 
         # RBAC prior to v6.5 does not have groups
         ext_group_data = raw_data.get("external_groups", None)
@@ -544,7 +541,8 @@ class Group:
             description=raw_data.get('description', None),
             roles=set(map(lambda r: Role.create_role(
                 r), raw_data.get('roles', []))),
-            ldap_group_reference=raw_data.get('ldap_group_ref', None)
+            ldap_group_reference=raw_data.get('ldap_group_ref', None),
+            raw_data=raw_data
         )
 
     def __repr__(self) -> str:

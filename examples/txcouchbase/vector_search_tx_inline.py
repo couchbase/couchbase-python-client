@@ -5,10 +5,11 @@ import json
 import os
 import pathlib
 from time import sleep
-from typing import List, Optional
+from typing import Any, Generator, List
 from uuid import uuid4
 
 from twisted.internet import reactor, defer, task
+from twisted.internet.defer import Deferred
 
 import txcouchbase.search as search
 from txcouchbase.auth import PasswordAuthenticator
@@ -44,9 +45,9 @@ TEST_SEARCH_VECTOR_PATH = os.path.join(TEST_PATH,
 def check_doc_count(sixm,
                     idx_name: str,
                     min_count: int,
-                    retries: Optional[int] = 20,
-                    delay: Optional[int] = 30
-                    ) -> bool:
+                    retries: int = 20,
+                    delay: int = 30
+                    ) -> Generator[Deferred[Any], Any, int]:
 
     indexed_docs = 0
     no_docs_cutoff = 300
@@ -64,7 +65,7 @@ def check_doc_count(sixm,
 
 
 @defer.inlineCallbacks
-def load_search_idx(cluster: TxCluster) -> None:
+def load_search_idx(cluster: TxCluster) -> Generator[Deferred[Any], Any, None]:
     sixm = cluster.search_indexes()
     params_json = None
     with open(TEST_INDEX_PATH) as params_file:
@@ -100,7 +101,7 @@ def read_docs():
 
 
 @defer.inlineCallbacks
-def load_docs(root: str, collection: TxCollection) -> List[str]:
+def load_docs(root: str, collection: TxCollection) -> Generator[Deferred[Any], Any, List[str]]:
     idx = 0
     keys = []
     for doc in read_docs():
@@ -115,9 +116,9 @@ def load_docs(root: str, collection: TxCollection) -> List[str]:
 
 
 @defer.inlineCallbacks
-def setup(cluster: TxCluster, collection: TxCollection) -> List[str]:
+def setup(cluster: TxCluster, collection: TxCollection) -> Generator[Deferred[Any], Any, List[str]]:
     root = str(uuid4())[:8]
-    keys = yield load_docs(root, collection)
+    keys: List[str] = yield load_docs(root, collection)
     try:
         yield load_search_idx(cluster)
     except QueryIndexAlreadyExistsException:
@@ -127,7 +128,7 @@ def setup(cluster: TxCluster, collection: TxCollection) -> List[str]:
 
 
 @defer.inlineCallbacks
-def remove_docs(keys: List[str], collection: TxCollection) -> None:
+def remove_docs(keys: List[str], collection: TxCollection) -> Generator[Deferred[Any], Any, None]:
     for key in keys:
         try:
             yield collection.remove(key)
@@ -136,13 +137,13 @@ def remove_docs(keys: List[str], collection: TxCollection) -> None:
 
 
 @defer.inlineCallbacks
-def drop_search_idx(cluster: TxCluster) -> None:
+def drop_search_idx(cluster: TxCluster) -> Generator[Deferred[Any], Any, None]:
     sixm = cluster.search_indexes()
     yield sixm.drop_index(TEST_INDEX_NAME)
 
 
 @defer.inlineCallbacks
-def teardown(cluster: TxCluster, collection: TxCollection, keys: List[str]) -> None:
+def teardown(cluster: TxCluster, collection: TxCollection, keys: List[str]) -> Generator[Deferred[Any], Any, None]:
     yield remove_docs(keys, collection)
     yield drop_search_idx(cluster)
 
@@ -171,9 +172,9 @@ def main():
 
     # NOTE: only use in conjunction w/ setup() method
     yield teardown(cluster, collection, keys)
-    reactor.stop()
+    reactor.stop()  # type: ignore[attr-defined]
 
 
 if __name__ == "__main__":
     main()
-    reactor.run()
+    reactor.run()  # type: ignore[attr-defined]

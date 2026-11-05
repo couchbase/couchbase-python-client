@@ -38,7 +38,7 @@ PYCBC_README = os.path.join(os.path.dirname(__file__), 'README.md')
 PYCBC_VERSION = couchbase_version.get_version()
 
 
-package_data = {}
+package_data = {pkg: ['py.typed'] for pkg in ('couchbase', 'acouchbase', 'txcouchbase')}
 # some more Windows tomfoolery...
 if platform.system() == 'Windows':
     # glob so both build modes match: _core.pyd (abi3) and _core.cp3XY-win_amd64.pyd

@@ -66,8 +66,8 @@ async def run():
             print(f'txn raised exception: {e}')
             ok = False
 
-    tasks = [coll.get(key1), coll.get(key2)]
-    results = await wait_for_all(tasks)
+    get_tasks = [coll.get(key1), coll.get(key2)]
+    results = await wait_for_all(get_tasks)
     print(f'after txns, we have {results}')
 
 
