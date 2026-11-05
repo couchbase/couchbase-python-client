@@ -85,7 +85,7 @@ class UserManager:
                 for this operation.
 
         Returns:
-            :class:`UserAndMetadata`: A :class:`UserAndMetadata` instance.
+            :class:`UserAndMetadata`: The user, with what the server records about it.
 
         Raises:
             :class:`~couchbase.exceptions.UserNotFoundException`: If the user does not exist.

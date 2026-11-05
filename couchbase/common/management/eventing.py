@@ -225,14 +225,7 @@ class EventingFunctionLogLevel(Enum):
 class EventingFunctionLanguageCompatibility(Enum):
     """Eventing language version the eventing function assumes with respect to syntax and behavior.
 
-    Allowed values:
-
-    Version_6_0_0
-    Version_6_5_0
-    Version_6_6_2
-    Version_7_2_0
-    Unknown
-        Couchbase Server returned a version the SDK does not recognize.
+    ``Unknown`` means Couchbase Server returned a version the SDK does not recognize.
     """
 
     Version_6_0_0 = "6.0.0"

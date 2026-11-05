@@ -30,6 +30,7 @@ __all__ = [
     'EventingFunctionSettings',
     'EventingFunctionState',
     'EventingFunctionStatus',
+    'EventingFunctionUrlAuth',
     'EventingFunctionUrlAuthBasic',
     'EventingFunctionUrlAuthBearer',
     'EventingFunctionUrlAuthDigest',
@@ -52,6 +53,7 @@ from couchbase.common.management.eventing import EventingFunctionLogLevel  # noq
 from couchbase.common.management.eventing import EventingFunctionProcessingStatus  # noqa: F401
 from couchbase.common.management.eventing import EventingFunctionSettings  # noqa: F401
 from couchbase.common.management.eventing import EventingFunctionState  # noqa: F401
+from couchbase.common.management.eventing import EventingFunctionUrlAuth  # noqa: F401
 from couchbase.common.management.eventing import EventingFunctionUrlAuthBasic  # noqa: F401
 from couchbase.common.management.eventing import EventingFunctionUrlAuthBearer  # noqa: F401
 from couchbase.common.management.eventing import EventingFunctionUrlAuthDigest  # noqa: F401

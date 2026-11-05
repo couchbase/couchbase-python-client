@@ -244,9 +244,9 @@ class User:
         username (str): The name the user authenticates with.
         display_name (str, optional): The name the server displays for the user.
         groups (SetInputType[str], optional): The names of the groups the user is in, as a set, list or tuple, or a
-        single name.
+            single name.
         roles (SetInputType[:class:`.Role`], optional): The roles assigned to the user directly. A set, list or tuple of
-        roles, or a single role.
+            roles, or a single role.
         password (str, optional): The password to set for the user.
 
     Raises:
@@ -465,7 +465,7 @@ class Group:
         name (str): The name of the group.
         description (str, optional): What the group is for.
         roles (SetInputType[:class:`.Role`], optional): The roles the group gives its users. A set, list or tuple of
-        roles, or a single role.
+            roles, or a single role.
         ldap_group_reference (str, optional): The LDAP group whose members the group takes in.
 
     Raises:

@@ -1,0 +1,42 @@
+{% include 'header.rst.jinja2' %}
+
+{{ title }}
+{{ rules[0] * title|length }}
+{% for block in blocks %}
+{% set depth = 1 if blocks|length > 1 else 0 %}
+{% if depth %}
+
+``{{ block.module }}``
+{{ rules[1] * (block.module|length + 4) }}
+{% endif %}
+
+.. module:: {{ block.module }}
+{% for group_title, items in block.groups %}
+{% if group_title %}
+
+{{ group_title }}
+{{ rules[depth + 1] * group_title|length }}
+
+.. autosummary::
+
+{% for item in items %}
+   {{ item.name }}
+{% endfor %}
+{% endif %}
+{% for item in items %}
+
+.. {{ item.directive }}:: {{ item.name }}
+{% for option in item.options %}
+   {{ option }}
+{% endfor %}
+{% endfor %}
+{% endfor %}
+{% if block.also %}
+
+This module also publishes these, described where they are first documented:
+
+{% for target in block.also %}
+* :py:obj:`{{ target }}`
+{% endfor %}
+{% endif %}
+{% endfor %}

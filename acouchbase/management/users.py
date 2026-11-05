@@ -83,7 +83,7 @@ class UserManager:
                 for this operation.
 
         Returns:
-            :class:`UserAndMetadata`: A :class:`UserAndMetadata` instance.
+            :class:`~couchbase.management.users.UserAndMetadata`: The user, with what the server records about it.
 
         Raises:
             :class:`~couchbase.exceptions.UserNotFoundException`: If the user does not exist.
@@ -102,7 +102,7 @@ class UserManager:
                 for this operation.
 
         Returns:
-            Iterable[:class:`UserAndMetadata`]: A list of existing users.
+            Iterable[:class:`~couchbase.management.users.UserAndMetadata`]: A list of existing users.
         """
         return await self._impl.get_all_users(options, **kwargs)
 
@@ -176,7 +176,7 @@ class UserManager:
                 for this operation.
 
         Returns:
-            Iterable[:class:`RoleAndDescription`]: A list of roles available on the server.
+            Iterable[:class:`~couchbase.management.users.RoleAndDescription`]: A list of roles available on the server.
         """
         return await self._impl.get_roles(options, **kwargs)
 
@@ -194,7 +194,7 @@ class UserManager:
                 for this operation.
 
         Returns:
-            :class:`Group`: A :class:`Group` instance.
+            :class:`~couchbase.management.users.Group`: A :class:`~couchbase.management.users.Group` instance.
 
         Raises:
             :class:`~couchbase.exceptions.GroupNotFoundException`: If the group does not exist.
@@ -213,7 +213,7 @@ class UserManager:
                 for this operation.
 
         Returns:
-            Iterable[:class:`Group`]: A list of existing groups.
+            Iterable[:class:`~couchbase.management.users.Group`]: A list of existing groups.
         """
         return await self._impl.get_all_groups(options, **kwargs)
 

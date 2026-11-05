@@ -67,13 +67,14 @@ class Scope:
         return self._impl.bucket_name
 
     def collection(self, name: str) -> Collection:
-        """Creates a :class:`~.collection.Collection` instance of the specified collection.
+        """Creates a :class:`~txcouchbase.collection.Collection` instance of the specified collection.
 
         Args:
             name (str): Name of the collection to reference.
 
         Returns:
-            :class:`~.collection.Collection`: A :class:`~.collection.Collection` instance of the specified collection.
+            :class:`~txcouchbase.collection.Collection`: A :class:`~txcouchbase.collection.Collection` instance of the
+            specified collection.
         """
         return Collection(self, name)
 

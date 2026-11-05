@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 class BinaryCollection:
     """The operations on a collection's binary documents and counters.
 
-    Get one from :meth:`~acouchbase.collection.Collection.binary`.
+    Get one from :meth:`~acouchbase.collection.AsyncCollection.binary`.
     """
 
     def __init__(self, impl: AsyncBinaryCollectionInterface) -> None:

@@ -1,0 +1,547 @@
+# The layout of the API reference.  tools/docgen renders it into docs/<output>, which it owns.
+#
+# Which modules are documented is tools/public_api.yaml's `docs: true`, and what each API has at a
+# couchbase path is its `counterparts`.  This file adds a title and an order for each page, the
+# pages that gather others, the groups a long page is split into, and the members a page leaves out.
+#
+# `common` holds the modules the asyncio and Twisted APIs only re-export, so each is described once.
+# `apis` holds the modules some API writes its own version of, named by their couchbase path; each
+# API renders the ones it has, and links to the synchronous page for the ones it re-exports.
+# A page takes `modules`, or `pages` to gather others.  `slug`, its path in the section, defaults to
+# the first module's path below couchbase, and to the title for a page of pages.  `groups` split a
+# common page of one module, and between them hold each of its public names once.
+docs: docs
+output: reference
+sections:
+  common:
+    title: Common reference
+    intro: |
+      The options, results, exceptions and other types shared by every API.  An ``acouchbase`` or
+      ``txcouchbase`` module of the same name publishes these same objects.
+  couchbase:
+    title: Synchronous API
+    intro: |
+      The ``couchbase`` package: every operation blocks until it completes.  The types its operations take
+      and return are in the :doc:`/reference/common/index`.
+  acouchbase:
+    title: asyncio API
+    intro: |
+      The ``acouchbase`` package: every operation is a coroutine, run on an asyncio event loop.  The types
+      its operations take and return are in the :doc:`/reference/common/index`.
+  txcouchbase:
+    title: Twisted API
+    intro: |
+      The ``txcouchbase`` package: every operation returns a Twisted ``Deferred``.  The types its operations
+      take and return are in the :doc:`/reference/common/index`.
+common:
+  - title: Authentication
+    modules: [couchbase.auth]
+  - title: Options
+    modules: [couchbase.options]
+    groups:
+      - title: Cluster configuration
+        names:
+          - CONFIG_PROFILES
+          - ClusterMetricsOptions
+          - ClusterOptions
+          - ClusterOrphanReportingOptions
+          - ClusterTimeoutOptions
+          - ClusterTracingOptions
+          - Compression
+          - ConfigProfile
+          - ConfigProfiles
+          - IpProtocol
+          - KnownConfigProfiles
+          - LockMode
+          - OptionValidationMode
+          - TLSVerifyMode
+          - WanDevelopmentProfile
+      - title: Key-value
+        names:
+          - ExistsOptions
+          - GetAllReplicasOptions
+          - GetAndLockOptions
+          - GetAndTouchOptions
+          - GetAnyReplicaOptions
+          - GetOptions
+          - InsertOptions
+          - MutationOptions
+          - RemoveOptions
+          - ReplaceOptions
+          - ScanOptions
+          - TouchOptions
+          - UnlockOptions
+          - UpsertOptions
+      - title: Binary
+        names:
+          - AppendOptions
+          - DecrementOptions
+          - DeltaValue
+          - IncrementOptions
+          - PrependOptions
+      - title: Multi-document key-value
+        names:
+          - AppendMultiOptions
+          - DecrementMultiOptions
+          - ExistsMultiOptions
+          - GetAllReplicasMultiOptions
+          - GetAndLockMultiOptions
+          - GetAnyReplicaMultiOptions
+          - GetMultiOptions
+          - IncrementMultiOptions
+          - InsertMultiOptions
+          - LockMultiOptions
+          - MutationMultiOptions
+          - NoValueMultiOptions
+          - PrependMultiOptions
+          - RemoveMultiOptions
+          - ReplaceMultiOptions
+          - TouchMultiOptions
+          - UnlockMultiOptions
+          - UpsertMultiOptions
+      - title: Sub-document
+        names:
+          - LookupInAllReplicasOptions
+          - LookupInAnyReplicaOptions
+          - LookupInOptions
+          - MutateInOptions
+      - title: 'Query, analytics, search and views'
+        names:
+          - AnalyticsOptions
+          - QueryOptions
+          - SearchOptions
+          - VectorSearchOptions
+          - ViewOptions
+      - title: Transactions
+        names:
+          - TransactionConfig
+          - TransactionGetMultiOptions
+          - TransactionGetMultiReplicasFromPreferredServerGroupOptions
+          - TransactionGetOptions
+          - TransactionGetReplicaFromPreferredServerGroupOptions
+          - TransactionInsertOptions
+          - TransactionOptions
+          - TransactionQueryOptions
+          - TransactionReplaceOptions
+      - title: Diagnostics
+        names:
+          - DiagnosticsOptions
+          - PingOptions
+          - WaitUntilReadyOptions
+      - title: Value types
+        names:
+          - AcceptableInts
+          - ConstrainedInt
+          - SignedInt64
+          - UnsignedInt32
+          - UnsignedInt64
+  - title: Management options
+    modules: [couchbase.management.options]
+    groups:
+      - title: Buckets
+        names:
+          - BucketDescribeOptions
+          - CreateBucketOptions
+          - DropBucketOptions
+          - FlushBucketOptions
+          - GetAllBucketOptions
+          - GetBucketOptions
+          - UpdateBucketOptions
+      - title: Scopes and collections
+        names:
+          - CreateCollectionOptions
+          - CreateScopeOptions
+          - DropCollectionOptions
+          - DropScopeOptions
+          - GetAllScopesOptions
+          - UpdateCollectionOptions
+      - title: Query indexes
+        names:
+          - BuildDeferredQueryIndexOptions
+          - CreatePrimaryQueryIndexOptions
+          - CreateQueryIndexOptions
+          - DropPrimaryQueryIndexOptions
+          - DropQueryIndexOptions
+          - GetAllQueryIndexOptions
+          - WatchQueryIndexOptions
+      - title: Search indexes
+        names:
+          - AllowQueryingSearchIndexOptions
+          - AnalyzeDocumentSearchIndexOptions
+          - DisallowQueryingSearchIndexOptions
+          - DropSearchIndexOptions
+          - FreezePlanSearchIndexOptions
+          - GetAllSearchIndexStatsOptions
+          - GetAllSearchIndexesOptions
+          - GetSearchIndexOptions
+          - GetSearchIndexStatsOptions
+          - GetSearchIndexedDocumentsCountOptions
+          - PauseIngestSearchIndexOptions
+          - ResumeIngestSearchIndexOptions
+          - UnfreezePlanSearchIndexOptions
+          - UpsertSearchIndexOptions
+      - title: Users and groups
+        names:
+          - ChangePasswordOptions
+          - DropGroupOptions
+          - DropUserOptions
+          - GetAllGroupsOptions
+          - GetAllUsersOptions
+          - GetGroupOptions
+          - GetRolesOptions
+          - GetUserOptions
+          - UpsertGroupOptions
+          - UpsertUserOptions
+      - title: Analytics
+        names:
+          - ConnectLinkOptions
+          - CreateAnalyticsIndexOptions
+          - CreateDatasetOptions
+          - CreateDataverseOptions
+          - CreateLinkAnalyticsOptions
+          - DisconnectLinkOptions
+          - DropAnalyticsIndexOptions
+          - DropDatasetOptions
+          - DropDataverseOptions
+          - DropLinkAnalyticsOptions
+          - GetAllAnalyticsIndexesOptions
+          - GetAllDatasetOptions
+          - GetLinksAnalyticsOptions
+          - GetPendingMutationsOptions
+          - ReplaceLinkAnalyticsOptions
+      - title: Eventing functions
+        names:
+          - DeployFunctionOptions
+          - DropFunctionOptions
+          - EventingFunctionOptions
+          - FunctionsStatusOptions
+          - GetAllFunctionOptions
+          - GetFunctionOptions
+          - PauseFunctionOptions
+          - ResumeFunctionOptions
+          - UndeployFunctionOptions
+          - UpsertFunctionOptions
+      - title: Views
+        names:
+          - DropDesignDocumentOptions
+          - GetAllDesignDocumentsOptions
+          - GetDesignDocumentOptions
+          - PublishDesignDocumentOptions
+          - UpsertDesignDocumentOptions
+  - title: Exceptions
+    modules: [couchbase.exceptions]
+    groups:
+      - title: Base classes and error contexts
+        names:
+          - AnalyticsErrorContext
+          - CouchbaseErrorCategory
+          - CouchbaseException
+          - ErrorContext
+          - ErrorContextType
+          - GenericErrorContext
+          - HTTPErrorContext
+          - KeyValueErrorContext
+          - ManagementErrorContext
+          - QueryErrorContext
+          - SearchErrorContext
+          - SubdocumentErrorContext
+          - TransactionsErrorContext
+          - ViewErrorContext
+      - title: General
+        names:
+          - AmbiguousTimeoutException
+          - AuthenticationException
+          - FeatureNotFoundException
+          - FeatureUnavailableException
+          - HTTPException
+          - InternalSDKException
+          - InternalServerFailureException
+          - InvalidArgumentException
+          - MissingConnectionException
+          - MissingTokenException
+          - ParsingFailedException
+          - QuotaLimitedException
+          - RateLimitedException
+          - RequestCanceledException
+          - ServiceUnavailableException
+          - TimeoutException
+          - UnAmbiguousTimeoutException
+          - UnsuccessfulOperationException
+          - UnsupportedOperation
+          - ValueFormatException
+      - title: Key-value
+        names:
+          - CASMismatchException
+          - CannotReviveLivingDocumentException
+          - CasMismatchException
+          - DeltaInvalidException
+          - DocumentExistsException
+          - DocumentLockedException
+          - DocumentNotFoundException
+          - DocumentNotLockedException
+          - DocumentUnretrievableException
+          - DurabilityImpossibleException
+          - DurabilityInvalidLevelException
+          - DurabilitySyncWriteAmbiguousException
+          - DurabilitySyncWriteInProgressException
+          - DurableWriteReCommitInProgressException
+          - MutationTokenOutdatedException
+          - RangeScanCompletedException
+          - TemporaryFailException
+          - ValueTooLargeException
+      - title: Sub-document
+        names:
+          - DocumentNotJsonException
+          - InvalidValueException
+          - NoChildrenException
+          - NumberTooBigException
+          - PathExistsException
+          - PathInvalidException
+          - PathMismatchException
+          - PathNotFoundException
+          - PathTooBigException
+          - PathTooDeepException
+          - SubdocCantInsertValueException
+          - SubdocPathMismatchException
+          - ValueTooDeepException
+          - XattrCannotModifyVirtualAttributeException
+          - XattrInvalidKeyComboException
+          - XattrNoAccessException
+          - XattrUnknownMacroException
+          - XattrUnknownVirtualAttributeException
+      - title: 'Query, analytics and search'
+        names:
+          - AlreadyQueriedException
+          - DesignDocumentNotFoundException
+          - InvalidIndexException
+          - KeyspaceNotFoundException
+          - QueryIndexAlreadyExistsException
+          - QueryIndexNotFoundException
+          - WatchQueryIndexTimeoutException
+      - title: Management
+        names:
+          - AnalyticsLinkExistsException
+          - AnalyticsLinkNotFoundException
+          - BucketAlreadyExistsException
+          - BucketDoesNotExistException
+          - BucketNotFlushableException
+          - BucketNotFoundException
+          - CollectionAlreadyExistsException
+          - CollectionNotFoundException
+          - DatasetAlreadyExistsException
+          - DatasetNotFoundException
+          - DataverseAlreadyExistsException
+          - DataverseNotFoundException
+          - EventingFunctionAlreadyDeployedException
+          - EventingFunctionCollectionNotFoundException
+          - EventingFunctionCompilationFailureException
+          - EventingFunctionIdenticalKeyspaceException
+          - EventingFunctionNotBootstrappedException
+          - EventingFunctionNotDeployedException
+          - EventingFunctionNotFoundException
+          - EventingFunctionNotUnDeployedException
+          - GroupNotFoundException
+          - ScopeAlreadyExistsException
+          - ScopeNotFoundException
+          - SearchIndexNotFoundException
+          - UserNotFoundException
+      - title: Transactions
+        names:
+          - TransactionCommitAmbiguous
+          - TransactionException
+          - TransactionExpired
+          - TransactionFailed
+          - TransactionOperationFailed
+      - title: Encryption
+        names:
+          - CryptoException
+          - CryptoKeyNotFoundException
+          - DecrypterAlreadyExistsException
+          - DecrypterNotFoundException
+          - DecryptionFailureException
+          - EncrypterAlreadyExistsException
+          - EncrypterNotFoundException
+          - EncryptionFailureException
+          - InvalidCipherTextException
+          - InvalidCryptoKeyException
+      - title: Datastructures
+        names:
+          - QueueEmpty
+  - title: Durability
+    modules: [couchbase.durability]
+  - title: Sub-document operations
+    modules: [couchbase.subdocument]
+    groups:
+      - title: Specs
+        names:
+          - ArrayValues
+          - Spec
+          - StoreSemantics
+          - SubDocOp
+          - SubDocStatus
+      - title: Lookups
+        names:
+          - LookupInMacro
+          - count
+          - exists
+          - get
+          - get_full
+      - title: Mutations
+        names:
+          - MutationMacro
+          - array_addunique
+          - array_append
+          - array_insert
+          - array_prepend
+          - convert_macro_cas_to_cas
+          - counter
+          - decrement
+          - increment
+          - insert
+          - remove
+          - replace
+          - upsert
+          - with_expiry
+  - title: Range scan
+    modules: [couchbase.kv_range_scan]
+  - title: Replica reads
+    modules: [couchbase.replica_reads]
+  - title: Query (SQL++)
+    modules: [couchbase.n1ql]
+  - title: Analytics
+    modules: [couchbase.analytics]
+  - title: Search
+    modules: [couchbase.search]
+    groups:
+      - title: Requests
+        names:
+          - HighlightStyle
+          - MatchOperator
+          - SearchQuery
+          - SearchRequest
+          - SearchScanConsistency
+      - title: Queries
+        names:
+          - BooleanFieldQuery
+          - BooleanQuery
+          - ConjunctionQuery
+          - DateRangeQuery
+          - DisjunctionQuery
+          - DocIdQuery
+          - GeoBoundingBoxQuery
+          - GeoDistanceQuery
+          - GeoPolygonQuery
+          - MatchAllQuery
+          - MatchNoneQuery
+          - MatchPhraseQuery
+          - MatchQuery
+          - NumericRangeQuery
+          - PhraseQuery
+          - PrefixQuery
+          - QueryStringQuery
+          - RawQuery
+          - RegexQuery
+          - TermQuery
+          - TermRangeQuery
+          - WildcardQuery
+      - title: Facets
+        names:
+          - DateFacet
+          - Facet
+          - NumericFacet
+          - TermFacet
+      - title: Sorting
+        names:
+          - Sort
+          - SortField
+          - SortGeoDistance
+          - SortID
+          - SortScore
+      - title: Results
+        names:
+          - SearchDateRangeFacet
+          - SearchFacetResult
+          - SearchMetaData
+          - SearchMetrics
+          - SearchNumericRangeFacet
+          - SearchRow
+          - SearchRowFields
+          - SearchRowLocation
+          - SearchRowLocations
+          - SearchTermFacet
+  - title: Vector search
+    modules: [couchbase.vector_search]
+  - title: Search scoring
+    modules: [couchbase.search_scoring]
+  - title: Views
+    modules: [couchbase.views]
+  - title: Mutation state
+    modules: [couchbase.mutation_state]
+  - title: Transactions
+    modules: [couchbase.transactions, couchbase.transactions.transactions_get_multi]
+  - title: Transcoders and serializers
+    modules: [couchbase.transcoder, couchbase.serializer]
+  - title: Field-level encryption
+    modules: [couchbase.encryption]
+  - title: Diagnostics
+    modules: [couchbase.diagnostics]
+  - title: Observability
+    modules: [couchbase.observability, couchbase.observability.tracing, couchbase.observability.metrics]
+apis:
+  - title: Package
+    modules: [couchbase]
+  - title: Cluster
+    modules: [couchbase.cluster]
+  - title: Bucket
+    modules: [couchbase.bucket]
+  - title: Scope
+    modules: [couchbase.scope]
+  - title: Collection
+    modules: [couchbase.collection]
+  - title: Binary collection
+    modules: [couchbase.binary_collection]
+  - title: Results
+    modules: [couchbase.result]
+  - title: Datastructures
+    modules: [couchbase.datastructures]
+  - title: Transactions
+    slug: transactions
+    modules: [couchbase.transactions.transactions]
+  - title: Management
+    pages:
+      - title: Analytics
+        modules: [couchbase.management.analytics]
+      - title: Buckets
+        modules: [couchbase.management.buckets]
+      - title: Collections
+        modules: [couchbase.management.collections]
+      - title: Eventing functions
+        modules: [couchbase.management.eventing]
+      - title: Query indexes
+        modules: [couchbase.management.queries]
+      - title: Search indexes
+        modules: [couchbase.management.search]
+      - title: Users
+        modules: [couchbase.management.users]
+      - title: Views
+        modules: [couchbase.management.views]
+exclude_members:
+  # Superseded by the datastructures classes, and kept only so existing code keeps working.
+  couchbase.collection.Collection:
+    - list_append
+    - list_get
+    - list_prepend
+    - list_remove
+    - list_set
+    - list_size
+    - map_add
+    - map_get
+    - map_remove
+    - map_size
+    - queue_pop
+    - queue_push
+    - queue_size
+    - set_add
+    - set_contains
+    - set_remove
+    - set_size

@@ -87,7 +87,7 @@ if TYPE_CHECKING:
 class AsyncCollection:
     """A collection in a scope, and the key-value operations on its documents.
 
-    Get one from :meth:`~acouchbase.scope.Scope.collection`.
+    Get one from :meth:`~acouchbase.scope.AsyncScope.collection`.
 
     Args:
         scope (:class:`~acouchbase.scope.Scope`): The scope the collection belongs to.
@@ -841,7 +841,7 @@ class AsyncCollection:
         Returns:
             Iterable[:class:`~couchbase.result.LookupInReplicaResult`]: A stream of
             :class:`~couchbase.result.LookupInReplicaResult` representing both active and replicas of the sub-document
-                retrieved.
+            retrieved.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist

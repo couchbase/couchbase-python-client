@@ -588,13 +588,13 @@ class SortField(Sort):
     """Sorts by the value of a field."""
 
     type: _OptionalField[str] = _OptionalField(_as_is, """
-        Coerce the field to this type: ``auto``, ``string``, ``number`` or ``date``
+        The type to coerce the field to, one of ``auto``, ``string``, ``number`` or ``date``.
         """)
     mode: _OptionalField[str] = _OptionalField(_as_is, """
-        Which value of a multi-valued field to sort by: ``default``, ``min`` or ``max``
+        Which value of a multi-valued field to sort by, one of ``default``, ``min`` or ``max``.
         """)
     missing: _OptionalField[str] = _OptionalField(_as_is, """
-        Where a match without the field sorts: ``first`` or ``last``
+        Where a match without the field sorts, either ``first`` or ``last``.
         """)
 
     def __init__(self,

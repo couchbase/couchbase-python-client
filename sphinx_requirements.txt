@@ -1,5 +1,13 @@
+# Building the docs imports every documented module, so the build needs what they import at load:
+# Twisted for txcouchbase, and OpenTelemetry for the names the observability modules import under
+# TYPE_CHECKING, which docs/type_checking_names.py gives autodoc.  It also needs the SDK built in place,
+# for the functions the native binding serves.
+-r requirements.txt
 Sphinx~=7.2
 sphinx-rtd-theme~=2.0
 sphinx-copybutton~=0.5
 enum-tools~=0.9
 sphinx-toolbox~=3.5
+# Keep Twisted in step with test_requirements.txt.
+Twisted~=24.7
+opentelemetry-api~=1.22

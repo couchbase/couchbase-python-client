@@ -113,7 +113,7 @@ class Cluster:
         """Creates a Bucket instance to a specific bucket.
 
         .. seealso::
-            :class:`.bucket.Bucket`
+            :class:`~couchbase.bucket.Bucket`
 
         Args:
             bucket_name (str): Name of the bucket to reference
@@ -266,7 +266,7 @@ class Cluster:
 
         .. seealso::
             * :class:`~couchbase.management.queries.QueryIndexManager`: for how to manage query indexes
-            * :meth:`couchbase.Scope.query`: For how to execute scope-level queries.
+            * :meth:`~couchbase.scope.Scope.query`: For how to execute scope-level queries.
 
         Args:
             statement (str): The N1QL statement to execute.
@@ -337,7 +337,7 @@ class Cluster:
 
             * :class:`~couchbase.management.analytics.AnalyticsIndexManager`: for how to manage analytics dataverses,
               datasets, indexes and links.
-            * :meth:`.Scope.analytics_query`: for how to execute scope-level analytics queries
+            * :meth:`~couchbase.scope.Scope.analytics_query`: for how to execute scope-level analytics queries
 
         Args:
             statement (str): The analytics SQL++ statement to execute.

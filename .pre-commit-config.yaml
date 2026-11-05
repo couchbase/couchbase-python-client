@@ -169,6 +169,18 @@ repos:
         additional_dependencies: [click, jinja2, pyyaml]
         pass_filenames: false
         files: ^(tools/autogen/(cli\.py|(config|templates|core|commands)/operations[./])|couchbase/common/_operations\.py$)
+  - repo: local
+    hooks:
+      - id: docgen
+        name: API reference pages against the public inventory and the docs layout
+        entry: python -m tools.docgen check
+        language: python
+        # Imports every documented module to choose each name's directive, so it needs what they
+        # import at load, as check-public-api does.  No native binding: the generator does not read it.
+        additional_dependencies: [click, jinja2, pyyaml, 'typing-extensions>=4.14', 'Twisted~=24.7',
+                                  'opentelemetry-api~=1.22']
+        pass_filenames: false
+        files: ^((a|tx)?couchbase/.*\.py|tools/docgen/|tools/check_public_api\.py|tools/public_api\.yaml|docs/reference/)
   - repo: https://github.com/PyCQA/bandit
     rev: 1.7.9
     hooks:

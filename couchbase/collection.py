@@ -816,7 +816,7 @@ class Collection:
         Returns:
             Iterable[:class:`~couchbase.result.LookupInReplicaResult`]: A stream of
             :class:`~couchbase.result.LookupInReplicaResult` representing both active and replicas of the sub-document
-                retrieved.
+            retrieved.
 
         Raises:
             :class:`~couchbase.exceptions.DocumentNotFoundException`: If the key provided does not exist

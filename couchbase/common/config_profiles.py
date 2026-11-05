@@ -173,7 +173,7 @@ class ConfigProfiles():
 
         Raises:
             :class:`~couchbase.exceptions.InvalidArgumentException`: If the specified profile is not derived
-            from :class:`~couchbase.options.ConfigProfile`.
+                from :class:`~couchbase.options.ConfigProfile`.
 
         """
         if not issubclass(profile.__class__, ConfigProfile):

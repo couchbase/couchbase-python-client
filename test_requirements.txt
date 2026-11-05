@@ -1,0 +1,11 @@
+# What the test suites need, and nothing for linting or the docs.
+# Keep Twisted in step with sphinx_requirements.txt.
+-r requirements.txt
+Faker~=37.1
+faker-vehicle~=0.2
+pytest~=8.3.5
+pytest-asyncio~=1.1
+pytest-rerunfailures~=15.1
+pytest-xdist~=3.8
+requests~=2.26
+Twisted~=24.7

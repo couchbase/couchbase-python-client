@@ -1,0 +1,23 @@
+{% include 'header.rst.jinja2' %}
+
+{{ title }}
+{{ rules[0] * title|length }}
+{% if intro %}
+
+{{ intro }}
+{% endif %}
+
+.. toctree::
+   :maxdepth: 2
+
+{% for child in children %}
+   /{{ child }}
+{% endfor %}
+{% if shared %}
+
+These are the same as in the {{ sync_title }}:
+
+{% for link in shared %}
+* :doc:`{{ link.title }} </{{ link.docname }}>`
+{% endfor %}
+{% endif %}

@@ -163,7 +163,6 @@ if TYPE_CHECKING:
 
     from typing_extensions import Unpack
 
-    from couchbase.common._metrics import CouchbaseMeter
     from couchbase.common._observability import TracerProtocol
     from couchbase.common._utils import JSONType, ScopeKeyspace
     from couchbase.common.analytics import AnalyticsScanConsistency
@@ -173,6 +172,7 @@ if TYPE_CHECKING:
     from couchbase.common.management.views import DesignDocumentNamespace
     from couchbase.common.mutation_state import MutationState
     from couchbase.common.n1ql import QueryProfile, QueryScanConsistency
+    from couchbase.common.observability.metrics import Meter
     from couchbase.common.observability.tracing import RequestSpan
     from couchbase.common.option_enums import (Compression,
                                                IpProtocol,
@@ -237,8 +237,8 @@ class AnalyticsOptions(dict):
             the query.
         read_only (bool, optional): Specifies that this query should be executed in read-only mode, disabling the
             ability for the query to make any changes to the data. Defaults to False.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.query_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``query_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         scan_consistency (:class:`~couchbase.analytics.AnalyticsScanConsistency`, optional): Specifies the consistency
             requirements when executing the query. Defaults to `NotBounded`.
         priority (bool, optional): Indicates whether this analytics query should be executed with a specific priority
@@ -278,8 +278,8 @@ class AppendOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
             operation.
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from this
@@ -316,8 +316,8 @@ class DecrementOptions(dict):
         initial (:class:`~couchbase.options.SignedInt64`, optional): The initial value to use for the document if it
             does not already exist. Setting it to a negative value means that the document will not be created if it
             does not exist. Defaults to 0.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         expiry (timedelta, optional): Specifies the expiry time for this document.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
             operation.
@@ -358,8 +358,8 @@ class IncrementOptions(dict):
         initial (:class:`~couchbase.options.SignedInt64`, optional): The initial value to use for the document if it
             does not already exist. Setting it to a negative value means that the document will not be created if it
             does not exist. Defaults to 0.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         expiry (timedelta, optional): Specifies the expiry time for this document.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
             operation.
@@ -394,8 +394,8 @@ class PrependOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
             operation.
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from this
@@ -439,8 +439,8 @@ class AppendMultiOptions(dict):
             :class:`~couchbase.options.AppendOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
             operation.
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from this
@@ -496,8 +496,8 @@ class DecrementMultiOptions(dict):
             :class:`~couchbase.options.DecrementOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
             operation.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -552,8 +552,8 @@ class IncrementMultiOptions(dict):
             :class:`~couchbase.options.IncrementOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
             operation.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -603,8 +603,8 @@ class PrependMultiOptions(dict):
             :class:`~couchbase.options.PrependOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
             operation.
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from this
@@ -715,7 +715,7 @@ class ClusterOptionsKwargs(TypedDict, total=False):
     compression_min_ratio: float | None
     lockmode: LockMode | None
     tracer: TracerProtocol | None
-    meter: CouchbaseMeter | None
+    meter: Meter | None
     dns_nameserver: str | None
     dns_port: int | None
     disable_mozilla_ca_certificates: bool | None
@@ -840,8 +840,8 @@ class ClusterOptions(dict):
         tracer (:class:`~couchbase.common._observability.TracerProtocol`, optional): Set an external tracer. Defaults to
             None, enabling the `threshold_logging_tracer`. Note when this is set, all tracing_options (see
             :class:`~couchbase.options.ClusterTracingOptions`) and then `enable_tracing` option are ignored.
-        meter (:class:`~couchbase.metrics.CouchbaseMeter`, optional): Set an external meter. Defaults to None, enabling
-            the `logging_meter`.   Note when this is set, the `logging_meter_emit_interval` option is ignored.
+        meter (:class:`~couchbase.observability.metrics.Meter`, optional): Set an external meter. Defaults to None,
+            enabling the `logging_meter`.   Note when this is set, the `logging_meter_emit_interval` option is ignored.
         dns_nameserver (str, optional): **VOLATILE** This API is subject to change at any time. Set to configure custom
             DNS nameserver. Defaults to the system resolver.
         dns_port (int, optional): **VOLATILE** This API is subject to change at any time. Set to configure custom DNS
@@ -1131,8 +1131,8 @@ class DiagnosticsOptions(dict):
 
     Args:
         report_id (str, optional): A unique identifier for the report generated by this operation.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -1159,8 +1159,8 @@ class PingOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         report_id (str, optional): A unique identifier for the report generated by this operation.
         service_types (Iterable[:class:`~couchbase.diagnostics.ServiceType`] | Iterable[str], optional): The services
             which should be pinged. Either every element is a :class:`~couchbase.diagnostics.ServiceType` or every
@@ -1205,8 +1205,8 @@ class WaitUntilReadyOptions(dict):
             which should be pinged. Either every element is a :class:`~couchbase.diagnostics.ServiceType` or every
             element is its ``.value`` string; the two forms are equivalent and are not intended to be mixed within one
             iterable.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -1236,8 +1236,8 @@ class ExistsOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -1264,8 +1264,8 @@ class GetAllReplicasOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
             this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
         read_preference (:class:`~couchbase.replica_reads.ReadPreference`, optional): Specifies how the replica nodes
@@ -1295,8 +1295,8 @@ class GetAndLockOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
             this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -1324,8 +1324,8 @@ class GetAndTouchOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
             this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -1354,8 +1354,8 @@ class GetAnyReplicaOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
             this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
         read_preference (:class:`~couchbase.replica_reads.ReadPreference`, optional): Specifies how the replica nodes
@@ -1391,8 +1391,8 @@ class GetOptions(dict):
             allows for easy retrieval of select fields without incurring the overhead of fetching the whole document.
         with_expiry (bool, optional): Indicates that the expiry of the document should be fetched alongside the data
             itself. Defaults to False.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
             this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -1432,8 +1432,8 @@ class InsertOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         expiry (timedelta, optional): Specifies the expiry time for this document.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
             operation.
@@ -1470,8 +1470,8 @@ class RemoveOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from this
             value, indicating that the document has changed.
         durability (:class:`~couchbase.durability.DurabilityType`, optional): Specifies the level of durability for this
@@ -1505,8 +1505,8 @@ class ReplaceOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         expiry (timedelta, optional): Specifies the expiry time for this document.
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from this
             value, indicating that the document has changed.
@@ -1551,8 +1551,8 @@ class ScanOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         ids_only (bool, optional): Specifies that scan should only return document ids. Defaults to False.
         consistent_with (:class:`~couchbase.mutation_state.MutationState`, optional): Specifies a
             :class:`~couchbase.mutation_state.MutationState` which the operation should be consistent with.
@@ -1589,8 +1589,8 @@ class TouchOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -1615,8 +1615,8 @@ class UnlockOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -1645,8 +1645,8 @@ class UpsertOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         expiry (timedelta, optional): Specifies the expiry time for this document.
         preserve_expiry (bool, optional): Specifies that any existing expiry on the document should be preserved.
             Defaults to False.
@@ -1696,8 +1696,8 @@ class ExistsMultiOptions(dict):
             :class:`~couchbase.options.ExistsOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -1743,8 +1743,8 @@ class GetAllReplicasMultiOptions(dict):
             :class:`~couchbase.options.GetAllReplicasOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
@@ -1794,8 +1794,8 @@ class GetAndLockMultiOptions(dict):
             :class:`~couchbase.options.GetAndLockOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
@@ -1845,8 +1845,8 @@ class GetAnyReplicaMultiOptions(dict):
             :class:`~couchbase.options.GetAnyReplicaOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
@@ -1904,8 +1904,8 @@ class GetMultiOptions(dict):
             :class:`~couchbase.options.GetOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
@@ -1966,8 +1966,8 @@ class InsertMultiOptions(dict):
             :class:`~couchbase.options.InsertOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         expiry (timedelta, optional): Specifies the expiry time for this document.
@@ -2026,8 +2026,8 @@ class RemoveMultiOptions(dict):
             :class:`~couchbase.options.RemoveOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from this
@@ -2086,8 +2086,8 @@ class ReplaceMultiOptions(dict):
             :class:`~couchbase.options.ReplaceOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         expiry (timedelta, optional): Specifies the expiry time for this document.
@@ -2149,8 +2149,8 @@ class TouchMultiOptions(dict):
             :class:`~couchbase.options.TouchOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -2194,8 +2194,8 @@ class UnlockMultiOptions(dict):
             :class:`~couchbase.options.UnlockOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -2242,8 +2242,8 @@ class UpsertMultiOptions(dict):
             :class:`~couchbase.options.UpsertOptions` per key.
         return_exceptions (bool, optional): If False, raise an Exception when encountered. If True return the Exception
             without raising. Defaults to True.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         expiry (timedelta, optional): Specifies the expiry time for this document.
@@ -2344,8 +2344,8 @@ class QueryOptions(dict):
             the query.
         read_only (bool, optional): Specifies that this query should be executed in read-only mode, disabling the
             ability for the query to make any changes to the data. Defaults to False.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.query_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``query_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         scan_consistency (:class:`~couchbase.n1ql.QueryScanConsistency`, optional): Specifies the consistency
             requirements when executing the query. Defaults to `NotBounded`.
         query_context (str, optional): Specifies the context within which this query should be executed. This can be
@@ -2416,8 +2416,8 @@ class SearchOptions(dict):
             engine when executing the query.
         limit (int, optional): Specifies the limit to the number of results that should be returned.
         skip (int, optional): Specifies the number of results to skip from the index before returning results.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.search_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``search_timeout``,
+            from :class:`~couchbase.options.ClusterTimeoutOptions`.
         explain (bool, optional): Configures whether the result should contain the execution plan for the search query.
             Defaults to False.
         fields (list[str], optional): Specifies the list of fields which should be searched.
@@ -2506,8 +2506,8 @@ class LookupInAllReplicasOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         serializer (:class:`~couchbase.serializer.Serializer`, optional): Specifies an explicit serializer to use for
@@ -2537,8 +2537,8 @@ class LookupInAnyReplicaOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         serializer (:class:`~couchbase.serializer.Serializer`, optional): Specifies an explicit serializer to use for
@@ -2569,8 +2569,8 @@ class LookupInOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         access_deleted (bool, optional): Whether the operation may access a deleted document's extended attributes.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
@@ -2605,8 +2605,8 @@ class MutateInOptions(dict):
         All options should be imported from ``couchbase.options``.
 
     Args:
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         expiry (timedelta, optional): Specifies the expiry time for this document. Cannot be combined with
             `preserve_expiry`.
         cas (int, optional): If specified, indicates that operation should be failed if the CAS has changed from this
@@ -3050,7 +3050,8 @@ class DeltaValue(ConstrainedInt):
         Importing this class from ``couchbase.collection`` is deprecated.
         Import it from ``couchbase.options``.
 
-    Used as an argument for :meth:`Collection.increment` and :meth:`Collection.decrement`.
+    Used as an argument for :meth:`~couchbase.binary_collection.BinaryCollection.increment` and
+    :meth:`~couchbase.binary_collection.BinaryCollection.decrement`.
 
     Args:
         value (:class:`~couchbase.options.AcceptableInts`): The value to initialise this with.
@@ -3225,8 +3226,8 @@ class ViewOptions(dict):
             when executing the query.
         limit (int, optional): Specifies the limit to the number of results that should be returned.
         skip (int, optional): Specifies the number of results to skip from the index before returning results.
-        timeout (timedelta, optional): The timeout for this operation. Defaults to
-            :attr:`~couchbase.options.ClusterTimeoutOptions.views_timeout`.
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``views_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
         scan_consistency (:class:`~couchbase.views.ViewScanConsistency`, optional): Specifies the consistency
             requirements when executing the query. Defaults to `NotBounded`.
         startkey (JSONType, optional): Specifies the first key that should be included in the results.

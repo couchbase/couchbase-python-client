@@ -54,10 +54,35 @@ release = sdk_version
 extensions = [
     'sphinx_rtd_theme',
     'sphinx.ext.autodoc',
+    'sphinx.ext.autosummary',
     'sphinx.ext.napoleon',
     'sphinx.ext.extlinks',
+    'sphinx.ext.intersphinx',
     'sphinx_copybutton',
-    'enum_tools.autoenum'
+    'enum_tools.autoenum',
+    'type_checking_names',
+]
+
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3', None),
+    'twisted': ('https://docs.twisted.org/en/stable/api', None),
+    'opentelemetry': ('https://opentelemetry-python.readthedocs.io/en/latest', None),
+    'typing_extensions': ('https://typing-extensions.readthedocs.io/en/latest', None),
+}
+
+nitpicky = True
+# Napoleon writes "str, optional" as a type, and the type field links each word of it.
+nitpick_ignore = [
+    ('py:class', 'optional'),
+    # Type aliases and protocols the SDK names in signatures and does not document.
+    ('py:class', 'DocumentValue'),
+    ('py:class', 'JSONType'),
+    ('py:class', 'ScopeKeyspace'),
+    ('py:class', 'SetInputType'),
+]
+nitpick_ignore_regex = [
+    # A private name in a signature has no page to link to.
+    ('py:.*', r'(.*\.)?_\w+(\..*)?'),
 ]
 
 # Add any paths that contain templates here, relative to this directory.

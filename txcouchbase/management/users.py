@@ -85,7 +85,8 @@ class UserManager:
                 for this operation.
 
         Returns:
-            Deferred[:class:`UserAndMetadata`]: A :class:`UserAndMetadata` instance.
+            Deferred[:class:`~couchbase.management.users.UserAndMetadata`]: The user, with what the server records about
+            it.
 
         Raises:
             :class:`~couchbase.exceptions.UserNotFoundException`: If the user does not exist.
@@ -104,7 +105,7 @@ class UserManager:
                 for this operation.
 
         Returns:
-            Deferred[Iterable[:class:`UserAndMetadata`]]: A list of existing users.
+            Deferred[Iterable[:class:`~couchbase.management.users.UserAndMetadata`]]: A list of existing users.
         """
         return self._impl.get_all_users_deferred(options, **kwargs)
 
@@ -178,7 +179,8 @@ class UserManager:
                 for this operation.
 
         Returns:
-            Deferred[Iterable[:class:`RoleAndDescription`]]: A list of roles available on the server.
+            Deferred[Iterable[:class:`~couchbase.management.users.RoleAndDescription`]]: A list of roles available
+            on the server.
         """
         return self._impl.get_roles_deferred(options, **kwargs)
 
@@ -196,7 +198,7 @@ class UserManager:
                 for this operation.
 
         Returns:
-            Deferred[:class:`Group`]: A :class:`Group` instance.
+            Deferred[:class:`~couchbase.management.users.Group`]: A :class:`~couchbase.management.users.Group` instance.
 
         Raises:
             :class:`~couchbase.exceptions.GroupNotFoundException`: If the group does not exist.
@@ -215,7 +217,7 @@ class UserManager:
                 for this operation.
 
         Returns:
-            Deferred[Iterable[:class:`Group`]]: A list of existing groups.
+            Deferred[Iterable[:class:`~couchbase.management.users.Group`]]: A list of existing groups.
         """
         return self._impl.get_all_groups_deferred(options, **kwargs)
 

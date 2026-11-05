@@ -76,10 +76,10 @@ class Bucket:
         return self._impl.close_bucket_deferred()
 
     def default_scope(self) -> Scope:
-        """Creates a :class:`~.scope.Scope` instance of the default scope.
+        """Creates a :class:`~txcouchbase.scope.Scope` instance of the default scope.
 
         Returns:
-            :class:`~.scope.Scope`: A :class:`~.scope.Scope` instance of the default scope.
+            :class:`~txcouchbase.scope.Scope`: A :class:`~txcouchbase.scope.Scope` instance of the default scope.
         """
         return self.scope(Scope.default_name())
 
@@ -154,7 +154,7 @@ class Bucket:
             the response, so iterating the :class:`~couchbase.result.ViewResult` does not block the reactor.
 
         .. seealso::
-            * :class:`~.management.ViewIndexManager`: for how to manage query indexes
+            * :class:`~txcouchbase.management.views.ViewIndexManager`: for how to manage design documents
 
         Args:
             design_doc (str): The name of the design document containing the view to execute.

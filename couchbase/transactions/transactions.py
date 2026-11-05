@@ -102,7 +102,8 @@ class Transactions:
         """Run a set of operations within a transaction.
 
         Args:
-            txn_logic (Callable[:class:`~couchbase.transactions.AttemptContext`]): The transaction logic to perform.
+            txn_logic (Callable[:class:`~couchbase.transactions.transactions.AttemptContext`]): The transaction logic
+                to perform.
             transaction_options (:class:`~couchbase.options.TransactionOptions`): Options to override those in the
                 :class:`~couchbase.options.TransactionConfig` for this transaction only.
             **kwargs: Accepts ``per_txn_config``, the same as ``transaction_options``. Any other
@@ -308,7 +309,7 @@ class AttemptContext:
         Args:
             coll (:class:`couchbase.collection.Collection`): Collection to use to find the document.
             key (str): document key.
-            value (:class:`couchbase.common._utils.JSONType):  Contents of the document.
+            value (JSONType): Contents of the document.
             options (:class:`~couchbase.options.TransactionInsertOptions`): Optional parameters for this operation.
             **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionInsertOptions`
@@ -333,7 +334,7 @@ class AttemptContext:
         Args:
             txn_get_result (:class:`couchbase.transactions.TransactionGetResult`): Document to replace, gotten from a
               previous call to another transaction operation.
-            value (:class:`couchbase.common._utils.JSONType):  The new contents of the document.
+            value (JSONType): The new contents of the document.
             options (:class:`~couchbase.options.TransactionReplaceOptions`): Optional parameters for this operation.
             **kwargs: keyword arguments that can be used in place or to
                 override provided :class:`~couchbase.options.TransactionReplaceOptions`
@@ -370,10 +371,10 @@ class AttemptContext:
 
         Args:
             query (str): Query to perform.
-            options (:class:`couchbase.transactions.TransactionQueryOptions`): Query options to use, if any.
+            options (:class:`~couchbase.options.TransactionQueryOptions`): Query options to use, if any.
 
         Returns:
-            :class:`couchbase.transactions.TransactionQueryResult`
+            :class:`~couchbase.transactions.TransactionQueryResults`
         Raises:
             :class:`couchbase.exceptions.TransactionOperationFailed`: If the operation failed.  In practice, there is
                 no need to handle the exception, as the transaction will rollback regardless.

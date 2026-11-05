@@ -167,7 +167,7 @@ class AsyncBucket:
             :class:`~.result.AsyncViewResult` begins.
 
         .. seealso::
-            * :class:`~.management.ViewIndexManager`: for how to manage query indexes
+            * :class:`~acouchbase.management.views.ViewIndexManager`: for how to manage design documents
 
         Args:
             design_doc (str): The name of the design document containing the view to execute.

@@ -315,6 +315,7 @@ modules:
       - EventingFunctionSettings
       - EventingFunctionState
       - EventingFunctionStatus
+      - EventingFunctionUrlAuth
       - EventingFunctionUrlAuthBasic
       - EventingFunctionUrlAuthBearer
       - EventingFunctionUrlAuthDigest
@@ -1960,6 +1961,7 @@ modules:
       - EventingFunctionSettings
       - EventingFunctionState
       - EventingFunctionStatus
+      - EventingFunctionUrlAuth
       - EventingFunctionUrlAuthBasic
       - EventingFunctionUrlAuthBearer
       - EventingFunctionUrlAuthDigest
@@ -2424,6 +2426,7 @@ modules:
       - Transactions
     compat: []
   couchbase.transactions.transactions_get_multi:
+    docs: true
     public:
       - TransactionGetMultiMode
       - TransactionGetMultiReplicasFromPreferredServerGroupMode

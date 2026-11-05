@@ -1,0 +1,5 @@
+# Requirements for running docgen.  Every command imports the documented modules, and `build` runs
+# Sphinx over them, so this is the docs requirements plus the tool's own.
+-r ../requirements.txt
+-r ../../sphinx_requirements.txt
+jinja2==3.1.6

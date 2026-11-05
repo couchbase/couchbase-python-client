@@ -2135,8 +2135,8 @@ def _clause(value: CompoundQueryType | None, reqtype: type[_Compound]) -> _Compo
 class RawQuery(SearchQuery):
     """A query given as its JSON, for parameters or query types the other classes do not cover.
 
-    The payload is read when the query is encoded, and never written: :attr:`boost` and
-    :meth:`set_prop` are added to a copy.
+    The payload is read when the query is encoded, and never written: :attr:`~couchbase.search.SearchQuery.boost` and
+    :meth:`~couchbase.search.SearchQuery.set_prop` are added to a copy.
     """
 
     def __init__(self, obj: JSONType) -> None:

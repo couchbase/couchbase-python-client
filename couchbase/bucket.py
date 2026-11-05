@@ -43,7 +43,7 @@ class Bucket:
     access to Collections as well as performing management operations against the bucket.
 
     Args:
-        cluster (:class:`~.Cluster`): A :class:`~.Cluster` instance.
+        cluster (:class:`~couchbase.cluster.Cluster`): A :class:`~couchbase.cluster.Cluster` instance.
         bucket_name (str): Name of the bucket.
 
     Raises:
@@ -71,10 +71,10 @@ class Bucket:
         self._impl.close_bucket()
 
     def default_scope(self) -> Scope:
-        """Creates a :class:`~.scope.Scope` instance of the default scope.
+        """Creates a :class:`~couchbase.scope.Scope` instance of the default scope.
 
         Returns:
-            :class:`~.scope.Scope`: A :class:`~.scope.Scope` instance of the default scope.
+            :class:`~couchbase.scope.Scope`: A :class:`~couchbase.scope.Scope` instance of the default scope.
 
         """
         return self.scope(Scope.default_name())
@@ -153,7 +153,7 @@ class Bucket:
             :class:`~.result.ViewResult` begins.
 
         .. seealso::
-            * :class:`~.management.ViewIndexManager`: for how to manage query indexes
+            * :class:`~couchbase.management.views.ViewIndexManager`: for how to manage design documents
 
         Args:
             design_doc (str): The name of the design document containing the view to execute.

@@ -138,7 +138,7 @@ class CouchbaseList(_Datastructure):
 
     Args:
         key (str): Document key to use for the list.
-        collection (:class:`~.collection.Collection`): The :class:`~.collection.Collection` where the
+        collection (:class:`~couchbase.collection.Collection`): The :class:`~couchbase.collection.Collection` where the
             list belongs
 
     """
@@ -277,7 +277,7 @@ class CouchbaseMap(_Datastructure):
 
     Args:
         key (str): Document key to use for the map.
-        collection (:class:`~.collection.Collection`): The :class:`~.collection.Collection` where the
+        collection (:class:`~couchbase.collection.Collection`): The :class:`~couchbase.collection.Collection` where the
             map belongs
 
     """
@@ -397,7 +397,7 @@ class CouchbaseSet(_Datastructure):
 
     Args:
         key (str): Document key to use for the set.
-        collection (:class:`~.collection.Collection`): The :class:`~.collection.Collection` where the
+        collection (:class:`~couchbase.collection.Collection`): The :class:`~couchbase.collection.Collection` where the
             set belongs.
 
     """
@@ -515,7 +515,7 @@ class CouchbaseQueue(_Datastructure):
 
     Args:
         key (str): Document key to use for the queue.
-        collection (:class:`~.collection.Collection`): The :class:`~.collection.Collection` where the
+        collection (:class:`~couchbase.collection.Collection`): The :class:`~couchbase.collection.Collection` where the
             queue belongs.
 
     """
