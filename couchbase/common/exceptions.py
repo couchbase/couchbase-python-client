@@ -147,6 +147,8 @@ if TYPE_CHECKING:
 
 
 class CouchbaseErrorCategory(Enum):
+    """The category of an error."""
+
     common = "couchbase.common"
     key_value = "couchbase.key_value"
     query = "couchbase.query"
@@ -159,27 +161,38 @@ class CouchbaseErrorCategory(Enum):
 
 
 class ErrorContext:
+    """Details of the request that raised an exception.
+
+    The fields here are on every context, and are ``None`` when the SDK did not record them. A
+    subclass adds the fields one service reports.
+    """
+
     def __init__(self, **kwargs: Any) -> None:
         self._base = kwargs
 
     @property
     def last_dispatched_to(self) -> str | None:
+        """The address of the node the request was last sent to."""
         return self._base.get("last_dispatched_to", None)
 
     @property
     def last_dispatched_from(self) -> str | None:
+        """The local address the request was last sent from."""
         return self._base.get("last_dispatched_from", None)
 
     @property
     def retry_attempts(self) -> int | None:
+        """How many times the request was retried."""
         return self._base.get("retry_attempts", None)
 
     @property
     def retry_reasons(self) -> set[str] | None:
+        """Why the request was retried."""
         return self._base.get("retry_reasons", None)
 
     @property
     def last_exception(self) -> str | None:
+        """The last error the request met before it failed."""
         return self._base.get("last_exception", None)
 
     @staticmethod
@@ -204,6 +217,8 @@ class ErrorContext:
 
 
 class HTTPErrorContext(ErrorContext):
+    """Details of a failed HTTP request to a Couchbase service."""
+
     _HTTP_EC_KEYS = ["client_context_id", "method", "path", "http_status",
                      "http_body"]
 
@@ -214,22 +229,27 @@ class HTTPErrorContext(ErrorContext):
 
     @property
     def method(self) -> str | None:
+        """The HTTP method of the request."""
         return self._http_err_ctx.get("method", None)
 
     @property
     def response_code(self) -> int | None:
+        """The HTTP status code of the response."""
         return self._http_err_ctx.get("http_status", None)
 
     @property
     def path(self) -> str | None:
+        """The path the request was sent to."""
         return self._http_err_ctx.get("path", None)
 
     @property
     def response_body(self) -> str | None:
+        """The body of the response."""
         return self._http_err_ctx.get("http_body", None)
 
     @property
     def client_context_id(self) -> str | None:
+        """The client context ID the request was sent with."""
         return self._http_err_ctx.get("client_context_id", None)
 
     def __repr__(self) -> str:
@@ -237,6 +257,8 @@ class HTTPErrorContext(ErrorContext):
 
 
 class KeyValueErrorContext(ErrorContext):
+    """Details of a failed key-value operation."""
+
     _KV_EC_KEYS = ['key', 'bucket_name', 'scope_name', 'collection_name',
                    'opaque', 'status_code', 'error_map_info', 'extended_error_info',
                    'retry_attempts', 'retry_reasons']
@@ -248,18 +270,22 @@ class KeyValueErrorContext(ErrorContext):
 
     @property
     def key(self) -> str | None:
+        """The key of the document the operation targeted."""
         return self._kv_err_ctx.get("key", None)
 
     @property
     def bucket_name(self) -> str | None:
+        """The name of the bucket the document is in."""
         return self._kv_err_ctx.get("bucket_name", None)
 
     @property
     def scope_name(self) -> str | None:
+        """The name of the scope the document is in."""
         return self._kv_err_ctx.get("scope_name", None)
 
     @property
     def collection_name(self) -> str | None:
+        """The name of the collection the document is in."""
         return self._kv_err_ctx.get("collection_name", None)
 
     def __repr__(self) -> str:
@@ -267,6 +293,8 @@ class KeyValueErrorContext(ErrorContext):
 
 
 class ManagementErrorContext(ErrorContext):
+    """Details of a failed management request."""
+
     _MGMT_EC_KEYS = ["client_context_id", "content", "path", "http_status"]
 
     def __init__(self, **kwargs: Any) -> None:
@@ -276,18 +304,22 @@ class ManagementErrorContext(ErrorContext):
 
     @property
     def response_code(self) -> int | None:
+        """The HTTP status code of the response."""
         return self._mgmt_err_ctx.get("http_status", None)
 
     @property
     def path(self) -> str | None:
+        """The path the request was sent to."""
         return self._mgmt_err_ctx.get("path", None)
 
     @property
     def content(self) -> str | None:
+        """The body of the response."""
         return self._mgmt_err_ctx.get("content", None)
 
     @property
     def client_context_id(self) -> str | None:
+        """The client context ID the request was sent with."""
         return self._mgmt_err_ctx.get("client_context_id", None)
 
     def __repr__(self) -> str:
@@ -295,6 +327,8 @@ class ManagementErrorContext(ErrorContext):
 
 
 class TransactionsErrorContext(ErrorContext):
+    """Details of a failed transaction."""
+
     _TXN_EC_KEYS = ["failure_type"]
 
     def __init__(self, **kwargs: Any) -> None:
@@ -304,22 +338,27 @@ class TransactionsErrorContext(ErrorContext):
 
     @property
     def failure_type(self) -> str | None:
+        """What kind of failure ended the transaction."""
         return self.txn_err_ctx.get("failure_type", None)
 
     @property
     def last_dispatched_to(self) -> str | None:
+        """Always ``None``: a transaction is not a single request."""
         return None
 
     @property
     def last_dispatched_from(self) -> str | None:
+        """Always ``None``: a transaction is not a single request."""
         return None
 
     @property
     def retry_attempts(self) -> int | None:
+        """Always ``None``: a transaction is not a single request."""
         return None
 
     @property
     def retry_reasons(self) -> set[str] | None:
+        """Always ``None``: a transaction is not a single request."""
         return None
 
     def __repr__(self) -> str:
@@ -327,6 +366,8 @@ class TransactionsErrorContext(ErrorContext):
 
 
 class AnalyticsErrorContext(HTTPErrorContext):
+    """Details of a failed analytics query."""
+
     _ANALYTICS_EC_KEYS = ["first_error_code", "first_error_message", "statement", "parameters"]
 
     def __init__(self, **kwargs: Any) -> None:
@@ -336,18 +377,22 @@ class AnalyticsErrorContext(HTTPErrorContext):
 
     @property
     def first_error_code(self) -> int | None:
+        """The code of the first error the analytics service reported."""
         return self._analytics_err_ctx.get("first_error_code", None)
 
     @property
     def first_error_message(self) -> str | None:
+        """The message of the first error the analytics service reported."""
         return self._analytics_err_ctx.get("first_error_message", None)
 
     @property
     def statement(self) -> str | None:
+        """The statement that was run."""
         return self._analytics_err_ctx.get("statement", None)
 
     @property
     def parameters(self) -> str | None:
+        """The parameters the statement was run with."""
         return self._analytics_err_ctx.get("parameters", None)
 
     def __repr__(self) -> str:
@@ -355,6 +400,8 @@ class AnalyticsErrorContext(HTTPErrorContext):
 
 
 class QueryErrorContext(HTTPErrorContext):
+    """Details of a failed SQL++ query."""
+
     _QUERY_EC_KEYS = ["first_error_code", "first_error_message", "statement", "parameters"]
 
     def __init__(self, **kwargs: Any) -> None:
@@ -364,18 +411,22 @@ class QueryErrorContext(HTTPErrorContext):
 
     @property
     def first_error_code(self) -> int | None:
+        """The code of the first error the query service reported."""
         return self._query_err_ctx.get("first_error_code", None)
 
     @property
     def first_error_message(self) -> str | None:
+        """The message of the first error the query service reported."""
         return self._query_err_ctx.get("first_error_message", None)
 
     @property
     def statement(self) -> str | None:
+        """The statement that was run."""
         return self._query_err_ctx.get("statement", None)
 
     @property
     def parameters(self) -> str | None:
+        """The parameters the statement was run with."""
         return self._query_err_ctx.get("parameters", None)
 
     def __repr__(self) -> str:
@@ -383,6 +434,8 @@ class QueryErrorContext(HTTPErrorContext):
 
 
 class SearchErrorContext(HTTPErrorContext):
+    """Details of a failed search query."""
+
     _SEARCH_EC_KEYS = ["index_name", "query", "parameters"]
 
     def __init__(self, **kwargs: Any) -> None:
@@ -392,14 +445,17 @@ class SearchErrorContext(HTTPErrorContext):
 
     @property
     def index_name(self) -> str | None:
+        """The name of the search index that was queried."""
         return self._search_err_ctx.get("index_name", None)
 
     @property
     def query(self) -> str | None:
+        """The query that was sent."""
         return self._search_err_ctx.get("query", None)
 
     @property
     def parameters(self) -> str | None:
+        """The parameters the query was sent with."""
         return self._search_err_ctx.get("parameters", None)
 
     def __repr__(self) -> str:
@@ -407,6 +463,8 @@ class SearchErrorContext(HTTPErrorContext):
 
 
 class ViewErrorContext(HTTPErrorContext):
+    """Details of a failed view query."""
+
     _VIEW_EC_KEYS = ["design_document_name", "view_name", "query_string"]
 
     def __init__(self, **kwargs: Any) -> None:
@@ -416,14 +474,17 @@ class ViewErrorContext(HTTPErrorContext):
 
     @property
     def design_document_name(self) -> str | None:
+        """The name of the design document the view is in."""
         return self._view_err_ctx.get("design_document_name", None)
 
     @property
     def view_name(self) -> str | None:
+        """The name of the view that was queried."""
         return self._view_err_ctx.get("view_name", None)
 
     @property
     def query_string(self) -> str | None:
+        """The query string the request was sent with."""
         return self._view_err_ctx.get("query_string", None)
 
     def __repr__(self) -> str:
@@ -431,6 +492,8 @@ class ViewErrorContext(HTTPErrorContext):
 
 
 class SubdocumentErrorContext(KeyValueErrorContext):
+    """Details of a failed sub-document operation."""
+
     _SUBDOC_EC_KEYS = ["first_error_path", "first_error_index", "deleted"]
 
     def __init__(self, **kwargs: Any) -> None:
@@ -440,14 +503,17 @@ class SubdocumentErrorContext(KeyValueErrorContext):
 
     @property
     def first_error_path(self) -> str | None:
+        """The path of the first spec that failed."""
         return self._subdoc_err_ctx.get("first_error_path", None)
 
     @property
     def first_error_index(self) -> int | None:
+        """The index of the first spec that failed."""
         return self._subdoc_err_ctx.get("first_error_index", None)
 
     @property
     def deleted(self) -> bool:
+        """Whether the document the operation targeted is deleted."""
         return self._subdoc_err_ctx.get("deleted", False)
 
     def __repr__(self) -> str:
@@ -455,9 +521,9 @@ class SubdocumentErrorContext(KeyValueErrorContext):
 
 
 class GenericErrorContext(ErrorContext):
-    """
-    A context for a failure that belongs to no one service, with no fields beyond the ones every
-    context carries.
+    """Details of a failure that belongs to no one service.
+
+    It has no fields beyond the ones every context carries.
     """
 
 
@@ -477,7 +543,8 @@ _ERROR_CONTEXT_TYPES: dict[str, type[ErrorContext]] = {klass.__name__: klass for
 
 
 class _ExceptionInfo(TypedDict, total=False):
-    """
+    """Where an exception came from, beyond its message.
+
     ``cinfo`` and ``message`` are what the classic binding writes, and ``inner_cause`` is the SDK's
     own. ``error_message`` is the server's explanation, which the error mapping reads; the binding
     does not write it at present.
@@ -497,6 +564,8 @@ class _ExceptionKwargs(TypedDict, total=False):
 
 
 class CouchbaseException(Exception):
+    """The base class of the exceptions the SDK raises."""
+
     def __init__(self,
                  message: str | None = None,
                  *,
@@ -505,10 +574,8 @@ class CouchbaseException(Exception):
                  category: str | None = None,
                  exc_info: _ExceptionInfo | None = None
                  ) -> None:
-        """
-        The protocol that raises an exception resolves everything it knows at construction, so an
-        exception holds plain values and no protocol object.
-        """
+        # The protocol that raises an exception resolves everything it knows at construction, so an
+        # exception holds plain values and no protocol object.
         self._message = message
         self._context = context if context is not None else ErrorContext()
         self._error_code = error_code
@@ -518,6 +585,7 @@ class CouchbaseException(Exception):
 
     @property
     def error_code(self) -> int | None:
+        """The error code behind the exception, if there is one."""
         return self._error_code
 
     @property
@@ -526,9 +594,6 @@ class CouchbaseException(Exception):
 
         .. deprecated:: 4.0.0
             Use :attr:`error_context` instead.
-
-        Returns:
-            ErrorContext | HTTPErrorContext | KeyValueErrorContext: Exception's error context object
         """
         from couchbase.common._supportability import Supportability
         Supportability.class_property_deprecated('CouchbaseException.context', 'CouchbaseException.error_context')
@@ -536,25 +601,22 @@ class CouchbaseException(Exception):
 
     @property
     def error_context(self) -> ErrorContextType:
+        """Details of the request that raised the exception."""
         return self._context
 
     @property
     def message(self) -> str | None:
-        """
-        **VOLATILE** This API is subject to change at any time.
+        """The exception's message, if it has one.
 
-        Returns:
-            str | None: Exception's error message, if it exists.
+        **VOLATILE** This API is subject to change at any time.
         """
         return self._message or None
 
     @property
     def inner_cause(self) -> Exception | None:
-        """
-        **VOLATILE** This API is subject to change at any time.
+        """The exception that caused this one, if there was one.
 
-        Returns:
-            Exception | None: Exception's inner cause, if it exists.
+        **VOLATILE** This API is subject to change at any time.
         """
         if not self._exc_info:
             return None
@@ -584,84 +646,98 @@ class CouchbaseException(Exception):
 
 # common errors
 class InternalServerFailureException(CouchbaseException):
-    """ Raised when the server service provides error w/in below ranges.
-        Query: Error range 5xxx
-        Analytics: Error range 25xxx
-        KV: error code ERR_INTERNAL (0x84)
-        Search: HTTP 500
+    """Raised when a service reports an internal error.
+
+    That is a 5xxx code from the query service, a 25xxx code from the analytics service,
+    ``ERR_INTERNAL`` from the key-value service or HTTP 500 from the search service.
     """
 
 
 class TimeoutException(CouchbaseException):
-    pass
+    """Raised when an operation times out."""
 
 
 class MissingConnectionException(CouchbaseException):
-    pass
+    """Raised when an operation needs a connection the SDK does not have."""
 
 
 class AmbiguousTimeoutException(CouchbaseException):
-    pass
+    """Raised when an operation timed out and it cannot be established whether it mutated any data.
 
-
-class TemporaryFailException(CouchbaseException):
-    pass
-
-
-class UnAmbiguousTimeoutException(CouchbaseException):
-    pass
-
-
-class RequestCanceledException(CouchbaseException):
-    pass
-
-
-class InvalidArgumentException(CouchbaseException):
-    """ Raised when a provided argmument has an invalid value
-        and/or invalid type.
+    This usually means the request reached the server and the response did not arrive in time.
+    A read-only operation never raises this; it raises :class:`UnAmbiguousTimeoutException` instead.
     """
 
 
+class TemporaryFailException(CouchbaseException):
+    """Raised when the server reports a temporary failure, for instance because it is busy.
+
+    Retrying the operation later is likely to succeed.
+    """
+
+
+class UnAmbiguousTimeoutException(CouchbaseException):
+    """Raised when an operation timed out and it is certain that it did not mutate any data.
+
+    A read-only operation always raises this rather than :class:`AmbiguousTimeoutException`.  For a
+    mutation, it usually means the SDK never sent the request, or the server reported that it failed.
+    """
+
+
+class RequestCanceledException(CouchbaseException):
+    """Raised when a request is canceled before its outcome is known.
+
+    This usually means the connection it was sent on closed.
+    """
+
+
+class InvalidArgumentException(CouchbaseException):
+    """Raised when an argument has an invalid value or type."""
+
+
 class AuthenticationException(CouchbaseException):
-    """Indicates that an error occurred authenticating the user to the cluster."""
+    """Raised when the cluster cannot authenticate the user."""
 
 
 class CasMismatchException(CouchbaseException):
-    pass
+    """Raised when the CAS given to an operation does not match the document's.
+
+    The document changed after the CAS was read. Fetch it again and retry the operation.
+    """
 
 
 CASMismatchException = CasMismatchException
 
 
 class BucketNotFoundException(CouchbaseException):
-    """Indicates that the bucket being referenced does not exist."""
+    """Raised when the bucket a request names does not exist."""
 
 
 class ValueFormatException(CouchbaseException):
-    """Failed to decode or encode value"""
+    """Raised when a transcoder cannot encode or decode a value."""
 
 
 class HTTPException(CouchbaseException):
-    pass
+    """Raised when an HTTP request to a service fails."""
 
 
 class ServiceUnavailableException(CouchbaseException):
-    """ Raised if tt can be determined from the config unambiguously that a
-        given service is not available.
-        I.e. no query node in the config, or a memcached bucket is accessed
-        and views or n1ql queries should be performed
+    """Raised when the cluster has no node running the service a request needs.
+
+    For instance, a query against a cluster with no query node, or a view query against a
+    memcached bucket.
     """
 
 
 class FeatureUnavailableException(CouchbaseException):
-    """Raised when feature that is not available with the current server version is used."""
+    """Raised when a feature is used that the cluster's server version does not support."""
 
 
 class InternalSDKException(CouchbaseException):
-    """
-    This means the SDK has done something wrong. Get support.
-    (this doesn't mean *you* didn't do anything wrong, it does mean you should
-    not be seeing this message)
+    """Raised when the SDK has done something wrong.
+
+    This does not rule out a mistake in the calling code, but the exception should never be seen.
+    Contact Couchbase support.
     """
 
 
@@ -669,136 +745,142 @@ class InternalSDKException(CouchbaseException):
 
 
 class DeltaInvalidException(CouchbaseException):
-    """Indicates the delta value specified for an operation is too large."""
+    """Raised when the delta given to a counter operation is invalid."""
 
 
 class DocumentExistsException(CouchbaseException):
-    """Indicates that the referenced document exists already, but the operation was not expecting it to exist."""
+    """Raised when an operation expects a document not to exist, and it does."""
 
 
 class DocumentLockedException(CouchbaseException):
-    """Indicates that the referenced document could not be used as it is currently locked,
-    likely by another actor in the system."""
+    """Raised when a document cannot be used because it is locked."""
 
 
 class DocumentNotLockedException(CouchbaseException):
-    """Indicates that the referenced document is not locked, generally raised when an
-    unlock operation is being performed."""
+    """Raised when unlocking a document that is not locked."""
 
 
 class DocumentNotFoundException(CouchbaseException):
-    """Indicates that the referenced document does not exist."""
+    """Raised when the document an operation names does not exist."""
 
 
 class DocumentNotJsonException(CouchbaseException):
-    """Indicates a sub-document operation was attempted on a non-JSON document."""
+    """Raised when a sub-document operation targets a document that is not JSON."""
 
 
 class CannotReviveLivingDocumentException(CouchbaseException):
-    """Indicates that a revive was attempted on a document that is not deleted."""
+    """Raised when reviving a document that is not deleted."""
 
 
 class DocumentUnretrievableException(CouchbaseException):
-    """Indicates that the referenced document does not exist and therefore no replicas are found."""
+    """Raised when a replica read finds no copy of the document."""
 
 
 class DurabilityImpossibleException(CouchbaseException):
-    """Given durability requirements are impossible to achieve"""
+    """Raised when the durability an operation asks for cannot be achieved.
+
+    For instance, the bucket has fewer replicas than the durability level requires.
+    """
 
 
 class DurabilityInvalidLevelException(CouchbaseException):
-    """Given durability level is invalid"""
+    """Raised when the server does not accept the durability level an operation asks for."""
 
 
 class DurabilitySyncWriteAmbiguousException(CouchbaseException):
-    """There is a synchronous mutation pending for given key
-    The SyncWrite request has not completed in the specified time and has ambiguous
-    result - it may Succeed or Fail; but the final value is not yet known"""
+    """Raised when a durable write did not complete in time and its outcome is unknown.
+
+    It may yet succeed or fail.
+    """
 
 
 class DurabilitySyncWriteInProgressException(CouchbaseException):
-    """Returned if an attempt is made to mutate a key which already has a
-    SyncWrite pending. Client would typically retry (possibly with backoff).
-    Similar to ELOCKED"""
+    """Raised when mutating a document that has a durable write pending.
+
+    Retrying, possibly with a backoff, usually succeeds.
+    """
 
 
 class DurableWriteReCommitInProgressException(CouchbaseException):
-    """Indicates that the server is resynchronizing replicas for earlier durable operations,
-    typically after a rebalance."""
+    """Raised when the server is resynchronizing replicas for earlier durable writes.
+
+    This typically follows a rebalance.
+    """
 
 
 class InvalidValueException(CouchbaseException):
-    """Indicates the provided value was invalid for the operation."""
+    """Raised when a value is not valid for the operation it is given to."""
 
 
 class NumberTooBigException(CouchbaseException):
-    """Indicates existing number is outside the valid range for arithmetic operations."""
+    """Raised when a sub-document counter targets a number outside the range arithmetic supports."""
 
 
 class PathExistsException(CouchbaseException):
-    """Indicates that the reference path already existed, but the operation expected that it did not."""
+    """Raised when a sub-document operation expects a path not to exist, and it does."""
 
 
 class PathInvalidException(CouchbaseException):
-    """Indicates that the reference path was not syntactically correct."""
+    """Raised when a sub-document path is not syntactically valid."""
 
 
 class PathMismatchException(CouchbaseException):
-    """Indicates that the referenced path made incorrect assumptions about the structure of a document,
-    for instance attempting to access a field as an object when in fact it is an array."""
+    """Raised when a sub-document path assumes the wrong structure for the document.
+
+    For instance, it treats a field as an object when it is an array.
+    """
 
 
 class PathNotFoundException(CouchbaseException):
-    """Indicates that the reference path was not found."""
+    """Raised when a sub-document path does not exist in the document."""
 
 
 class PathTooBigException(CouchbaseException):
-    """Indicates that the reference path is too long, or contains too many independent components."""
+    """Raised when a sub-document path is too long or has too many components."""
 
 
 class RangeScanCompletedException(CouchbaseException):
-    """Indicates the range scan has completed."""
+    """Raised when a range scan has already returned all of its items."""
 
 
 class PathTooDeepException(CouchbaseException):
-    """Indicates that the reference path contains too many levels to parse."""
+    """Raised when a sub-document path has too many levels to parse."""
 
 
 class ValueTooDeepException(CouchbaseException):
-    """
-        Indicates that the value provided, if inserted into the document,
-        would cause the document to become too deep for the server to accept.
-    """
+    """Raised when inserting a value would make the document too deep for the server to accept."""
 
 
 class ValueTooLargeException(CouchbaseException):
-    """Indicates that the value sent was too large to store, typically over 20MB."""
+    """Raised when a value is too large to store, typically over 20MB."""
 
 
 class XattrCannotModifyVirtualAttributeException(CouchbaseException):
-    """Indicates that a sub-document operation attempted to modify a virtual attribute."""
+    """Raised when a sub-document operation modifies a virtual attribute."""
 
 
 class XattrInvalidKeyComboException(CouchbaseException):
-    """Indicates that a sub-document operation attempted to access multiple extended attributes in one
-    operation."""
+    """Raised when one sub-document operation accesses more than one extended attribute."""
 
 
 class XattrNoAccessException(CouchbaseException):
-    """Indicates that there is no permission to access a system attribute, whose name starts with an
-    underscore, without SystemXattrRead or SystemXattrWrite."""
+    """Raised when accessing a system extended attribute without permission.
+
+    A system attribute's name starts with an underscore, and accessing one needs the
+    ``SystemXattrRead`` or ``SystemXattrWrite`` privilege.
+    """
 
 
 class XattrUnknownMacroException(CouchbaseException):
-    """Indicates that a macro was used which the server did not understand."""
+    """Raised when a sub-document operation uses a macro the server does not know."""
 
 
 class XattrUnknownVirtualAttributeException(CouchbaseException):
-    """Indicates that a sub-document operation attempted to access an unknown virtual attribute."""
+    """Raised when a sub-document operation accesses an unknown virtual attribute."""
 
 
 class MutationTokenOutdatedException(CouchbaseException):
-    """Indicates that the vbucket uuid requirements do not align with the server."""
+    """Raised when a mutation token's partition UUID does not match the server's."""
 
 
 # @TODO:  How to Deprecate?
@@ -811,32 +893,25 @@ SubdocPathMismatchException = PathMismatchException
 
 
 class ParsingFailedException(CouchbaseException):
-    """
-    Raised when the query service is unable to parse a N1QL query
-    """
+    """Raised when a service cannot parse a query."""
 
 
 class AlreadyQueriedException(CouchbaseException):
-    """
-    Raised when query (N1QL, Search, Analytics or Views) results
-    have already been iterated over.
-    """
+    """Raised when iterating the rows of a query result a second time."""
 
     def __init__(self, message: str = 'Previously iterated over results.', **kwargs: Unpack[_ExceptionKwargs]) -> None:
         super().__init__(message, **kwargs)
 
 
 class KeyspaceNotFoundException(CouchbaseException):
-    """Keyspace not found (collection or bucket does not exist)"""
+    """Raised when the bucket or collection a query names does not exist."""
 
 
 # Search Exceptions
 
 
 class NoChildrenException(CouchbaseException):
-    """
-    Compound query is missing children"
-    """
+    """Raised when a search query is given none of the IDs, terms or child queries it needs."""
 
     def __init__(self, message: str = 'No child queries.', **kwargs: Unpack[_ExceptionKwargs]) -> None:
         super().__init__(message, **kwargs)
@@ -846,234 +921,225 @@ class NoChildrenException(CouchbaseException):
 
 
 class BucketAlreadyExistsException(CouchbaseException):
-    pass
+    """Raised when creating a bucket that already exists."""
 
 
 class BucketDoesNotExistException(CouchbaseException):
-    pass
+    """Raised when a bucket management operation names a bucket that does not exist."""
 
 
 class BucketNotFlushableException(CouchbaseException):
-    pass
+    """Raised when flushing a bucket that does not have flush enabled."""
 
 # Scope/Collection mgmt
 
 
 class CollectionAlreadyExistsException(CouchbaseException):
-    pass
+    """Raised when creating a collection that already exists."""
 
 
 class CollectionNotFoundException(CouchbaseException):
-    pass
+    """Raised when the collection a request names does not exist."""
 
 
 class UnsupportedOperation(CouchbaseException):
-    pass
+    """Raised when the server does not support an operation."""
 
 
 class ScopeAlreadyExistsException(CouchbaseException):
-    pass
+    """Raised when creating a scope that already exists."""
 
 
 class ScopeNotFoundException(CouchbaseException):
-    pass
+    """Raised when the scope a request names does not exist."""
 
 # User mgmt
 
 
 class GroupNotFoundException(CouchbaseException):
-    """ The RBAC Group was not found"""
+    """Raised when the RBAC group a request names does not exist."""
 
 
 class UserNotFoundException(CouchbaseException):
-    """ The RBAC User was not found"""
+    """Raised when the RBAC user a request names does not exist."""
 
 
 # Query index mgmt
 
 
 class QueryIndexAlreadyExistsException(CouchbaseException):
-    """ The query index already exists"""
+    """Raised when creating a query index that already exists."""
 
 
 class QueryIndexNotFoundException(CouchbaseException):
-    """ The query index was not found"""
+    """Raised when the query index a request names does not exist."""
 
 
 class WatchQueryIndexTimeoutException(CouchbaseException):
-    """Unable to find all requested indexes online within specified timeout"""
+    """Raised when the watched query indexes are not all online before the timeout."""
 
 
 # Search Index mgmt
 
 
 class SearchIndexNotFoundException(CouchbaseException):
-    pass
+    """Raised when the search index a request names does not exist."""
 
 # Analytics mgmt
 
 
 class DataverseAlreadyExistsException(CouchbaseException):
-    """Raised when attempting to create dataverse when it already exists"""
+    """Raised when creating an analytics dataverse that already exists."""
 
 
 class DataverseNotFoundException(CouchbaseException):
-    """Raised when attempting to drop a dataverse which does not exist"""
+    """Raised when the analytics dataverse a request names does not exist."""
 
 
 class DatasetNotFoundException(CouchbaseException):
-    """Raised when attempting to drop a dataset which does not exist."""
+    """Raised when the analytics dataset a request names does not exist."""
 
 
 class DatasetAlreadyExistsException(CouchbaseException):
-    """Raised when attempting to create a dataset which already exists"""
+    """Raised when creating an analytics dataset that already exists."""
 
 
 class AnalyticsLinkExistsException(CouchbaseException):
-    """Raised when attempting to create an analytics link which already exists"""
+    """Raised when creating an analytics link that already exists."""
 
 
 class AnalyticsLinkNotFoundException(CouchbaseException):
-    """Raised when attempting to replace or drop an analytics link that does not exists"""
+    """Raised when the analytics link a request names does not exist."""
 
 
 # Views mgmt
 
 
 class DesignDocumentNotFoundException(CouchbaseException):
-    pass
+    """Raised when the design document a request names does not exist."""
 
 # Eventing function mgmt
 
 
 class EventingFunctionNotFoundException(CouchbaseException):
-    """Raised when an eventing function is not found"""
+    """Raised when the eventing function a request names does not exist."""
 
 
 class EventingFunctionCompilationFailureException(CouchbaseException):
-    """Raised when compilation of an eventing function failed"""
+    """Raised when an eventing function does not compile."""
 
 
 class EventingFunctionIdenticalKeyspaceException(CouchbaseException):
-    """Raised when the source and metadata keyspaces are the same"""
+    """Raised when an eventing function's source and metadata keyspaces are the same."""
 
 
 class EventingFunctionNotBootstrappedException(CouchbaseException):
-    """Raised when an eventing function is deployed but not “fully” bootstrapped"""
+    """Raised when an eventing function is deployed but not fully bootstrapped."""
 
 
 class EventingFunctionNotDeployedException(CouchbaseException):
-    """Raised when an eventing function is not deployed, but the action expects it to be deployed"""
+    """Raised when an operation needs an eventing function deployed, and it is not."""
 
 
 class EventingFunctionNotUnDeployedException(CouchbaseException):
-    """Raised when an eventing function is deployed, but the action expects it to be undeployed"""
+    """Raised when an operation needs an eventing function undeployed, and it is not."""
 
 
 class EventingFunctionAlreadyDeployedException(CouchbaseException):
-    """Raised when an eventing function has already been deployed"""
+    """Raised when deploying an eventing function that is already deployed."""
 
 
 class EventingFunctionCollectionNotFoundException(CouchbaseException):
-    """Raised when collection in specified keyspace is not found"""
+    """Raised when a collection in an eventing function's keyspace does not exist."""
 
 
 # python client only errors
 
 
 class FeatureNotFoundException(CouchbaseException):
-    """Thrown when feature is not supported by server version."""
+    """Raised when a feature is used that the cluster's server version does not support."""
 
 
 class InvalidIndexException(CouchbaseException):
-    pass
+    """Raised when an index into a sub-document or transaction get-multi result is out of range."""
 
 
 class MissingTokenException(CouchbaseException):
-    pass
+    """Raised when a :class:`~couchbase.mutation_state.MutationState` is given no mutation token."""
 
 
 class QueueEmpty(CouchbaseException):
-    """
-    Thrown if a datastructure queue is empty
-    """
+    """Raised when popping from an empty :class:`~couchbase.datastructures.CouchbaseQueue`."""
 
 
 class UnsuccessfulOperationException(CouchbaseException):
-    """Thrown when a specific pycbc_core operation is unsuccessful."""
+    """Raised when the SDK cannot start an operation.
+
+    For instance, a range scan before the SDK has the cluster's partition map.
+    """
 
 
 # Ratelimiting
 
 
 class RateLimitedException(CouchbaseException):
-    """
-    Rate limited exceptions are an uncommitted API that is unlikely to change,
-    but may still change as final consensus on its behavior has not yet been reached.
+    """Raised when the server rate limits the caller for exceeding a rate threshold.
 
-    The server decided that the caller must be rate limited due to
-    exceeding a rate threshold."""
+    **UNCOMMITTED** This API is unlikely to change, but may still change as final consensus on
+    its behavior has not yet been reached.
+    """
 
 
 class QuotaLimitedException(CouchbaseException):
-    """
-    Quota limited exceptions are an uncommitted API that is unlikely to change,
-    but may still change as final consensus on its behavior has not yet been reached.
+    """Raised when the server limits the caller for exceeding a quota threshold.
 
-    The server decided that the caller must be limited due to exceeding
-    a quota threshold."""
+    **UNCOMMITTED** This API is unlikely to change, but may still change as final consensus on
+    its behavior has not yet been reached.
+    """
 
 
 # Transaction errors
 
 
 class TransactionException(CouchbaseException):
-    """
-    Base class for any transaction-related exception
-    """
+    """The base class of the exceptions a transaction raises."""
 
 
 class TransactionOperationFailed(TransactionException):
-    """
-    Indicates a transaction operation failed.
+    """Raised when an operation in a transaction fails.
 
-    The transaction will be rolled back no matter what, but this error can give some context as to why it failed.
+    The transaction is rolled back whatever happens next; this exception says why the operation
+    failed.
     """
 
 
 class TransactionFailed(TransactionException):
-    """
-    The transaction failed and was rolled back.
+    """Raised when a transaction failed and was rolled back.
 
-     No actors can see any changes made by this transaction.
-     """
+    No actor can see any change the transaction made.
+    """
 
 
 class TransactionExpired(TransactionException):
-    """
-    The transaction could not be fully completed in the configured timeout.
+    """Raised when a transaction did not complete within its timeout, and was rolled back.
 
-    It is in an undefined state, but it unambiguously did not reach the commit point.  No actors will be able to see the
-    contents of this transaction.The transaction exceeded the expiry set in the TransactionConfig, and was rolled back.
+    It unambiguously did not reach the commit point, so no actor can see any change it made.
     """
 
 
 class TransactionCommitAmbiguous(TransactionException):
-    """
-    The transaction expired at the point of trying to commit it.  It is ambiguous whether the transaction has committed
-    or not.  Actors may be able to see the content of this transaction.
+    """Raised when a transaction expired while committing, so whether it committed is unknown.
 
-    This error is result of inevitable and unavoidable edge cases when working with unreliable networks.  For example,
-    consider an ordinary mutation being made over the network to any database.  The mutation could succeed on the
-    database-side, and then just before the result is returned to the client, the network connection drops.  The client
-    cannot receive the success result and will timeout - it is ambiguous to it whether the mutation succeeded or not.
+    Actors may be able to see the changes it made.
 
-    The transactions layer will work to resolve the ambiguity up until the transaction expires, but if unable to resolve
-    it in that time, it is forced to raise this error.  The transaction may or may not have been successful, and
-    error-handling of this is highly application-dependent.
+    This is an unavoidable edge case of unreliable networks. A mutation can succeed on the
+    server and its response be lost when the connection drops, so the client times out without
+    knowing the outcome. The transactions layer works to resolve the ambiguity until the
+    transaction expires, and raises this when it cannot. How to handle it depends on the
+    application.
 
-    The asynchronous cleanup process will try to complete the transaction: roll it back if it didn't commit, roll it
-    forwards if it did.
+    The asynchronous cleanup process completes the transaction: it rolls it back if it did not
+    commit, and forwards if it did.
     """
 
 
@@ -1081,6 +1147,8 @@ class TransactionCommitAmbiguous(TransactionException):
 
 
 class CryptoException(CouchbaseException):
+    """The base class of the field-level encryption exceptions."""
+
     def __init__(self,
                  message: str | None = 'Generic Cryptography exception',
                  **kwargs: Unpack[_ExceptionKwargs]) -> None:
@@ -1088,6 +1156,8 @@ class CryptoException(CouchbaseException):
 
 
 class EncryptionFailureException(CryptoException):
+    """Raised when a crypto manager fails to encrypt a value."""
+
     def __init__(self,
                  message: str | None = 'Generic Encryption exception',
                  **kwargs: Unpack[_ExceptionKwargs]) -> None:
@@ -1095,6 +1165,8 @@ class EncryptionFailureException(CryptoException):
 
 
 class DecryptionFailureException(CryptoException):
+    """Raised when a crypto manager fails to decrypt a value."""
+
     def __init__(self,
                  message: str | None = 'Generic Decryption exception',
                  **kwargs: Unpack[_ExceptionKwargs]) -> None:
@@ -1102,31 +1174,31 @@ class DecryptionFailureException(CryptoException):
 
 
 class CryptoKeyNotFoundException(CryptoException):
-    pass
+    """Raised when a keyring has no key with the requested ID, or an encryption result has no such field."""
 
 
 class InvalidCryptoKeyException(CryptoException):
-    pass
+    """Raised when an encrypter or decrypter is given a key it cannot use."""
 
 
 class EncrypterNotFoundException(CryptoException):
-    pass
+    """Raised when a crypto manager has no encrypter under the requested alias."""
 
 
 class DecrypterNotFoundException(CryptoException):
-    pass
+    """Raised when a crypto manager has no decrypter for an encryption algorithm."""
 
 
 class EncrypterAlreadyExistsException(CryptoException):
-    pass
+    """Raised when registering an encrypter under an alias that already has one."""
 
 
 class DecrypterAlreadyExistsException(CryptoException):
-    pass
+    """Raised when registering a decrypter for an algorithm that already has one."""
 
 
 class InvalidCipherTextException(CryptoException):
-    pass
+    """Raised when a decrypter is given ciphertext it cannot decrypt."""
 
 
 # An exception is named by `__module__` in the last line of a traceback, in error trackers that

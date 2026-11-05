@@ -91,13 +91,15 @@ if TYPE_CHECKING:
 
 
 class AsyncScanResultIterable(_ScanResultIterable):
+    """The documents a range scan returns, read with ``async for``."""
+
     _request: AsyncRowIterator[ScanResult, None]
 
     def rows(self) -> AsyncRowIterator[ScanResult, None]:
-        """The rows which have been returned by the scan.
+        """Get the documents the scan returns.
 
         Returns:
-            AsyncIterable: An async iterable over the scan's rows.  Use ``async for`` to loop over it.
+            AsyncIterable: An async iterable over the documents.  Use ``async for`` to loop over it.
         """
         return self.__aiter__()
 
@@ -106,15 +108,12 @@ class AsyncScanResultIterable(_ScanResultIterable):
 
 
 class AsyncQueryResult(_QueryResult[asyncio.Task[list[Any]]]):
+    """The result of a query: its rows, read with ``async for``, then its metadata."""
+
     _request: AsyncRowIterator[Any, QueryMetaData]
 
     def rows(self) -> AsyncRowIterator[Any, QueryMetaData]:
         """The rows which have been returned by the query.
-
-        .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
 
         Returns:
             AsyncIterable: An async iterable over the query's rows.  Use ``async for`` to loop over it.
@@ -126,15 +125,12 @@ class AsyncQueryResult(_QueryResult[asyncio.Task[list[Any]]]):
 
 
 class AsyncAnalyticsResult(_AnalyticsResult):
+    """The result of an analytics query: its rows, read with ``async for``, then its metadata."""
+
     _request: AsyncRowIterator[Any, AnalyticsMetaData]
 
     def rows(self) -> AsyncRowIterator[Any, AnalyticsMetaData]:
         """The rows which have been returned by the analytics query.
-
-        .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
 
         Returns:
             AsyncIterable: An async iterable over the analytics query's rows.  Use ``async for`` to loop
@@ -147,15 +143,12 @@ class AsyncAnalyticsResult(_AnalyticsResult):
 
 
 class AsyncSearchResult(_SearchResult):
+    """The result of a search: its rows, read with ``async for``, then its metadata and facets."""
+
     _request: AsyncRowIterator[SearchRow, _SearchFinalMetadata]
 
     def rows(self) -> AsyncRowIterator[SearchRow, _SearchFinalMetadata]:
         """The rows which have been returned by the search query.
-
-        .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
 
         Returns:
             AsyncIterable: An async iterable over the search query's rows.  Use ``async for`` to loop over it.
@@ -167,15 +160,12 @@ class AsyncSearchResult(_SearchResult):
 
 
 class AsyncViewResult(_ViewResult):
+    """The result of a view query: its rows, read with ``async for``, then its metadata."""
+
     _request: AsyncRowIterator[ViewRow, ViewMetaData]
 
     def rows(self) -> AsyncRowIterator[ViewRow, ViewMetaData]:
         """The rows which have been returned by the view query.
-
-        .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
 
         Returns:
             AsyncIterable: An async iterable over the view query's rows.  Use ``async for`` to loop over it.

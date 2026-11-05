@@ -184,6 +184,8 @@ if TYPE_CHECKING:
 
 
 class ConnectLinkOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.ConnectLinkOptions`."""
+
     timeout: timedelta | None
     dataverse_name: str | None
     link_name: str | None
@@ -192,12 +194,18 @@ class ConnectLinkOptionsKwargs(TypedDict, total=False):
 
 
 class ConnectLinkOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.connect_link`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
-        dataverse_name (str, optional):
-        link_name (str, optional):
-        force (bool, optional):
+        dataverse_name (str, optional): The name of the dataverse the operation applies to.
+        link_name (str, optional): The name of the link.
+        force (bool, optional): Whether to connect the link even if the bucket's UUID has changed, as it does when a
+            bucket is dropped and created again.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -208,18 +216,23 @@ class ConnectLinkOptions(dict):
 
     @property
     def dataverse_name(self) -> str:
+        """The value of the ``dataverse_name`` option, or ``'Default'`` if it was not set."""
         return self.get("dataverse_name", 'Default')
 
     @property
     def link_name(self) -> str:
+        """The value of the ``link_name`` option, or ``'Local'`` if it was not set."""
         return self.get("link_name", 'Local')
 
     @property
     def force(self) -> bool:
+        """The value of the ``force`` option, or ``False`` if it was not set."""
         return self.get("force", False)
 
 
 class CreateAnalyticsIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.CreateAnalyticsIndexOptions`."""
+
     timeout: timedelta | None
     ignore_if_exists: bool | None
     dataverse_name: str | None
@@ -227,12 +240,17 @@ class CreateAnalyticsIndexOptionsKwargs(TypedDict, total=False):
 
 
 class CreateAnalyticsIndexOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.create_index`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         ignore_if_exists (bool, optional): Whether or not the call should ignore the index already existing when
             determining whether the call was successful.
-        dataverse_name (str, optional):
+        dataverse_name (str, optional): The name of the dataverse the operation applies to.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -243,14 +261,18 @@ class CreateAnalyticsIndexOptions(dict):
 
     @property
     def ignore_if_exists(self) -> bool:
+        """The value of the ``ignore_if_exists`` option, or ``False`` if it was not set."""
         return self.get("ignore_if_exists", False)
 
     @property
     def dataverse_name(self) -> str:
+        """The value of the ``dataverse_name`` option, or ``'Default'`` if it was not set."""
         return self.get("dataverse_name", 'Default')
 
 
 class CreateDatasetOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.CreateDatasetOptions`."""
+
     timeout: timedelta | None
     ignore_if_exists: bool | None
     condition: str | None
@@ -259,13 +281,18 @@ class CreateDatasetOptionsKwargs(TypedDict, total=False):
 
 
 class CreateDatasetOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.create_dataset`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         ignore_if_exists (bool, optional): Whether or not the call should ignore the index already existing when
             determining whether the call was successful.
         condition (str, optional): Specifies the 'where' condition for partial index creation.
-        dataverse_name (str, optional):
+        dataverse_name (str, optional): The name of the dataverse the operation applies to.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -276,25 +303,35 @@ class CreateDatasetOptions(dict):
 
     @property
     def ignore_if_exists(self) -> bool:
+        """The value of the ``ignore_if_exists`` option, or ``False`` if it was not set."""
         return self.get("ignore_if_exists", False)
 
     @property
     def condition(self) -> str | None:
+        """The value of the ``condition`` option, or ``None`` if it was not set."""
         return self.get("condition", None)
 
     @property
     def dataverse_name(self) -> str:
+        """The value of the ``dataverse_name`` option, or ``'Default'`` if it was not set."""
         return self.get("dataverse_name", 'Default')
 
 
 class CreateDataverseOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.CreateDataverseOptions`."""
+
     timeout: timedelta | None
     ignore_if_exists: bool | None
     parent_span: RequestSpan | None
 
 
 class CreateDataverseOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.create_dataverse`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         ignore_if_exists (bool, optional): Whether or not the call should ignore the index already existing when
@@ -309,16 +346,24 @@ class CreateDataverseOptions(dict):
 
     @property
     def ignore_if_exists(self) -> bool:
+        """The value of the ``ignore_if_exists`` option, or ``False`` if it was not set."""
         return self.get("ignore_if_exists", False)
 
 
 class CreateLinkAnalyticsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.CreateLinkAnalyticsOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class CreateLinkAnalyticsOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.create_link`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -331,6 +376,8 @@ class CreateLinkAnalyticsOptions(dict):
 
 
 class DisconnectLinkOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DisconnectLinkOptions`."""
+
     timeout: timedelta | None
     dataverse_name: str | None
     link_name: str | None
@@ -338,11 +385,16 @@ class DisconnectLinkOptionsKwargs(TypedDict, total=False):
 
 
 class DisconnectLinkOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.disconnect_link`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
-        dataverse_name (str, optional):
-        link_name (str, optional):
+        dataverse_name (str, optional): The name of the dataverse the operation applies to.
+        link_name (str, optional): The name of the link.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -353,14 +405,18 @@ class DisconnectLinkOptions(dict):
 
     @property
     def dataverse_name(self) -> str:
+        """The value of the ``dataverse_name`` option, or ``'Default'`` if it was not set."""
         return self.get("dataverse_name", 'Default')
 
     @property
     def link_name(self) -> str:
+        """The value of the ``link_name`` option, or ``'Local'`` if it was not set."""
         return self.get("link_name", 'Local')
 
 
 class DropAnalyticsIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropAnalyticsIndexOptions`."""
+
     timeout: timedelta | None
     ignore_if_not_exists: bool | None
     dataverse_name: str | None
@@ -368,12 +424,17 @@ class DropAnalyticsIndexOptionsKwargs(TypedDict, total=False):
 
 
 class DropAnalyticsIndexOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.drop_index`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         ignore_if_not_exists (bool, optional): Whether or not the call should ignore the index not existing when
             determining whether the call was successful.
-        dataverse_name (str, optional):
+        dataverse_name (str, optional): The name of the dataverse the operation applies to.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -384,14 +445,18 @@ class DropAnalyticsIndexOptions(dict):
 
     @property
     def ignore_if_not_exists(self) -> bool:
+        """The value of the ``ignore_if_not_exists`` option, or ``False`` if it was not set."""
         return self.get("ignore_if_not_exists", False)
 
     @property
     def dataverse_name(self) -> str:
+        """The value of the ``dataverse_name`` option, or ``'Default'`` if it was not set."""
         return self.get("dataverse_name", 'Default')
 
 
 class DropDatasetOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropDatasetOptions`."""
+
     timeout: timedelta | None
     ignore_if_not_exists: bool | None
     dataverse_name: str | None
@@ -399,12 +464,17 @@ class DropDatasetOptionsKwargs(TypedDict, total=False):
 
 
 class DropDatasetOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.drop_dataset`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         ignore_if_not_exists (bool, optional): Whether or not the call should ignore the index not existing when
             determining whether the call was successful.
-        dataverse_name (str, optional):
+        dataverse_name (str, optional): The name of the dataverse the operation applies to.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -415,21 +485,30 @@ class DropDatasetOptions(dict):
 
     @property
     def ignore_if_not_exists(self) -> bool:
+        """The value of the ``ignore_if_not_exists`` option, or ``False`` if it was not set."""
         return self.get("ignore_if_not_exists", False)
 
     @property
     def dataverse_name(self) -> str:
+        """The value of the ``dataverse_name`` option, or ``'Default'`` if it was not set."""
         return self.get("dataverse_name", 'Default')
 
 
 class DropDataverseOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropDataverseOptions`."""
+
     timeout: timedelta | None
     ignore_if_not_exists: bool | None
     parent_span: RequestSpan | None
 
 
 class DropDataverseOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.drop_dataverse`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         ignore_if_not_exists (bool, optional): Whether or not the call should ignore the index not existing when
@@ -444,16 +523,24 @@ class DropDataverseOptions(dict):
 
     @property
     def ignore_if_not_exists(self) -> bool:
+        """The value of the ``ignore_if_not_exists`` option, or ``False`` if it was not set."""
         return self.get("ignore_if_not_exists", False)
 
 
 class DropLinkAnalyticsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropLinkAnalyticsOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class DropLinkAnalyticsOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.drop_link`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -466,12 +553,19 @@ class DropLinkAnalyticsOptions(dict):
 
 
 class GetAllAnalyticsIndexesOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllAnalyticsIndexesOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetAllAnalyticsIndexesOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.get_all_indexes`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -484,12 +578,19 @@ class GetAllAnalyticsIndexesOptions(dict):
 
 
 class GetAllDatasetOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllDatasetOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetAllDatasetOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.get_all_datasets`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -502,6 +603,8 @@ class GetAllDatasetOptions(dict):
 
 
 class GetLinksAnalyticsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetLinksAnalyticsOptions`."""
+
     timeout: timedelta | None
     dataverse_name: str | None
     name: str | None
@@ -510,12 +613,18 @@ class GetLinksAnalyticsOptionsKwargs(TypedDict, total=False):
 
 
 class GetLinksAnalyticsOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.get_links`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
-        dataverse_name (str, optional):
-        name (str, optional):
-        link_type (:class:`~couchbase.management.analytics.AnalyticsLinkType`, optional):
+        dataverse_name (str, optional): The name of the dataverse the operation applies to.
+        name (str, optional): Only get the link with this name, which also needs ``dataverse_name``.
+        link_type (:class:`~couchbase.management.analytics.AnalyticsLinkType`, optional): Only get the links of this
+            type.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
     """
@@ -526,24 +635,34 @@ class GetLinksAnalyticsOptions(dict):
 
     @property
     def dataverse_name(self) -> str:
+        """The value of the ``dataverse_name`` option, or ``'Default'`` if it was not set."""
         return self.get("dataverse_name", 'Default')
 
     @property
     def name(self) -> str | None:
+        """The value of the ``name`` option, or ``None`` if it was not set."""
         return self.get("name", None)
 
     @property
     def link_type(self) -> AnalyticsLinkType | None:
+        """The value of the ``link_type`` option, or ``None`` if it was not set."""
         return self.get("link_type", None)
 
 
 class GetPendingMutationsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetPendingMutationsOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetPendingMutationsOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.get_pending_mutations`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -556,12 +675,19 @@ class GetPendingMutationsOptions(dict):
 
 
 class ReplaceLinkAnalyticsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.ReplaceLinkAnalyticsOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class ReplaceLinkAnalyticsOptions(dict):
-    """Args:
+    """Available options for :meth:`.AnalyticsIndexManager.replace_link`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.analytics_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -579,6 +705,8 @@ class ReplaceLinkAnalyticsOptions(dict):
 
 
 class BucketDescribeOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.BucketDescribeOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -587,7 +715,7 @@ class BucketDescribeOptions(dict):
     """Available options for a :class:`~couchbase.management.buckets.BucketManager`'s bucket describe operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -602,6 +730,8 @@ class BucketDescribeOptions(dict):
 
 
 class CreateBucketOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.CreateBucketOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -610,7 +740,7 @@ class CreateBucketOptions(dict):
     """Available options for a :class:`~couchbase.management.buckets.BucketManager`'s create bucket operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -625,6 +755,8 @@ class CreateBucketOptions(dict):
 
 
 class DropBucketOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropBucketOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -633,7 +765,7 @@ class DropBucketOptions(dict):
     """Available options for a :class:`~couchbase.management.buckets.BucketManager`'s drop bucket operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -648,6 +780,8 @@ class DropBucketOptions(dict):
 
 
 class FlushBucketOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.FlushBucketOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -656,7 +790,7 @@ class FlushBucketOptions(dict):
     """Available options for a :class:`~couchbase.management.buckets.BucketManager`'s flush bucket operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -671,6 +805,8 @@ class FlushBucketOptions(dict):
 
 
 class GetAllBucketOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllBucketOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -679,7 +815,7 @@ class GetAllBucketOptions(dict):
     """Available options for a :class:`~couchbase.management.buckets.BucketManager`'s get all buckets operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -694,6 +830,8 @@ class GetAllBucketOptions(dict):
 
 
 class GetBucketOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetBucketOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -702,7 +840,7 @@ class GetBucketOptions(dict):
     """Available options for a :class:`~couchbase.management.buckets.BucketManager`'s get bucket operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -717,6 +855,8 @@ class GetBucketOptions(dict):
 
 
 class UpdateBucketOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.UpdateBucketOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -725,7 +865,7 @@ class UpdateBucketOptions(dict):
     """Available options for a :class:`~couchbase.management.buckets.BucketManager`'s update bucket operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -745,22 +885,24 @@ class UpdateBucketOptions(dict):
 
 
 class CreateCollectionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.CreateCollectionOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
 
 class CreateCollectionOptions(dict):
-    """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s create collection operation.
+    """Available options for :meth:`.CollectionManager.create_collection`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
-    """  # noqa: E501
+    """
 
     def __init__(self, **kwargs: Unpack[CreateCollectionOptionsKwargs]) -> None:
         provided = {k: v for k, v in kwargs.items() if v is not None}
@@ -768,6 +910,8 @@ class CreateCollectionOptions(dict):
 
 
 class CreateScopeOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.CreateScopeOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -776,7 +920,7 @@ class CreateScopeOptions(dict):
     """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s create scope operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -791,6 +935,8 @@ class CreateScopeOptions(dict):
 
 
 class DropCollectionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropCollectionOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -799,7 +945,7 @@ class DropCollectionOptions(dict):
     """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s drop collection operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -814,6 +960,8 @@ class DropCollectionOptions(dict):
 
 
 class DropScopeOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropScopeOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -822,7 +970,7 @@ class DropScopeOptions(dict):
     """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s drop scope operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -837,6 +985,8 @@ class DropScopeOptions(dict):
 
 
 class GetAllScopesOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllScopesOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
@@ -845,7 +995,7 @@ class GetAllScopesOptions(dict):
     """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s get all scopes operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -860,22 +1010,24 @@ class GetAllScopesOptions(dict):
 
 
 class UpdateCollectionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.UpdateCollectionOptions`."""
+
     parent_span: RequestSpan | None
     timeout: timedelta | None
 
 
 class UpdateCollectionOptions(dict):
-    """Available options for a :class:`~couchbase.management.collections.CollectionManager`'s update collection operation.
+    """Available options for :meth:`.CollectionManager.update_collection`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
-    """  # noqa: E501
+    """
 
     def __init__(self, **kwargs: Unpack[UpdateCollectionOptionsKwargs]) -> None:
         provided = {k: v for k, v in kwargs.items() if v is not None}
@@ -888,12 +1040,21 @@ class UpdateCollectionOptions(dict):
 
 
 class DeployFunctionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DeployFunctionOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class DeployFunctionOptions(dict):
-    """Args:
+    """Available options for :meth:`.EventingFunctionManager.deploy_function`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeEventingFunctionManager.deploy_function`.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -906,12 +1067,21 @@ class DeployFunctionOptions(dict):
 
 
 class DropFunctionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropFunctionOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class DropFunctionOptions(dict):
-    """Args:
+    """Available options for :meth:`.EventingFunctionManager.drop_function`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeEventingFunctionManager.drop_function`.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -924,6 +1094,8 @@ class DropFunctionOptions(dict):
 
 
 class EventingFunctionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.EventingFunctionOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
@@ -932,7 +1104,7 @@ class EventingFunctionOptions(dict):
     """Available options for a :class:`~couchbase.management.eventing.EventingFunctionManager` operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -947,12 +1119,21 @@ class EventingFunctionOptions(dict):
 
 
 class FunctionsStatusOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.FunctionsStatusOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class FunctionsStatusOptions(dict):
-    """Args:
+    """Available options for :meth:`.EventingFunctionManager.functions_status`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeEventingFunctionManager.functions_status`.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -965,12 +1146,21 @@ class FunctionsStatusOptions(dict):
 
 
 class GetAllFunctionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllFunctionOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetAllFunctionOptions(dict):
-    """Args:
+    """Available options for :meth:`.EventingFunctionManager.get_all_functions`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeEventingFunctionManager.get_all_functions`.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -983,12 +1173,21 @@ class GetAllFunctionOptions(dict):
 
 
 class GetFunctionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetFunctionOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetFunctionOptions(dict):
-    """Args:
+    """Available options for :meth:`.EventingFunctionManager.get_function`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeEventingFunctionManager.get_function`.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -1001,12 +1200,21 @@ class GetFunctionOptions(dict):
 
 
 class PauseFunctionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.PauseFunctionOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class PauseFunctionOptions(dict):
-    """Args:
+    """Available options for :meth:`.EventingFunctionManager.pause_function`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeEventingFunctionManager.pause_function`.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -1019,12 +1227,21 @@ class PauseFunctionOptions(dict):
 
 
 class ResumeFunctionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.ResumeFunctionOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class ResumeFunctionOptions(dict):
-    """Args:
+    """Available options for :meth:`.EventingFunctionManager.resume_function`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeEventingFunctionManager.resume_function`.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -1037,12 +1254,21 @@ class ResumeFunctionOptions(dict):
 
 
 class UndeployFunctionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.UndeployFunctionOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class UndeployFunctionOptions(dict):
-    """Args:
+    """Available options for :meth:`.EventingFunctionManager.undeploy_function`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeEventingFunctionManager.undeploy_function`.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -1055,12 +1281,21 @@ class UndeployFunctionOptions(dict):
 
 
 class UpsertFunctionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.UpsertFunctionOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class UpsertFunctionOptions(dict):
-    """Args:
+    """Available options for :meth:`.EventingFunctionManager.upsert_function`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeEventingFunctionManager.upsert_function`.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -1078,6 +1313,8 @@ class UpsertFunctionOptions(dict):
 
 
 class BuildDeferredQueryIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.BuildDeferredQueryIndexOptions`."""
+
     timeout: timedelta | None
     scope_name: str | None
     collection_name: str | None
@@ -1085,10 +1322,10 @@ class BuildDeferredQueryIndexOptionsKwargs(TypedDict, total=False):
 
 
 class BuildDeferredQueryIndexOptions(dict):
-    """Available options for a :class:`~couchbase.management.queries.QueryIndexManager`'s build deferred indexes operation.
+    """Available options for :meth:`.QueryIndexManager.build_deferred_indexes`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1103,7 +1340,7 @@ class BuildDeferredQueryIndexOptions(dict):
                 Use :class:`~couchbase.management.queries.CollectionQueryIndexManager` instead.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
-    """  # noqa: E501
+    """
 
     def __init__(self, **kwargs: Unpack[BuildDeferredQueryIndexOptionsKwargs]) -> None:
         provided = {k: v for k, v in kwargs.items() if v is not None}
@@ -1111,6 +1348,8 @@ class BuildDeferredQueryIndexOptions(dict):
 
 
 class CreatePrimaryQueryIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.CreatePrimaryQueryIndexOptions`."""
+
     index_name: str | None
     timeout: timedelta | None
     ignore_if_exists: bool | None
@@ -1123,10 +1362,10 @@ class CreatePrimaryQueryIndexOptionsKwargs(TypedDict, total=False):
 
 
 class CreatePrimaryQueryIndexOptions(dict):
-    """Available options for a :class:`~couchbase.management.queries.QueryIndexManager`'s create primary index operation.
+    """Available options for :meth:`.QueryIndexManager.create_primary_index`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         index_name (str, optional): Specifies the name of the primary index.
@@ -1148,7 +1387,7 @@ class CreatePrimaryQueryIndexOptions(dict):
                 Use :class:`~couchbase.management.queries.CollectionQueryIndexManager` instead.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
-    """  # noqa: E501
+    """
 
     def __init__(self, **kwargs: Unpack[CreatePrimaryQueryIndexOptionsKwargs]) -> None:
         provided = {k: v for k, v in kwargs.items() if v is not None}
@@ -1156,14 +1395,18 @@ class CreatePrimaryQueryIndexOptions(dict):
 
     @property
     def ignore_if_exists(self) -> bool:
+        """The value of the ``ignore_if_exists`` option, or ``False`` if it was not set."""
         return self.get("ignore_if_exists", False)
 
     @property
     def condition(self) -> str | None:
+        """The value of the ``condition`` option, or ``None`` if it was not set."""
         return self.get("condition", None)
 
 
 class CreateQueryIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.CreateQueryIndexOptions`."""
+
     timeout: timedelta | None
     ignore_if_exists: bool | None
     num_replicas: int | None
@@ -1178,7 +1421,7 @@ class CreateQueryIndexOptions(dict):
     """Available options for a :class:`~couchbase.management.queries.QueryIndexManager`'s create index operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1207,14 +1450,18 @@ class CreateQueryIndexOptions(dict):
 
     @property
     def ignore_if_exists(self) -> bool:
+        """The value of the ``ignore_if_exists`` option, or ``False`` if it was not set."""
         return self.get("ignore_if_exists", False)
 
     @property
     def condition(self) -> str | None:
+        """The value of the ``condition`` option, or ``None`` if it was not set."""
         return self.get("condition", None)
 
 
 class DropPrimaryQueryIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropPrimaryQueryIndexOptions`."""
+
     index_name: str | None
     ignore_if_not_exists: bool | None
     timeout: timedelta | None
@@ -1227,7 +1474,7 @@ class DropPrimaryQueryIndexOptions(dict):
     """Available options for a :class:`~couchbase.management.queries.QueryIndexManager`'s drop primary index operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         index_name (str, optional): Specifies the name of the primary index.
@@ -1253,10 +1500,13 @@ class DropPrimaryQueryIndexOptions(dict):
 
     @property
     def ignore_if_not_exists(self) -> bool:
+        """The value of the ``ignore_if_not_exists`` option, or ``False`` if it was not set."""
         return self.get("ignore_if_not_exists", False)
 
 
 class DropQueryIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropQueryIndexOptions`."""
+
     ignore_if_not_exists: bool | None
     timeout: timedelta | None
     scope_name: str | None
@@ -1268,7 +1518,7 @@ class DropQueryIndexOptions(dict):
     """Available options for a :class:`~couchbase.management.queries.QueryIndexManager`'s drop index operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         ignore_if_not_exists (bool, optional): Whether or not the call should ignore the index not existing when
@@ -1293,10 +1543,13 @@ class DropQueryIndexOptions(dict):
 
     @property
     def ignore_if_not_exists(self) -> bool:
+        """The value of the ``ignore_if_not_exists`` option, or ``False`` if it was not set."""
         return self.get("ignore_if_not_exists", False)
 
 
 class GetAllQueryIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllQueryIndexOptions`."""
+
     timeout: timedelta | None
     scope_name: str | None
     collection_name: str | None
@@ -1307,7 +1560,7 @@ class GetAllQueryIndexOptions(dict):
     """Available options for a :class:`~couchbase.management.queries.QueryIndexManager`'s get all indexes operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1330,6 +1583,8 @@ class GetAllQueryIndexOptions(dict):
 
 
 class WatchQueryIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.WatchQueryIndexOptions`."""
+
     watch_primary: bool | None
     timeout: timedelta | None
     scope_name: str | None
@@ -1341,7 +1596,7 @@ class WatchQueryIndexOptions(dict):
     """Available options for a :class:`~couchbase.management.queries.QueryIndexManager`'s watch indexes operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         watch_primary (bool, optional): Specifies whether the primary indexes should be watched as well.
@@ -1370,16 +1625,19 @@ class WatchQueryIndexOptions(dict):
 
 
 class AllowQueryingSearchIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.AllowQueryingSearchIndexOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class AllowQueryingSearchIndexOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.allow_querying` or a
-    :meth:`.SearchIndexManager.allow_querying` operation.
+    """Available options for :meth:`.SearchIndexManager.allow_querying`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.allow_querying`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1394,16 +1652,19 @@ class AllowQueryingSearchIndexOptions(dict):
 
 
 class AnalyzeDocumentSearchIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.AnalyzeDocumentSearchIndexOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class AnalyzeDocumentSearchIndexOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.analyze_document` or a
-    :meth:`.SearchIndexManager.analyze_document` operation.
+    """Available options for :meth:`.SearchIndexManager.analyze_document`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.analyze_document`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1418,16 +1679,19 @@ class AnalyzeDocumentSearchIndexOptions(dict):
 
 
 class DisallowQueryingSearchIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DisallowQueryingSearchIndexOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class DisallowQueryingSearchIndexOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.disallow_querying` or a
-    :meth:`.SearchIndexManager.disallow_querying` operation.
+    """Available options for :meth:`.SearchIndexManager.disallow_querying`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.disallow_querying`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1442,16 +1706,19 @@ class DisallowQueryingSearchIndexOptions(dict):
 
 
 class DropSearchIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropSearchIndexOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class DropSearchIndexOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.drop_index` or a :meth:`.SearchIndexManager.drop_index`
-    operation.
+    """Available options for :meth:`.SearchIndexManager.drop_index`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.drop_index`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1466,16 +1733,19 @@ class DropSearchIndexOptions(dict):
 
 
 class FreezePlanSearchIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.FreezePlanSearchIndexOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class FreezePlanSearchIndexOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.freeze_plan` or a :meth:`.SearchIndexManager.freeze_plan`
-    operation.
+    """Available options for :meth:`.SearchIndexManager.freeze_plan`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.freeze_plan`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1490,16 +1760,19 @@ class FreezePlanSearchIndexOptions(dict):
 
 
 class GetAllSearchIndexStatsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllSearchIndexStatsOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetAllSearchIndexStatsOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.get_all_index_stats` or a
-    :meth:`.SearchIndexManager.get_all_index_stats` operation.
+    """Available options for :meth:`.SearchIndexManager.get_all_index_stats`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.get_all_index_stats`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1514,16 +1787,19 @@ class GetAllSearchIndexStatsOptions(dict):
 
 
 class GetAllSearchIndexesOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllSearchIndexesOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetAllSearchIndexesOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.get_all_indexes` or a
-    :meth:`.SearchIndexManager.get_all_indexes` operation.
+    """Available options for :meth:`.SearchIndexManager.get_all_indexes`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.get_all_indexes`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1538,16 +1814,19 @@ class GetAllSearchIndexesOptions(dict):
 
 
 class GetSearchIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetSearchIndexOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetSearchIndexOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.get_index` or a :meth:`.SearchIndexManager.get_index`
-    operation.
+    """Available options for :meth:`.SearchIndexManager.get_index`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.get_index`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1562,16 +1841,19 @@ class GetSearchIndexOptions(dict):
 
 
 class GetSearchIndexStatsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetSearchIndexStatsOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetSearchIndexStatsOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.get_index_stats` or a
-    :meth:`.SearchIndexManager.get_index_stats` operation.
+    """Available options for :meth:`.SearchIndexManager.get_index_stats`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.get_index_stats`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1586,16 +1868,19 @@ class GetSearchIndexStatsOptions(dict):
 
 
 class GetSearchIndexedDocumentsCountOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetSearchIndexedDocumentsCountOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetSearchIndexedDocumentsCountOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.get_indexed_documents_count` or a
-    :meth:`.SearchIndexManager.get_indexed_documents_count` operation.
+    """Available options for :meth:`.SearchIndexManager.get_indexed_documents_count`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.get_indexed_documents_count`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1610,23 +1895,26 @@ class GetSearchIndexedDocumentsCountOptions(dict):
 
 
 class PauseIngestSearchIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.PauseIngestSearchIndexOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class PauseIngestSearchIndexOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.pause_ingest` or a :meth:`.SearchIndexManager.pause_ingest`
-    operation.
+    """Available options for :meth:`.SearchIndexManager.pause_ingest`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.pause_ingest`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
-    """  # noqa: E501
+    """
 
     def __init__(self, **kwargs: Unpack[PauseIngestSearchIndexOptionsKwargs]) -> None:
         provided = {k: v for k, v in kwargs.items() if v is not None}
@@ -1634,16 +1922,19 @@ class PauseIngestSearchIndexOptions(dict):
 
 
 class ResumeIngestSearchIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.ResumeIngestSearchIndexOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class ResumeIngestSearchIndexOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.resume_ingest` or a
-    :meth:`.SearchIndexManager.resume_ingest` operation.
+    """Available options for :meth:`.SearchIndexManager.resume_ingest`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.resume_ingest`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1658,16 +1949,19 @@ class ResumeIngestSearchIndexOptions(dict):
 
 
 class UnfreezePlanSearchIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.UnfreezePlanSearchIndexOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class UnfreezePlanSearchIndexOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.unfreeze_plan` or a
-    :meth:`.SearchIndexManager.unfreeze_plan` operation.
+    """Available options for :meth:`.SearchIndexManager.unfreeze_plan`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.unfreeze_plan`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1682,23 +1976,26 @@ class UnfreezePlanSearchIndexOptions(dict):
 
 
 class UpsertSearchIndexOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.UpsertSearchIndexOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class UpsertSearchIndexOptions(dict):
-    """Available options for a :meth:`.ScopeSearchIndexManager.upsert_index` or a :meth:`.SearchIndexManager.upsert_index`
-    operation.
+    """Available options for :meth:`.SearchIndexManager.upsert_index`.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
+
+    The same options apply to :meth:`.ScopeSearchIndexManager.upsert_index`.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
-    """  # noqa: E501
+    """
 
     def __init__(self, **kwargs: Unpack[UpsertSearchIndexOptionsKwargs]) -> None:
         provided = {k: v for k, v in kwargs.items() if v is not None}
@@ -1711,6 +2008,8 @@ class UpsertSearchIndexOptions(dict):
 
 
 class ChangePasswordOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.ChangePasswordOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
@@ -1719,7 +2018,7 @@ class ChangePasswordOptions(dict):
     """Available options for a :class:`~couchbase.management.users.UserManager`'s change password operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1734,6 +2033,8 @@ class ChangePasswordOptions(dict):
 
 
 class DropGroupOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropGroupOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
@@ -1742,7 +2043,7 @@ class DropGroupOptions(dict):
     """Available options for a :class:`~couchbase.management.users.UserManager`'s drop group operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1757,6 +2058,8 @@ class DropGroupOptions(dict):
 
 
 class DropUserOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropUserOptions`."""
+
     domain_name: str | AuthDomain | None
     timeout: timedelta | None
     parent_span: RequestSpan | None
@@ -1766,7 +2069,7 @@ class DropUserOptions(dict):
     """Available options for a :class:`~couchbase.management.users.UserManager`'s drop user operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         domain_name (str | :class:`~couchbase.auth.AuthDomain`, optional): The user's domain name (either ``local`` or
@@ -1783,6 +2086,8 @@ class DropUserOptions(dict):
 
 
 class GetAllGroupsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllGroupsOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
@@ -1791,7 +2096,7 @@ class GetAllGroupsOptions(dict):
     """Available options for a :class:`~couchbase.management.users.UserManager`'s get all groups operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1806,6 +2111,8 @@ class GetAllGroupsOptions(dict):
 
 
 class GetAllUsersOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllUsersOptions`."""
+
     domain_name: str | AuthDomain | None
     timeout: timedelta | None
     parent_span: RequestSpan | None
@@ -1815,7 +2122,7 @@ class GetAllUsersOptions(dict):
     """Available options for a :class:`~couchbase.management.users.UserManager`'s get all users operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         domain_name (str | :class:`~couchbase.auth.AuthDomain`, optional): The user's domain name (either ``local`` or
@@ -1832,6 +2139,8 @@ class GetAllUsersOptions(dict):
 
 
 class GetGroupOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetGroupOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
@@ -1840,7 +2149,7 @@ class GetGroupOptions(dict):
     """Available options for a :class:`~couchbase.management.users.UserManager`'s get group operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1855,6 +2164,8 @@ class GetGroupOptions(dict):
 
 
 class GetRolesOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetRolesOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
@@ -1863,7 +2174,7 @@ class GetRolesOptions(dict):
     """Available options for a :class:`~couchbase.management.users.UserManager`'s get roles operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1878,6 +2189,8 @@ class GetRolesOptions(dict):
 
 
 class GetUserOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetUserOptions`."""
+
     domain_name: str | AuthDomain | None
     timeout: timedelta | None
     parent_span: RequestSpan | None
@@ -1887,7 +2200,7 @@ class GetUserOptions(dict):
     """Available options for a :class:`~couchbase.management.users.UserManager`'s get user operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         domain_name (str | :class:`~couchbase.auth.AuthDomain`, optional): The user's domain name (either ``local`` or
@@ -1904,6 +2217,8 @@ class GetUserOptions(dict):
 
 
 class UpsertGroupOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.UpsertGroupOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
@@ -1912,7 +2227,7 @@ class UpsertGroupOptions(dict):
     """Available options for a :class:`~couchbase.management.users.UserManager`'s upsert group operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
@@ -1927,6 +2242,8 @@ class UpsertGroupOptions(dict):
 
 
 class UpsertUserOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.UpsertUserOptions`."""
+
     domain_name: str | AuthDomain | None
     timeout: timedelta | None
     parent_span: RequestSpan | None
@@ -1936,7 +2253,7 @@ class UpsertUserOptions(dict):
     """Available options for a :class:`~couchbase.management.users.UserManager`'s upsert user operation.
 
     .. note::
-        All options should be imported from ``couchbase.management.options``.
+        All management options should be imported from ``couchbase.management.options``.
 
     Args:
         domain_name (str | :class:`~couchbase.auth.AuthDomain`, optional): The user's domain name (either ``local`` or
@@ -1958,12 +2275,19 @@ class UpsertUserOptions(dict):
 
 
 class DropDesignDocumentOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.DropDesignDocumentOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class DropDesignDocumentOptions(dict):
-    """Args:
+    """Available options for :meth:`.ViewIndexManager.drop_design_document`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.views_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -1976,12 +2300,19 @@ class DropDesignDocumentOptions(dict):
 
 
 class GetAllDesignDocumentsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetAllDesignDocumentsOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetAllDesignDocumentsOptions(dict):
-    """Args:
+    """Available options for :meth:`.ViewIndexManager.get_all_design_documents`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.management_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -1994,12 +2325,19 @@ class GetAllDesignDocumentsOptions(dict):
 
 
 class GetDesignDocumentOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.GetDesignDocumentOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class GetDesignDocumentOptions(dict):
-    """Args:
+    """Available options for :meth:`.ViewIndexManager.get_design_document`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.views_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -2012,12 +2350,19 @@ class GetDesignDocumentOptions(dict):
 
 
 class PublishDesignDocumentOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.PublishDesignDocumentOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class PublishDesignDocumentOptions(dict):
-    """Args:
+    """Available options for :meth:`.ViewIndexManager.publish_design_document`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.views_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -2030,12 +2375,19 @@ class PublishDesignDocumentOptions(dict):
 
 
 class UpsertDesignDocumentOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.management.options.UpsertDesignDocumentOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
 
 class UpsertDesignDocumentOptions(dict):
-    """Args:
+    """Available options for :meth:`.ViewIndexManager.upsert_design_document`.
+
+    .. note::
+        All management options should be imported from ``couchbase.management.options``.
+
+    Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.views_timeout`.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this

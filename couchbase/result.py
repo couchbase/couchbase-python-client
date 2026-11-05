@@ -109,7 +109,8 @@ class _ScanCanceller(Protocol):
 
 
 class HttpResult:
-    """
+    """An HTTP response.
+
     .. deprecated:: 4.7.0
         Nothing in the SDK returns one.
     """
@@ -133,13 +134,15 @@ class _ScanResultIterable:
 
 
 class ScanResultIterable(_ScanResultIterable):
+    """The documents a range scan returns, read by iterating it."""
+
     _request: RowIterator[ScanResult, None]
 
     def rows(self) -> RowIterator[ScanResult, None]:
-        """The rows which have been returned by the scan.
+        """Get the documents the scan returns.
 
         Returns:
-            Iterable: An iterable over the scan's rows.
+            Iterable: An iterable over the documents.
         """
         return self.__iter__()
 
@@ -152,22 +155,22 @@ class _QueryResult(Generic[_ExecuteT]):
         self._request = n1ql_request
 
     def execute(self) -> _ExecuteT:
-        """Convenience method to execute the query.
+        """Read every row of the query.
 
         Returns:
-            list[Any]:  A list of query results.
+            list[Any]: The rows.  On the asyncio API, a task that resolves to them.
 
-        Example:
-            q_rows = cluster.query('SELECT * FROM `travel-sample` WHERE country LIKE 'United%' LIMIT 2;').execute()
+        Example::
 
+            rows = cluster.query("SELECT * FROM `travel-sample` WHERE country LIKE 'United%' LIMIT 2").execute()
         """
         return self._request.execute()
 
     def metadata(self) -> QueryMetaData | None:
-        """The meta-data which has been returned by the query.
+        """Get the metadata the service returned after the query's rows.
 
         Returns:
-            :class:`~couchbase.n1ql.QueryMetaData`: An instance of :class:`~couchbase.n1ql.QueryMetaData`.
+            :class:`~couchbase.n1ql.QueryMetaData` | None: The metadata, or ``None`` until every row has been read.
         """
         return self._request.final_metadata()
 
@@ -176,15 +179,16 @@ class _QueryResult(Generic[_ExecuteT]):
 
 
 class QueryResult(_QueryResult[list[Any]]):
+    """The result of a query: its rows, read by iterating it, then its metadata."""
+
     _request: RowIterator[Any, QueryMetaData]
 
     def rows(self) -> RowIterator[Any, QueryMetaData]:
         """The rows which have been returned by the query.
 
         .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
+            While iterating waits on the server, a pending ``KeyboardInterrupt`` is checked for once per
+            the request's timeout, so it can take up to that long to arrive.
 
         Returns:
             Iterable: An iterable over the query's rows.
@@ -200,11 +204,11 @@ class _AnalyticsResult:
         self._request = analytics_request
 
     def metadata(self) -> AnalyticsMetaData | None:
-        """The meta-data which has been returned by the analytics query.
+        """Get the metadata the service returned after the analytics query's rows.
 
         Returns:
-            :class:`~couchbase.analytics.AnalyticsMetaData`: An instance of
-            :class:`~couchbase.analytics.AnalyticsMetaData`.
+            :class:`~couchbase.analytics.AnalyticsMetaData` | None: The metadata, or ``None`` until every row
+            has been read.
         """
         return self._request.final_metadata()
 
@@ -213,15 +217,16 @@ class _AnalyticsResult:
 
 
 class AnalyticsResult(_AnalyticsResult):
+    """The result of an analytics query: its rows, read by iterating it, then its metadata."""
+
     _request: RowIterator[Any, AnalyticsMetaData]
 
     def rows(self) -> RowIterator[Any, AnalyticsMetaData]:
         """The rows which have been returned by the analytics query.
 
         .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
+            While iterating waits on the server, a pending ``KeyboardInterrupt`` is checked for once per
+            the request's timeout, so it can take up to that long to arrive.
 
         Returns:
             Iterable: An iterable over the analytics query's rows.
@@ -237,11 +242,11 @@ class _SearchResult:
         self._request = search_request
 
     def metadata(self) -> SearchMetaData | None:
-        """The meta-data which has been returned by the search query.
+        """Get the metadata the service returned after the search's rows.
 
         Returns:
-            :class:`~couchbase.search.SearchMetaData`: An instance of
-            :class:`~couchbase.search.SearchMetaData`.
+            :class:`~couchbase.search.SearchMetaData` | None: The metadata, or ``None`` until every row has been
+            read.
         """
         final_metadata = self._request.final_metadata()
         return None if final_metadata is None else final_metadata.metadata
@@ -250,6 +255,12 @@ class _SearchResult:
         return None
 
     def facets(self) -> dict[str, SearchFacetResult] | None:
+        """Get the results of the search's facets, which the service returns after its rows.
+
+        Returns:
+            dict[str, :class:`~couchbase.search.SearchFacetResult`] | None: Each facet's result, by the facet's
+            name, or ``None`` until every row has been read.
+        """
         final_metadata = self._request.final_metadata()
         return None if final_metadata is None else final_metadata.facets
 
@@ -258,15 +269,16 @@ class _SearchResult:
 
 
 class SearchResult(_SearchResult):
+    """The result of a search: its rows, read by iterating it, then its metadata and facets."""
+
     _request: RowIterator[SearchRow, _SearchFinalMetadata]
 
     def rows(self) -> RowIterator[SearchRow, _SearchFinalMetadata]:
         """The rows which have been returned by the search query.
 
         .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
+            While iterating waits on the server, a pending ``KeyboardInterrupt`` is checked for once per
+            the request's timeout, so it can take up to that long to arrive.
 
         Returns:
             Iterable: An iterable over the search query's rows.
@@ -282,11 +294,11 @@ class _ViewResult:
         self._request = view_request
 
     def metadata(self) -> ViewMetaData | None:
-        """The meta-data which has been returned by the view query.
+        """Get the metadata the service returned after the view query's rows.
 
         Returns:
-            :class:`~couchbase.views.ViewMetaData`: An instance of
-            :class:`~couchbase.views.ViewMetaData`.
+            :class:`~couchbase.views.ViewMetaData` | None: The metadata, or ``None`` until every row has been
+            read.
         """
         return self._request.final_metadata()
 
@@ -295,15 +307,16 @@ class _ViewResult:
 
 
 class ViewResult(_ViewResult):
+    """The result of a view query: its rows, read by iterating it, then its metadata."""
+
     _request: RowIterator[ViewRow, ViewMetaData]
 
     def rows(self) -> RowIterator[ViewRow, ViewMetaData]:
         """The rows which have been returned by the view query.
 
         .. note::
-            A ``KeyboardInterrupt`` raised while iterating rows is only checked for at
-            internal timeout boundaries while waiting on the server, so it may take a moment
-            to be delivered rather than firing instantly.
+            While iterating waits on the server, a pending ``KeyboardInterrupt`` is checked for once per
+            the request's timeout, so it can take up to that long to arrive.
 
         Returns:
             Iterable: An iterable over the view query's rows.

@@ -40,6 +40,8 @@ class _GetResultSource(Protocol):
 
 
 class TransactionGetResult:
+    """A document read inside a transaction."""
+
     def __init__(self, res: _GetResultSource, transcoder: Transcoder) -> None:
         self._res = res
         self._transcoder = transcoder
@@ -47,14 +49,23 @@ class TransactionGetResult:
 
     @property
     def id(self) -> str:
+        """The document's ID."""
         return self._res.get("id")
 
     @property
     def cas(self) -> int:
+        """The CAS of the document."""
         return self._res.get("cas")
 
     @property
     def content_as(self) -> ContentProxy:
+        """The contents of the document.
+
+        Get the value as a dict::
+
+            res = ctx.get(collection, key)
+            value = res.content_as[dict]
+        """
         if self._decoded_value is _UNDECODED:
             val, flags = self._res.get('value')
             if val is None:

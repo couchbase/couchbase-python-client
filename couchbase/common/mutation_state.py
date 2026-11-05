@@ -29,18 +29,33 @@ if TYPE_CHECKING:
 
 
 class MutationState:
+    """A set of mutation tokens a query, search or range scan is to be consistent with.
+
+    Pass it as the ``consistent_with`` option, and the service waits until it has seen every mutation
+    in the set before it answers.
+
+    Args:
+        *docs: Results of mutations whose tokens to add, as :meth:`add_results` takes them.
+        **kwargs: ``quiet``, as :meth:`add_results` takes it.
+    """
+
     def __init__(self, *docs: MutationResult, **kwargs: Any) -> None:
         self._sv: set[MutationToken] = set()
         if docs:
             self.add_results(*docs, **kwargs)
 
     def add_mutation_token(self, mut_token: MutationToken | None) -> None:
+        """Add a mutation token to the set.
+
+        Args:
+            mut_token: The token to add.  Anything that is not a :class:`~couchbase.result.MutationToken`
+                is ignored.
+        """
         if isinstance(mut_token, MutationToken):
             self._sv.add(mut_token)
 
     def _add_scanvec(self, mut_token: MutationToken) -> bool:
-        """
-        Internal method used to specify a scan vector.
+        """Internal method used to specify a scan vector.
 
         Args:
             mut_token: A tuple in the form of `(vbucket id, vbucket uuid, mutation sequence)`
@@ -52,23 +67,23 @@ class MutationState:
         return False
 
     def add_results(self, *rvs: MutationResult, **kwargs: Any) -> bool:
-        """
-        Changes the state to reflect the mutation which yielded the given
-        result.
+        """Add the mutation tokens of the given results to the set.
 
-        In order to use the result, the `enable_mutation_tokens` option must
-        have been specified in the connection string, _and_ the result
-        must have been successful.
+        A result carries a token only if mutation tokens are enabled on the connection, as they are by
+        default.
 
         Args:
-            rvs: One or more :class:`~.OperationResult` which have been returned from mutations
-            quiet: Suppress errors if one of the results does not contain a convertible state.
+            *rvs: One or more results of mutations.
+            **kwargs: ``quiet``: when ``True``, a result with no token stops the adding and returns
+                ``False`` rather than raising.
 
         Returns:
-            `True` if the result was valid and added, `False` if not added (and `quiet` was specified)
+            bool: ``True`` if every result's token was added, ``False`` if a result had none and
+            ``quiet`` was given.
 
         Raises:
-            MissingTokenException: if `result` does not contain a valid token
+            :class:`~couchbase.exceptions.MissingTokenException`: If no results are given, or a result
+                has no token and ``quiet`` was not given.
         """
         if not rvs:
             raise MissingTokenException(message='No results passed')
@@ -84,23 +99,18 @@ class MutationState:
         return True
 
     def add_all(self, bucket: Any, quiet: bool = False) -> bool:
-        """
-        Ensures the query result is consistent with all prior
-        mutations performed by a given bucket.
-
-        Using this function is equivalent to keeping track of all
-        mutations performed by the given bucket, and passing them to
-        :meth:`~add_result`
+        """Add every mutation made through a bucket to the set.
 
         Args:
-            bucket: A :class:`~couchbase_core.client.Client` object used for the mutations
-            quiet: If the bucket contains no valid mutations, this option suppresses throwing exceptions.
+            bucket: The bucket the mutations were made through.
+            quiet: When ``True``, a bucket with no mutations returns ``False`` rather than raising.
 
         Returns:
-            `True` if at least one mutation was added, `False` if none were added (and `quiet` was specified)
+            bool: ``True`` if at least one mutation was added, ``False`` if none was and ``quiet`` was given.
 
         Raises:
-            MissingTokenException: if no mutations were added and `quiet` was not specified
+            :class:`~couchbase.exceptions.MissingTokenException`: If no mutation was added and ``quiet`` was
+                not given.
         """
         raise NotImplementedError("Feature currently not implemented in 4.x series of the Python SDK")
 

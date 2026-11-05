@@ -203,6 +203,8 @@ if TYPE_CHECKING:
 
 
 class AnalyticsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.AnalyticsOptions`."""
+
     client_context_id: str | None
     raw: dict[str, JSONType] | None
     metrics: bool | None
@@ -260,6 +262,8 @@ class AnalyticsOptions(dict):
 
 
 class AppendOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.AppendOptions`."""
+
     timeout: timedelta | None
     durability: DurabilityType | None
     cas: int | None
@@ -290,6 +294,8 @@ class AppendOptions(dict):
 
 
 class DecrementOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.DecrementOptions`."""
+
     delta: DeltaValue | None
     initial: SignedInt64 | None
     timeout: timedelta | None
@@ -325,10 +331,13 @@ class DecrementOptions(dict):
 
     @property
     def expiry(self) -> timedelta | None:
+        """The value of the ``expiry`` option, or ``None`` if it was not set."""
         return self.get("expiry", None)
 
 
 class IncrementOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.IncrementOptions`."""
+
     delta: DeltaValue | None
     initial: SignedInt64 | None
     timeout: timedelta | None
@@ -364,10 +373,13 @@ class IncrementOptions(dict):
 
     @property
     def expiry(self) -> timedelta | None:
+        """The value of the ``expiry`` option, or ``None`` if it was not set."""
         return self.get("expiry", None)
 
 
 class PrependOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.PrependOptions`."""
+
     timeout: timedelta | None
     durability: DurabilityType | None
     cas: int | None
@@ -403,6 +415,8 @@ class PrependOptions(dict):
 
 
 class AppendMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.AppendMultiOptions`."""
+
     per_key_options: dict[str, AppendOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -441,6 +455,7 @@ class AppendMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -452,6 +467,8 @@ class AppendMultiOptions(dict):
 
 
 class DecrementMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.DecrementMultiOptions`."""
+
     delta: DeltaValue | None
     initial: SignedInt64 | None
     per_key_options: dict[str, DecrementOptions] | None
@@ -493,6 +510,7 @@ class DecrementMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "delta",
             "initial",
@@ -505,6 +523,8 @@ class DecrementMultiOptions(dict):
 
 
 class IncrementMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.IncrementMultiOptions`."""
+
     delta: DeltaValue | None
     initial: SignedInt64 | None
     per_key_options: dict[str, IncrementOptions] | None
@@ -546,6 +566,7 @@ class IncrementMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "delta",
             "initial",
@@ -558,6 +579,8 @@ class IncrementMultiOptions(dict):
 
 
 class PrependMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.PrependMultiOptions`."""
+
     per_key_options: dict[str, PrependOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -596,6 +619,7 @@ class PrependMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -612,6 +636,8 @@ class PrependMultiOptions(dict):
 
 
 class ClusterMetricsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ClusterMetricsOptions`."""
+
     enable_metrics: bool | None
     emit_interval: timedelta | None
 
@@ -639,6 +665,10 @@ class ClusterMetricsOptions(dict):
 
     @staticmethod
     def get_allowed_option_keys(use_transform_keys: bool | None = False) -> list[str]:
+        """**INTERNAL** The keys these options carry.
+
+        ``use_transform_keys`` is deprecated, and the keys are the same either way.
+        """
         if use_transform_keys is True:
             Supportability.method_deprecated("get_allowed_option_keys(use_transform_keys=True)",
                                              "get_allowed_option_keys()",
@@ -648,6 +678,8 @@ class ClusterMetricsOptions(dict):
 
 
 class ClusterOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ClusterOptions`."""
+
     option_validation: OptionValidationMode | str | None
     trust_store_path: str | None
     timeout_options: ClusterTimeoutOptions | None
@@ -724,6 +756,8 @@ class ClusterOptionsKwargs(TypedDict, total=False):
 
 
 class ClusterKwargs(ClusterOptionsKwargs, total=False):
+    """The keyword arguments a method accepts in place of :class:`~couchbase.options.ClusterOptions`."""
+
     authenticator: Authenticator
 
 
@@ -749,7 +783,8 @@ class ClusterOptions(dict):
             operations. See :class:`~couchbase.options.ClusterTimeoutOptions` for details.
         orphan_reporting_options (:class:`~couchbase.options.ClusterOrphanReportingOptions`, optional): Options for SDK
             orphaned response reporting. See :class:`~couchbase.options.ClusterOrphanReportingOptions` for details.
-        metrics_options (:class:`~couchbase.options.ClusterMetricsOptions`, optional):
+        metrics_options (:class:`~couchbase.options.ClusterMetricsOptions`, optional): Options for SDK metrics. See
+            :class:`~couchbase.options.ClusterMetricsOptions` for details.
         tracing_options (:class:`~couchbase.options.ClusterTracingOptions`, optional): Tracing options for SDK tracing
             bevavior. See :class:`~couchbase.options.ClusterTracingOptions` for details. These are ignored if an
             external tracer is specified.
@@ -852,27 +887,21 @@ class ClusterOptions(dict):
 
     @staticmethod
     def get_valid_options() -> dict[str, Any]:
+        """**DEPRECATED** Each key these options carry, mapped to ``(key, None)``."""
         Supportability.method_deprecated("ClusterOptions.get_valid_options",
                                          message="What a key is sent as is the protocol's, so each key is "
                                                  "answered under its own name and unconverted.")
         return {key: (key, None) for key in cluster_keys("ClusterOptions")}
 
     def apply_profile(self, profile_name: KnownConfigProfiles | str) -> None:
-        """
-        **VOLATILE** This API is subject to change at any time.
-
-        Apply the provided ConfigProfile options.
+        """**VOLATILE** Apply a configuration profile's options to these options.
 
         Args:
-            profile_name ([:class:`~couchbase.options.KnownConfigProfiles`, str]):  The name of the profile to apply
-                toward ClusterOptions.
-            authenticator (:class:`~couchbase.auth.PasswordAuthenticator` | :class:`~couchbase.auth.CertificateAuthenticator`):
-                An authenticator instance.
+            profile_name (:class:`~couchbase.options.KnownConfigProfiles` | str): The name of the profile to apply.
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If the specified profile is not registered.
-
-        """  # noqa: E501
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If no profile is registered under the name.
+        """
         prof_name = profile_name.value if isinstance(profile_name, KnownConfigProfiles) else profile_name
         CONFIG_PROFILES.apply_profile(prof_name, self)
 
@@ -881,21 +910,18 @@ class ClusterOptions(dict):
                                     authenticator: Authenticator,
                                     profile_name: KnownConfigProfiles | str
                                     ) -> ClusterOptions:
-        """
-        **VOLATILE** This API is subject to change at any time.
-
-        Create a ClusterOptions instance and apply the provided ConfigProfile options.
+        """**VOLATILE** Create cluster options with a configuration profile's options applied.
 
         Args:
-            authenticator (:class:`~couchbase.auth.PasswordAuthenticator` | :class:`~couchbase.auth.CertificateAuthenticator`):
-                An authenticator instance.
-            profile_name ([:class:`~couchbase.options.KnownConfigProfiles`, str]):  The name of the profile to apply
-                toward ClusterOptions.
+            authenticator (:class:`~couchbase.auth.Authenticator`): The authenticator the options hold.
+            profile_name (:class:`~couchbase.options.KnownConfigProfiles` | str): The name of the profile to apply.
+
+        Returns:
+            :class:`~couchbase.options.ClusterOptions`: The new options.
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If the specified profile is not registered.
-
-        """  # noqa: E501
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If no profile is registered under the name.
+        """
         opts = cls(authenticator)
         prof_name = profile_name.value if isinstance(profile_name, KnownConfigProfiles) else profile_name
         CONFIG_PROFILES.apply_profile(prof_name, opts)
@@ -903,6 +929,8 @@ class ClusterOptions(dict):
 
 
 class ClusterOrphanReportingOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ClusterOrphanReportingOptions`."""
+
     enable_orphan_reporting: bool | None
     sample_size: int | None
     emit_interval: timedelta | None
@@ -933,6 +961,10 @@ class ClusterOrphanReportingOptions(dict):
 
     @staticmethod
     def get_allowed_option_keys(use_transform_keys: bool | None = False) -> list[str]:
+        """**INTERNAL** The keys these options carry.
+
+        ``use_transform_keys`` is deprecated, and the keys are the same either way.
+        """
         if use_transform_keys is True:
             Supportability.method_deprecated("get_allowed_option_keys(use_transform_keys=True)",
                                              "get_allowed_option_keys()",
@@ -942,6 +974,8 @@ class ClusterOrphanReportingOptions(dict):
 
 
 class ClusterTimeoutOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ClusterTimeoutOptions`."""
+
     bootstrap_timeout: timedelta | None
     resolve_timeout: timedelta | None
     connect_timeout: timedelta | None
@@ -994,6 +1028,10 @@ class ClusterTimeoutOptions(dict):
 
     @staticmethod
     def get_allowed_option_keys(use_transform_keys: bool | None = False) -> list[str]:
+        """**INTERNAL** The keys these options carry.
+
+        ``use_transform_keys`` is deprecated, and the keys are the same either way.
+        """
         if use_transform_keys is True:
             Supportability.method_deprecated("get_allowed_option_keys(use_transform_keys=True)",
                                              "get_allowed_option_keys()",
@@ -1003,6 +1041,8 @@ class ClusterTimeoutOptions(dict):
 
 
 class ClusterTracingOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ClusterTracingOptions`."""
+
     enable_tracing: bool | None
     tracing_threshold_kv: timedelta | None
     tracing_threshold_view: timedelta | None
@@ -1057,6 +1097,10 @@ class ClusterTracingOptions(dict):
 
     @staticmethod
     def get_allowed_option_keys(use_transform_keys: bool | None = False) -> list[str]:
+        """**INTERNAL** The keys these options carry.
+
+        ``use_transform_keys`` is deprecated, and the keys are the same either way.
+        """
         if use_transform_keys is True:
             Supportability.method_deprecated("get_allowed_option_keys(use_transform_keys=True)",
                                              "get_allowed_option_keys()",
@@ -1071,6 +1115,8 @@ class ClusterTracingOptions(dict):
 
 
 class DiagnosticsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.DiagnosticsOptions`."""
+
     report_id: str | None
     timeout: timedelta | None
     parent_span: RequestSpan | None
@@ -1097,6 +1143,8 @@ class DiagnosticsOptions(dict):
 
 
 class PingOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.PingOptions`."""
+
     timeout: timedelta | None
     report_id: str | None
     service_types: Iterable[ServiceType] | Iterable[str] | None
@@ -1128,6 +1176,8 @@ class PingOptions(dict):
 
 
 class WaitUntilReadyOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.WaitUntilReadyOptions`."""
+
     desired_state: ClusterState | None
     service_types: Iterable[ServiceType] | Iterable[str] | None
     timeout: timedelta | None
@@ -1135,6 +1185,8 @@ class WaitUntilReadyOptionsKwargs(TypedDict, total=False):
 
 
 class WaitUntilReadyKwargs(TypedDict, total=False):
+    """The keyword arguments a method accepts in place of :class:`~couchbase.options.WaitUntilReadyOptions`."""
+
     desired_state: ClusterState | None
     service_types: Iterable[ServiceType] | Iterable[str] | None
     parent_span: RequestSpan | None
@@ -1170,6 +1222,8 @@ class WaitUntilReadyOptions(dict):
 
 
 class ExistsOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ExistsOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
@@ -1194,6 +1248,8 @@ class ExistsOptions(dict):
 
 
 class GetAllReplicasOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.GetAllReplicasOptions`."""
+
     timeout: timedelta | None
     transcoder: Transcoder | None
     read_preference: ReadPreference | None
@@ -1224,6 +1280,8 @@ class GetAllReplicasOptions(dict):
 
 
 class GetAndLockOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.GetAndLockOptions`."""
+
     timeout: timedelta | None
     transcoder: Transcoder | None
     parent_span: RequestSpan | None
@@ -1251,6 +1309,8 @@ class GetAndLockOptions(dict):
 
 
 class GetAndTouchOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.GetAndTouchOptions`."""
+
     timeout: timedelta | None
     transcoder: Transcoder | None
     parent_span: RequestSpan | None
@@ -1278,6 +1338,8 @@ class GetAndTouchOptions(dict):
 
 
 class GetAnyReplicaOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.GetAnyReplicaOptions`."""
+
     timeout: timedelta | None
     transcoder: Transcoder | None
     read_preference: ReadPreference | None
@@ -1308,6 +1370,8 @@ class GetAnyReplicaOptions(dict):
 
 
 class GetOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.GetOptions`."""
+
     project: Iterable[str] | None
     with_expiry: bool | None
     timeout: timedelta | None
@@ -1341,14 +1405,18 @@ class GetOptions(dict):
 
     @property
     def project(self) -> Iterable[str]:
+        """The value of the ``project`` option, or ``[]`` if it was not set."""
         return self.get("project", [])
 
     @property
     def with_expiry(self) -> bool:
+        """The value of the ``with_expiry`` option, or ``False`` if it was not set."""
         return self.get("with_expiry", False)
 
 
 class InsertOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.InsertOptions`."""
+
     timeout: timedelta | None
     expiry: timedelta | None
     durability: DurabilityType | None
@@ -1381,10 +1449,13 @@ class InsertOptions(dict):
 
     @property
     def expiry(self) -> timedelta | None:
+        """The value of the ``expiry`` option, or ``None`` if it was not set."""
         return self.get("expiry", None)
 
 
 class RemoveOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.RemoveOptions`."""
+
     timeout: timedelta | None
     cas: int | None
     durability: DurabilityType | None
@@ -1415,6 +1486,8 @@ class RemoveOptions(dict):
 
 
 class ReplaceOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ReplaceOptions`."""
+
     timeout: timedelta | None
     expiry: timedelta | None
     cas: int | None
@@ -1453,10 +1526,13 @@ class ReplaceOptions(dict):
 
     @property
     def expiry(self) -> timedelta | None:
+        """The value of the ``expiry`` option, or ``None`` if it was not set."""
         return self.get("expiry", None)
 
 
 class ScanOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ScanOptions`."""
+
     timeout: timedelta | None
     ids_only: bool | None
     consistent_with: MutationState | None
@@ -1499,6 +1575,8 @@ class ScanOptions(dict):
 
 
 class TouchOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TouchOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
@@ -1523,6 +1601,8 @@ class TouchOptions(dict):
 
 
 class UnlockOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.UnlockOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
 
@@ -1547,6 +1627,8 @@ class UnlockOptions(dict):
 
 
 class UpsertOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.UpsertOptions`."""
+
     timeout: timedelta | None
     expiry: timedelta | None
     preserve_expiry: bool | None
@@ -1582,6 +1664,7 @@ class UpsertOptions(dict):
 
     @property
     def expiry(self) -> timedelta | None:
+        """The value of the ``expiry`` option, or ``None`` if it was not set."""
         return self.get("expiry", None)
 
 
@@ -1591,6 +1674,8 @@ class UpsertOptions(dict):
 
 
 class ExistsMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ExistsMultiOptions`."""
+
     per_key_options: dict[str, ExistsOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -1623,6 +1708,7 @@ class ExistsMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -1632,6 +1718,8 @@ class ExistsMultiOptions(dict):
 
 
 class GetAllReplicasMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.GetAllReplicasMultiOptions`."""
+
     per_key_options: dict[str, GetAllReplicasOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -1671,6 +1759,7 @@ class GetAllReplicasMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -1682,6 +1771,8 @@ class GetAllReplicasMultiOptions(dict):
 
 
 class GetAndLockMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.GetAndLockMultiOptions`."""
+
     per_key_options: dict[str, GetAndLockOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -1717,6 +1808,7 @@ class GetAndLockMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -1728,6 +1820,8 @@ class GetAndLockMultiOptions(dict):
 
 
 class GetAnyReplicaMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.GetAnyReplicaMultiOptions`."""
+
     per_key_options: dict[str, GetAnyReplicaOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -1767,6 +1861,7 @@ class GetAnyReplicaMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -1778,6 +1873,8 @@ class GetAnyReplicaMultiOptions(dict):
 
 
 class GetMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.GetMultiOptions`."""
+
     project: Iterable[str] | None
     with_expiry: bool | None
     per_key_options: dict[str, GetOptions] | None
@@ -1821,14 +1918,17 @@ class GetMultiOptions(dict):
 
     @property
     def project(self) -> Iterable[str]:
+        """The value of the ``project`` option, or ``[]`` if it was not set."""
         return self.get("project", [])
 
     @property
     def with_expiry(self) -> bool:
+        """The value of the ``with_expiry`` option, or ``False`` if it was not set."""
         return self.get("with_expiry", False)
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "project",
             "with_expiry",
@@ -1841,6 +1941,8 @@ class GetMultiOptions(dict):
 
 
 class InsertMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.InsertMultiOptions`."""
+
     per_key_options: dict[str, InsertOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -1881,10 +1983,12 @@ class InsertMultiOptions(dict):
 
     @property
     def expiry(self) -> timedelta | None:
+        """The value of the ``expiry`` option, or ``None`` if it was not set."""
         return self.get("expiry", None)
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -1897,6 +2001,8 @@ class InsertMultiOptions(dict):
 
 
 class RemoveMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.RemoveMultiOptions`."""
+
     per_key_options: dict[str, RemoveOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -1940,6 +2046,7 @@ class RemoveMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -1952,6 +2059,8 @@ class RemoveMultiOptions(dict):
 
 
 class ReplaceMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ReplaceMultiOptions`."""
+
     per_key_options: dict[str, ReplaceOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -1998,10 +2107,12 @@ class ReplaceMultiOptions(dict):
 
     @property
     def expiry(self) -> timedelta | None:
+        """The value of the ``expiry`` option, or ``None`` if it was not set."""
         return self.get("expiry", None)
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -2016,6 +2127,8 @@ class ReplaceMultiOptions(dict):
 
 
 class TouchMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TouchMultiOptions`."""
+
     per_key_options: dict[str, TouchOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -2048,6 +2161,7 @@ class TouchMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -2058,6 +2172,8 @@ class TouchMultiOptions(dict):
 
 
 class UnlockMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.UnlockMultiOptions`."""
+
     per_key_options: dict[str, UnlockOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -2090,6 +2206,7 @@ class UnlockMultiOptions(dict):
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -2099,6 +2216,8 @@ class UnlockMultiOptions(dict):
 
 
 class UpsertMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.UpsertMultiOptions`."""
+
     per_key_options: dict[str, UpsertOptions] | None
     return_exceptions: bool | None
     timeout: timedelta | None
@@ -2142,10 +2261,12 @@ class UpsertMultiOptions(dict):
 
     @property
     def expiry(self) -> timedelta | None:
+        """The value of the ``expiry`` option, or ``None`` if it was not set."""
         return self.get("expiry", None)
 
     @classmethod
     def get_valid_keys(cls) -> list[str]:
+        """**INTERNAL** The keys a multi operation reads from these options."""
         return [
             "per_key_options",
             "return_exceptions",
@@ -2164,6 +2285,8 @@ class UpsertMultiOptions(dict):
 
 
 class QueryOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.QueryOptions`."""
+
     client_context_id: str | None
     raw: dict[str, JSONType] | None
     adhoc: bool | None
@@ -2235,7 +2358,7 @@ class QueryOptions(dict):
             active node is down.
         consistent_with (:class:`~couchbase.mutation_state.MutationState`, optional): Specifies a
             :class:`~couchbase.mutation_state.MutationState` which the operation should be consistent with.
-        send_to_node (str, optional):
+        send_to_node (str, optional): The node to send the query to, rather than one the SDK chooses.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         serializer (:class:`~couchbase.serializer.Serializer`, optional): Specifies an explicit serializer to use for
@@ -2253,6 +2376,8 @@ class QueryOptions(dict):
 
 
 class SearchOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.SearchOptions`."""
+
     client_context_id: str | None
     raw: dict[str, JSONType] | None
     limit: int | None
@@ -2339,6 +2464,8 @@ class SearchOptions(dict):
 
 
 class VectorSearchOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.VectorSearchOptions`."""
+
     vector_query_combination: VectorQueryCombination | None
 
 
@@ -2364,6 +2491,8 @@ class VectorSearchOptions(dict):
 
 
 class LookupInAllReplicasOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.LookupInAllReplicasOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
     serializer: Serializer | None
@@ -2393,6 +2522,8 @@ class LookupInAllReplicasOptions(dict):
 
 
 class LookupInAnyReplicaOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.LookupInAnyReplicaOptions`."""
+
     timeout: timedelta | None
     parent_span: RequestSpan | None
     serializer: Serializer | None
@@ -2422,6 +2553,8 @@ class LookupInAnyReplicaOptions(dict):
 
 
 class LookupInOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.LookupInOptions`."""
+
     timeout: timedelta | None
     access_deleted: bool | None
     parent_span: RequestSpan | None
@@ -2438,7 +2571,7 @@ class LookupInOptions(dict):
     Args:
         timeout (timedelta, optional): The timeout for this operation. Defaults to
             :attr:`~couchbase.options.ClusterTimeoutOptions.kv_timeout`.
-        access_deleted (bool, optional):
+        access_deleted (bool, optional): Whether the operation may access a deleted document's extended attributes.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
             operation.
         serializer (:class:`~couchbase.serializer.Serializer`, optional): Specifies an explicit serializer to use for
@@ -2451,6 +2584,8 @@ class LookupInOptions(dict):
 
 
 class MutateInOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.MutateInOptions`."""
+
     timeout: timedelta | None
     expiry: timedelta | None
     cas: int | None
@@ -2480,7 +2615,7 @@ class MutateInOptions(dict):
             operation.
         store_semantics (:class:`~couchbase.subdocument.StoreSemantics`, optional): Specifies the store semantics to use
             for this operation.
-        access_deleted (bool, optional):
+        access_deleted (bool, optional): Whether the operation may access a deleted document's extended attributes.
         preserve_expiry (bool, optional): Specifies that any existing expiry on the document should be preserved.
             Defaults to False.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
@@ -2495,6 +2630,7 @@ class MutateInOptions(dict):
 
     @property
     def expiry(self) -> timedelta | None:
+        """The value of the ``expiry`` option, or ``None`` if it was not set."""
         return self.get("expiry", None)
 
 
@@ -2504,6 +2640,8 @@ class MutateInOptions(dict):
 
 
 class TransactionConfigKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TransactionConfig`."""
+
     expiration_time: timedelta | None
     metadata_collection: TransactionKeyspace | None
     durability: ServerDurability | None
@@ -2516,12 +2654,21 @@ class TransactionConfigKwargs(TypedDict, total=False):
 
 
 class TransactionConfig(dict):
-    """Args:
+    """The configuration of the transactions a cluster runs.
+
+    .. note::
+        All options should be imported from ``couchbase.options``.
+
+    Set it through ``transaction_config`` on :class:`~couchbase.options.ClusterOptions`.
+    :class:`~couchbase.options.TransactionOptions` overrides some of it for a single transaction.
+
+    Args:
         expiration_time (timedelta, optional): Maximum amount of time a transaction can take before rolling back.
 
             .. deprecated:: 4.1.10
                 Use ``timeout`` instead.
-        metadata_collection (:class:`~couchbase.transactions.TransactionKeyspace`, optional):
+        metadata_collection (:class:`~couchbase.transactions.TransactionKeyspace`, optional): The collection to store
+            transaction metadata in.
         durability (:class:`~couchbase.durability.ServerDurability`, optional): Specifies the level of durability for
             this operation.
         cleanup_window (timedelta, optional): The query metadata is cleaned up over a the cleanup_window. Longer windows
@@ -2530,8 +2677,10 @@ class TransactionConfig(dict):
 
             .. deprecated:: 4.1.10
                 It has no effect. Transactions use the cluster's ``kv_durable_timeout``.
-        cleanup_lost_attempts (bool, optional):
-        cleanup_client_attempts (bool, optional):
+        cleanup_lost_attempts (bool, optional): Whether to look for, in the background, transactions that were lost and
+            clean them up. See ``cleanup_window``.
+        cleanup_client_attempts (bool, optional): Whether to clean up, in the background, the transactions this client
+            attempted.
         scan_consistency (:class:`~couchbase.n1ql.QueryScanConsistency`, optional): Specifies the consistency
             requirements when executing the query. Defaults to `NotBounded`.
         timeout (timedelta, optional): The maximum time a transaction may run, across all its attempts, before it
@@ -2544,6 +2693,8 @@ class TransactionConfig(dict):
 
 
 class TransactionGetMultiOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TransactionGetMultiOptions`."""
+
     mode: TransactionGetMultiMode | None
 
 
@@ -2564,6 +2715,8 @@ class TransactionGetMultiOptions(dict):
 
 
 class TransactionGetMultiReplicasFromPreferredServerGroupOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TransactionGetMultiReplicasFromPreferredServerGroupOptions`."""  # noqa: E501
+
     mode: TransactionGetMultiReplicasFromPreferredServerGroupMode | None
 
 
@@ -2584,6 +2737,8 @@ class TransactionGetMultiReplicasFromPreferredServerGroupOptions(dict):
 
 
 class TransactionGetOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TransactionGetOptions`."""
+
     transcoder: Transcoder | None
 
 
@@ -2604,6 +2759,8 @@ class TransactionGetOptions(dict):
 
 
 class TransactionGetReplicaFromPreferredServerGroupOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TransactionGetReplicaFromPreferredServerGroupOptions`."""
+
     transcoder: Transcoder | None
 
 
@@ -2624,6 +2781,8 @@ class TransactionGetReplicaFromPreferredServerGroupOptions(dict):
 
 
 class TransactionInsertOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TransactionInsertOptions`."""
+
     transcoder: Transcoder | None
 
 
@@ -2644,6 +2803,8 @@ class TransactionInsertOptions(dict):
 
 
 class TransactionOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TransactionOptions`."""
+
     expiration_time: timedelta | None
     metadata_collection: TransactionKeyspace | None
     durability: ServerDurability | None
@@ -2653,12 +2814,20 @@ class TransactionOptionsKwargs(TypedDict, total=False):
 
 
 class TransactionOptions(dict):
-    """Args:
+    """Available options for a single transaction.
+
+    .. note::
+        All options should be imported from ``couchbase.options``.
+
+    Each one set here overrides the cluster's :class:`~couchbase.options.TransactionConfig` for this transaction.
+
+    Args:
         expiration_time (timedelta, optional): Maximum amount of time a transaction can take before rolling back.
 
             .. deprecated:: 4.1.10
                 Use ``timeout`` instead.
-        metadata_collection (:class:`~couchbase.transactions.TransactionKeyspace`, optional):
+        metadata_collection (:class:`~couchbase.transactions.TransactionKeyspace`, optional): The collection to store
+            transaction metadata in.
         durability (:class:`~couchbase.durability.ServerDurability`, optional): Specifies the level of durability for
             this operation.
         kv_timeout (timedelta, optional): KV operations timeout.
@@ -2677,6 +2846,8 @@ class TransactionOptions(dict):
 
 
 class TransactionQueryOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TransactionQueryOptions`."""
+
     client_context_id: str | None
     raw: dict[str, JSONType] | None
     adhoc: bool | None
@@ -2695,7 +2866,12 @@ class TransactionQueryOptionsKwargs(TypedDict, total=False):
 
 
 class TransactionQueryOptions(dict):
-    """Args:
+    """Available options for a query run inside a transaction.
+
+    .. note::
+        All options should be imported from ``couchbase.options``.
+
+    Args:
         client_context_id (str, optional): The returned client context id for this query. Defaults to a generated UUID.
         raw (dict[str, JSONType], optional): Specifies any additional parameters which should be passed to the query
             engine when executing the query.
@@ -2745,6 +2921,8 @@ class TransactionQueryOptions(dict):
 
 
 class TransactionReplaceOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.TransactionReplaceOptions`."""
+
     transcoder: Transcoder | None
 
 
@@ -2784,14 +2962,35 @@ class ConstrainedInt:
 
     @classmethod
     def min(cls) -> int:
+        """Get the smallest value the class accepts.
+
+        Returns:
+            int: The smallest value the class accepts.
+        """
         raise NotImplementedError()
 
     @classmethod
     def max(cls) -> int:
+        """Get the largest value the class accepts.
+
+        Returns:
+            int: The largest value the class accepts.
+        """
         raise NotImplementedError()
 
     @classmethod
     def verify_value(cls, value: AcceptableInts) -> int:
+        """Check that a value is an integer in the class's range.
+
+        Args:
+            value (:class:`~couchbase.options.AcceptableInts`): The value to check.
+
+        Returns:
+            int: The value, as an ``int``.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the value is not an integer in range.
+        """
         held = getattr(value, "value", value)
         if not isinstance(held, int) or not (cls.min() <= held <= cls.max()):
             raise InvalidArgumentException(
@@ -2800,6 +2999,14 @@ class ConstrainedInt:
 
     @classmethod
     def is_valid(cls, value: AcceptableInts) -> bool:
+        """Get whether a value is an instance of the class.
+
+        Args:
+            value (:class:`~couchbase.options.AcceptableInts`): The value to check.
+
+        Returns:
+            bool: ``True`` if the value is an instance of the class.
+        """
         return isinstance(value, cls)
 
     def __int__(self) -> int:
@@ -2837,12 +3044,13 @@ class ConstrainedInt:
 
 
 class DeltaValue(ConstrainedInt):
-    """An integer between 0 and 0x7FFFFFFFFFFFFFFF inclusive. Used as an argument for :meth:`Collection.increment` and
-    :meth:`Collection.decrement`.
+    """An integer between 0 and 0x7FFFFFFFFFFFFFFF inclusive.
 
     .. warning::
         Importing this class from ``couchbase.collection`` is deprecated.
         Import it from ``couchbase.options``.
+
+    Used as an argument for :meth:`Collection.increment` and :meth:`Collection.decrement`.
 
     Args:
         value (:class:`~couchbase.options.AcceptableInts`): The value to initialise this with.
@@ -2853,10 +3061,20 @@ class DeltaValue(ConstrainedInt):
 
     @classmethod
     def min(cls) -> int:
+        """Get the smallest value the class accepts.
+
+        Returns:
+            int: The smallest value the class accepts.
+        """
         return 0
 
     @classmethod
     def max(cls) -> int:
+        """Get the largest value the class accepts.
+
+        Returns:
+            int: The largest value the class accepts.
+        """
         return 0x7FFFFFFFFFFFFFFF
 
 
@@ -2875,10 +3093,20 @@ class SignedInt64(ConstrainedInt):
 
     @classmethod
     def min(cls) -> int:
+        """Get the smallest value the class accepts.
+
+        Returns:
+            int: The smallest value the class accepts.
+        """
         return -0x8000000000000000
 
     @classmethod
     def max(cls) -> int:
+        """Get the largest value the class accepts.
+
+        Returns:
+            int: The largest value the class accepts.
+        """
         return 0x7FFFFFFFFFFFFFFF
 
 
@@ -2901,10 +3129,20 @@ class UnsignedInt32(ConstrainedInt):
 
     @classmethod
     def min(cls) -> int:
+        """Get the smallest value the class accepts.
+
+        Returns:
+            int: The smallest value the class accepts.
+        """
         return 0x00000000
 
     @classmethod
     def max(cls) -> int:
+        """Get the largest value the class accepts.
+
+        Returns:
+            int: The largest value the class accepts.
+        """
         return 0x80000000
 
 
@@ -2923,10 +3161,20 @@ class UnsignedInt64(ConstrainedInt):
 
     @classmethod
     def min(cls) -> int:
+        """Get the smallest value the class accepts.
+
+        Returns:
+            int: The smallest value the class accepts.
+        """
         return 0x0000000000000000
 
     @classmethod
     def max(cls) -> int:
+        """Get the largest value the class accepts.
+
+        Returns:
+            int: The largest value the class accepts.
+        """
         return 0x8000000000000000
 
 
@@ -2936,6 +3184,8 @@ class UnsignedInt64(ConstrainedInt):
 
 
 class ViewOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.ViewOptions`."""
+
     client_context_id: str | None
     raw: dict[str, str] | None
     limit: int | None
@@ -2994,10 +3244,11 @@ class ViewOptions(dict):
         reduce (bool, optional): Specifies whether reduction should be performed as part of the view query.
         on_error (:class:`~couchbase.views.ViewErrorMode`, optional): Specifies the error-handling behaviour that should
             be used when an error occurs.
-        debug (bool, optional):
+        debug (bool, optional): Whether the view service should include debug information in the response.
         namespace (:class:`~couchbase.management.views.DesignDocumentNamespace`, optional): Specifies the namespace for
             the design document. Defaults to ``Development``.
-        query_string (list[str], optional):
+        query_string (list[str], optional): Raw query string parameters, each written ``key=value``, added to the view
+            request.
         full_set (bool, optional): Specifies whether the query should force the entire set of document in the index to
             be included in the result. Defaults to False.
         parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this

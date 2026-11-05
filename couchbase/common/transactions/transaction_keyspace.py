@@ -86,14 +86,17 @@ class TransactionKeyspace:
 
     @property
     def bucket(self) -> str:
+        """The name of the bucket."""
         return self._bucket
 
     @property
     def scope(self) -> str:
+        """The name of the scope."""
         return self._scope
 
     @property
     def collection(self) -> str:
+        """The name of the collection."""
         return self._collection
 
     def __repr__(self) -> str:

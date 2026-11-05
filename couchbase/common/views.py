@@ -41,13 +41,25 @@ class _ViewMetaDataRecord:
 
 
 class ViewMetaData:
+    """The metadata the view service returned with a view query's rows."""
+
     def __init__(self, record: _ViewMetaDataRecord) -> None:
         self._record = record
 
     def debug_info(self) -> str | None:
+        """Get the debug information the view service returned.
+
+        Returns:
+            str | None: The debug information, if the query asked for it.
+        """
         return self._record.debug_info
 
     def total_rows(self) -> int | None:
+        """Get the number of rows in the view's index, before the query's filters.
+
+        Returns:
+            int | None: The number of rows, if the service sent it.
+        """
         return self._record.total_rows
 
     def __repr__(self) -> str:
@@ -56,6 +68,15 @@ class ViewMetaData:
 
 @dataclass
 class ViewRow(object):
+    """One row of a view query.
+
+    Attributes:
+        key: The key the view's map function emitted.
+        id: The ID of the document that emitted the row, or ``None`` for a reduced row.
+        value: The value the view's map function emitted, or the reduced value.
+        document: The emitting document's content, when it was fetched with the row.
+    """
+
     key: Any = None
     id: str | None = None
     value: Any = None
@@ -63,6 +84,7 @@ class ViewRow(object):
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> ViewRow:
+        """**INTERNAL** Build a row from the service's JSON."""
         output = cls(id=json_data.get('id', None))
         if 'key' in json_data:
             output.key = json.loads(json_data['key'])
@@ -72,11 +94,18 @@ class ViewRow(object):
 
 
 class ViewScanConsistency(Enum):
+    """How current a view's index must be when a view query reads it.
+
+    ``NOT_BOUNDED`` reads the index as it is.  ``REQUEST_PLUS`` updates the index first, so the query
+    sees every mutation made before it.  ``UPDATE_AFTER`` reads the index as it is and then updates it.
+    """
+
     NOT_BOUNDED = 'ok'
     REQUEST_PLUS = 'false'
     UPDATE_AFTER = 'update_after'
 
     def to_str(self) -> str:
+        """**INTERNAL** The member as the view request spells it."""
         if self.value == 'false':
             return 'request_plus'
         elif self.value == 'ok':
@@ -86,6 +115,7 @@ class ViewScanConsistency(Enum):
 
     @classmethod
     def from_str(cls, value: str) -> ViewScanConsistency:
+        """**INTERNAL** The member a string names."""
         if value in ['false', 'request_plus']:
             return cls.REQUEST_PLUS
         elif value in ['ok', 'not_bounded']:
@@ -98,10 +128,13 @@ class ViewScanConsistency(Enum):
 
 
 class ViewOrdering(Enum):
+    """The order, by key, a view query returns its rows in."""
+
     DESCENDING = 'true'
     ASCENDING = 'false'
 
     def to_str(self) -> str:
+        """**INTERNAL** The member as the view request spells it."""
         if self.value == 'false':
             return 'ascending'
         else:
@@ -109,6 +142,7 @@ class ViewOrdering(Enum):
 
     @classmethod
     def from_str(cls, value: str) -> ViewOrdering:
+        """**INTERNAL** The member a string names."""
         if value == 'descending':
             return cls.DESCENDING
         elif value == 'ascending':
@@ -119,14 +153,21 @@ class ViewOrdering(Enum):
 
 
 class ViewErrorMode(Enum):
+    """What a view query does when a node reports an error.
+
+    ``CONTINUE`` returns the rows the other nodes sent; ``STOP`` ends the query.
+    """
+
     CONTINUE = 'continue'
     STOP = 'stop'
 
     def to_str(self) -> str:
+        """**INTERNAL** The member as the view request spells it."""
         return 'resume' if self.value == 'continue' else self.value
 
     @classmethod
     def from_str(cls, value: str) -> ViewErrorMode:
+        """**INTERNAL** The member a string names."""
         if value in ['resume', 'continue']:
             return cls.CONTINUE
         elif value == 'stop':

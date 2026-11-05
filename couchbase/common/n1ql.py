@@ -35,9 +35,7 @@ from couchbase.common.options import UnsignedInt64
 
 
 class QueryStatus(Enum):
-    """
-    Represents the status of a query.
-    """
+    """Represents the status of a query."""
     RUNNING = "running"
     SUCCESS = "success"
     ERRORS = "errors"
@@ -51,6 +49,7 @@ class QueryStatus(Enum):
 
     @classmethod
     def from_str(cls, value: str) -> QueryStatus:
+        """**INTERNAL** The member for a status the server sent, or ``UNKNOWN`` for one it does not name."""
         # The status is sent by the server, so a value this SDK cannot name comes from a newer
         # server rather than from a mistake by the caller, and it reads as UNKNOWN.
         if isinstance(value, str):
@@ -100,13 +99,25 @@ class _QueryMetaDataRecord:
 
 
 class QueryProblem(object):
+    """A warning or error the query service reported for a query."""
+
     def __init__(self, record: _QueryProblemRecord) -> None:
         self._record = record
 
     def code(self) -> int:
+        """Get the service's code for the problem.
+
+        Returns:
+            int: The service's code for the problem.
+        """
         return self._record.code
 
     def message(self) -> str:
+        """Get the service's description of the problem.
+
+        Returns:
+            str: The service's description of the problem.
+        """
         return self._record.message
 
     def __repr__(self) -> str:
@@ -114,14 +125,16 @@ class QueryProblem(object):
 
 
 class QueryWarning(QueryProblem):
-    pass
+    """A warning the query service reported for a query."""
 
 
 class QueryError(QueryProblem):
-    pass
+    """An error the query service reported for a query."""
 
 
 class QueryMetrics(object):
+    """The metrics the query service reported for a query."""
+
     def __init__(self, record: _QueryMetricsRecord) -> None:
         self._record = record
 
@@ -198,6 +211,8 @@ class QueryMetrics(object):
 
 
 class QueryMetaData:
+    """The metadata the query service returned with a query's rows."""
+
     def __init__(self, record: _QueryMetaDataRecord) -> None:
         self._record = record
 
@@ -210,26 +225,26 @@ class QueryMetaData:
         return self._record.request_id
 
     def client_context_id(self) -> str:
-        """Get the client context id which is assoicated with the executed query.
+        """Get the client context ID which is associated with the executed query.
 
         Returns:
-            str: The client context id which is assoicated with the executed query.
+            str: The client context ID which is associated with the executed query.
         """
         return self._record.client_context_id
 
     def status(self) -> QueryStatus:
-        """Get the status of the query at the time the query meta-data was generated.
+        """Get the status of the query at the time the query metadata was generated.
 
         Returns:
-            :class:`.QueryStatus`: The status of the query at the time the query meta-data was generated.
+            :class:`.QueryStatus`: The status of the query at the time the query metadata was generated.
         """
         return self._record.status
 
     def signature(self) -> JSONType | None:
-        """Provides the signature of the query.
+        """Get the signature of the query.
 
         Returns:
-            JSONType | None:  The signature of the query.
+            JSONType | None: The signature of the query.
         """
         return self._record.signature
 
@@ -253,7 +268,7 @@ class QueryMetaData:
         """Get the various metrics which are made available by the query engine.
 
         Returns:
-            :class:`.QueryMetrics` | None: A :class:`.QueryMetrics` instance.
+            :class:`.QueryMetrics` | None: The query's metrics, if the service sent them.
         """
         if self._record.metrics is None:
             return None
@@ -272,8 +287,7 @@ class QueryMetaData:
 
 
 class QueryScanConsistency(Enum):
-    """
-    Represents the various scan consistency options that are available when querying against the query service.
+    """Represents the various scan consistency options that are available when querying against the query service.
 
     .. warning::
         Importing :class:`.QueryScanConsistency` from ``couchbase.cluster`` is deprecated.
@@ -287,8 +301,7 @@ class QueryScanConsistency(Enum):
 
 
 class QueryProfile(Enum):
-    """
-    Specifies the profiling mode for a query.
+    """Specifies the profiling mode for a query.
 
     .. warning::
         Importing :class:`.QueryProfile` from ``couchbase.cluster`` is deprecated.

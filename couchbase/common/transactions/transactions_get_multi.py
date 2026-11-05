@@ -52,12 +52,26 @@ class _GetMultiResultSource(Protocol):
 
 
 class TransactionGetMultiMode(Enum):
+    """How hard a multi-document read inside a transaction works to avoid read skew.
+
+    Read skew is seeing some documents from before another transaction committed and some from after.
+    ``PRIORITISE_LATENCY`` makes a time-bounded effort to avoid it, ``PRIORITISE_READ_SKEW_DETECTION``
+    makes a greater effort at a cost in latency, and ``DISABLE_READ_SKEW_DETECTION`` makes none.
+    """
+
     PRIORITISE_LATENCY = 'prioritise_latency'
     DISABLE_READ_SKEW_DETECTION = 'disable_read_skew_detection'
     PRIORITISE_READ_SKEW_DETECTION = 'prioritise_read_skew_detection'
 
 
 class TransactionGetMultiReplicasFromPreferredServerGroupMode(Enum):
+    """How hard a multi-document read inside a transaction works to avoid read skew.
+
+    Read skew is seeing some documents from before another transaction committed and some from after.
+    ``PRIORITISE_LATENCY`` makes a time-bounded effort to avoid it, ``PRIORITISE_READ_SKEW_DETECTION``
+    makes a greater effort at a cost in latency, and ``DISABLE_READ_SKEW_DETECTION`` makes none.
+    """
+
     PRIORITISE_LATENCY = 'prioritise_latency'
     DISABLE_READ_SKEW_DETECTION = 'disable_read_skew_detection'
     PRIORITISE_READ_SKEW_DETECTION = 'prioritise_read_skew_detection'
@@ -65,14 +79,19 @@ class TransactionGetMultiReplicasFromPreferredServerGroupMode(Enum):
 
 @dataclass
 class TransactionGetMultiSpec:
+    """One document for a multi-document read inside a transaction.
+
+    Attributes:
+        collection: The collection the document is in.
+        id: The document's ID.
+        transcoder: The transcoder to decode the document with, if not the transaction's default.
+    """
+
     collection: Collection | AsyncCollection
     id: str
     transcoder: Transcoder | None = None
 
     def _astuple(self) -> tuple[str, str, str, str]:
-        """
-          **INTERNAL**
-        """
         return (self.collection._impl.bucket_name,
                 self.collection._impl.scope_name,
                 self.collection.name,
@@ -81,14 +100,19 @@ class TransactionGetMultiSpec:
 
 @dataclass
 class TransactionGetMultiReplicasFromPreferredServerGroupSpec:
+    """One document for a multi-document read inside a transaction from the preferred server group's replicas.
+
+    Attributes:
+        collection: The collection the document is in.
+        id: The document's ID.
+        transcoder: The transcoder to decode the document with, if not the transaction's default.
+    """
+
     collection: Collection | AsyncCollection
     id: str
     transcoder: Transcoder | None = None
 
     def _astuple(self) -> tuple[str, str, str, str]:
-        """
-          **INTERNAL**
-        """
         return (self.collection._impl.bucket_name,
                 self.collection._impl.scope_name,
                 self.collection.name,
@@ -96,27 +120,30 @@ class TransactionGetMultiReplicasFromPreferredServerGroupSpec:
 
 
 class TransactionMultiContentProxy:
-    """
-    Used to provide access to TransactionGetMultiResult content via TransactionGetMultiResult.content_as[type](index)
+    """What a transactional multi-document read's ``content_as`` returns.
+
+    ``content_as[dict](0)`` is the first document as a ``dict``.
     """
 
     def __init__(self, content_as_index: Callable[[int], Any]) -> None:
         self._content_as_index = content_as_index
 
     def __getitem__(self, type_: type[_T] | Callable[[Any], _T]) -> Callable[[int], _T]:
-        """
+        """Get a function that takes a document's index and returns the document, converted by calling ``type_`` on it.
 
         Args:
-            type_: the type to attempt to cast the result to
+            type_: The type, or any callable, to convert the document with.
 
         Returns:
-            the content cast to the given type, if possible
+            The function.
         """
         convert = cast(Callable[[Any], _T], type_)
         return lambda index: convert(self._content_as_index(index))
 
 
 class TransactionGetMultiResult:
+    """The documents a multi-document read inside a transaction returned, in the order of its specs."""
+
     def __init__(self,
                  res: _GetMultiResultSource,
                  transcoders: list[Transcoder | None],
@@ -127,6 +154,17 @@ class TransactionGetMultiResult:
         self._decoded_values: dict[int, Any] = {}
 
     def exists(self, index: int) -> bool:
+        """Check whether the document at an index exists.
+
+        Args:
+            index: The index of the document's spec.
+
+        Returns:
+            bool: ``True`` if the document exists.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidIndexException`: If the index is out of range.
+        """
         if index > len(self._res.content) - 1 or index < 0:
             raise InvalidIndexException(f'Provided index ({index}) is invalid.')
 
@@ -134,6 +172,16 @@ class TransactionGetMultiResult:
 
     @property
     def content_as(self) -> TransactionMultiContentProxy:
+        """A proxy to return the document at the specified index.
+
+        Get the first document as a dict::
+
+            res = ctx.get_multi(specs)
+            value = res.content_as[dict](0)
+
+        Reading a document that does not exist raises
+        :class:`~couchbase.exceptions.DocumentNotFoundException`.
+        """
 
         def content_at_index(index: int) -> Any:
             if not self.exists(index):
@@ -163,6 +211,8 @@ class TransactionGetMultiResult:
 
 
 class TransactionGetMultiReplicasFromPreferredServerGroupResult:
+    """The documents a multi-document read from the preferred server group returned, in the order of its specs."""
+
     def __init__(self,
                  res: _GetMultiResultSource,
                  transcoders: list[Transcoder | None],
@@ -173,6 +223,17 @@ class TransactionGetMultiReplicasFromPreferredServerGroupResult:
         self._decoded_values: dict[int, Any] = {}
 
     def exists(self, index: int) -> bool:
+        """Check whether the document at an index exists.
+
+        Args:
+            index: The index of the document's spec.
+
+        Returns:
+            bool: ``True`` if the document exists.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidIndexException`: If the index is out of range.
+        """
         if index > len(self._res.content) - 1 or index < 0:
             raise InvalidIndexException(f'Provided index ({index}) is invalid.')
 
@@ -180,6 +241,16 @@ class TransactionGetMultiReplicasFromPreferredServerGroupResult:
 
     @property
     def content_as(self) -> TransactionMultiContentProxy:
+        """A proxy to return the document at the specified index.
+
+        Get the first document as a dict::
+
+            res = ctx.get_multi_replicas_from_preferred_server_group(specs)
+            value = res.content_as[dict](0)
+
+        Reading a document that does not exist raises
+        :class:`~couchbase.exceptions.DocumentNotFoundException`.
+        """
 
         def content_at_index(index: int) -> Any:
             if not self.exists(index):

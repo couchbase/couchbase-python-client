@@ -70,9 +70,10 @@ enable_error_code = ["ignore-without-code"]
 module = ["faker.*", "faker_vehicle.*", "faker_vehicle", "xdist.*"]
 ignore_missing_imports = true
 
-# Ruff enforces one thing here so far: annotations are spelled the way python_requires>=3.10
-# allows, `X | None` and `dict[...]` rather than `Optional[X]` and `Dict[...]`.  flake8, isort and
-# autopep8 still own linting, import order and formatting, so `select` names only these rules.
+# Ruff enforces two things here: annotations are spelled the way python_requires>=3.10 allows,
+# `X | None` and `dict[...]` rather than `Optional[X]` and `Dict[...]`, and the user-facing package
+# has Google-style docstrings, the style Sphinx's napoleon reads.  flake8, isort and autopep8 still
+# own linting, import order and formatting, so `select` names only these rules.
 [tool.ruff]
 target-version = "py310"
 line-length = 120
@@ -82,7 +83,30 @@ force-exclude = true
 extend-exclude = ["deps", "src", "examples"]
 
 [tool.ruff.lint]
-select = ["UP006", "UP007", "UP035", "UP045", "TID251"]
+select = ["UP006", "UP007", "UP035", "UP045", "TID251", "D"]
+# A class's docstring documents its constructor's arguments, so `__init__` and the other dunders
+# need none of their own.  Module docstrings are not required.
+ignore = ["D100", "D104", "D105", "D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Docstrings are checked on the user-facing package: not the tests, the tools, the protocol
+# implementations or a private module.
+"{tests,tools,docs}/**" = ["D"]
+"**/{tests,protocol}/**" = ["D"]
+"**/_[!_]*.py" = ["D"]
+"{setup,conftest,couchbase_version,pycbc_build_setup}.py" = ["D"]
+# Not yet brought to the docstring rules.  Each line goes as its area is done.
+"{couchbase,acouchbase,txcouchbase}/management/*.py" = ["D"]
+"couchbase/common/management/{analytics,buckets,collections,eventing,queries,search,users,views}.py" = ["D"]
+"couchbase/common/{search_queries,search_request,search_scoring,vector_search,subdocument}.py" = ["D"]
+"couchbase/common/{kv_range_scan,durability,transcoder,serializer,auth,config_profiles}.py" = ["D"]
+"couchbase/common/{otel_tracer,replica_reads,protocol}.py" = ["D"]
+"couchbase/common/{encryption,observability}/*.py" = ["D"]
+"{couchbase,acouchbase,txcouchbase}/{__init__,cluster,bucket,scope,collection,binary_collection,datastructures}.py" = ["D"]
+"{couchbase,acouchbase,txcouchbase}/transactions/transactions.py" = ["D"]
 
 # UP035 rejects importing the aliases PEP 585 replaced, but `Optional` and `Union` are not among
 # them, and a `# type:` comment, which ruff does not read, can keep either alive.  Banning the

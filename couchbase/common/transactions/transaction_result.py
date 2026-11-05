@@ -19,13 +19,19 @@ __all__ = [
 
 
 class TransactionResult(dict):
+    """The outcome of a transaction that committed."""
 
     @property
     def transaction_id(self) -> str:
+        """The transaction's ID."""
         return self['transaction_id']
 
     @property
     def unstaging_complete(self) -> bool:
+        """Whether every change the transaction made was visible when it returned.
+
+        When ``False`` the transaction has committed, and cleanup makes the remaining changes visible.
+        """
         return self['unstaging_complete']
 
     def __repr__(self) -> str:

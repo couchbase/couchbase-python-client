@@ -32,6 +32,8 @@ from couchbase.common._supportability import Supportability
 
 
 class EndpointState(Enum):
+    """The state of one endpoint's connection, in a diagnostics report."""
+
     Disconnected = "disconnected"
     Connecting = "connecting"
     Connected = "connected"
@@ -39,12 +41,19 @@ class EndpointState(Enum):
 
 
 class ClusterState(Enum):
+    """The state of the SDK's connections, summed over the endpoints of a diagnostics report.
+
+    ``Online`` when every endpoint is connected, ``Offline`` when none is, and ``Degraded`` otherwise.
+    """
+
     Online = "online"
     Degraded = "degraded"
     Offline = "offline"
 
 
 class ServiceType(Enum):
+    """A Couchbase Server service, as an endpoint in a diagnostics or ping report names it."""
+
     Analytics = "analytics"
     KeyValue = "key_value"
     Eventing = "eventing"
@@ -55,6 +64,8 @@ class ServiceType(Enum):
 
 
 class PingState(Enum):
+    """The outcome of pinging one endpoint."""
+
     OK = 'ok'
     TIMEOUT = 'timeout'
     ERROR = 'error'
@@ -93,18 +104,17 @@ class _EndpointPingRecord:
 
 
 class EndpointDiagnosticsReport:
+    """One endpoint of a :class:`~couchbase.result.DiagnosticsResult`."""
+
     def __init__(self, record: _EndpointDiagnosticsRecord) -> None:
         self._record = record
 
     @property
     def type(self) -> ServiceType:
-        """Endpoint point service type
+        """The service the endpoint belongs to.
 
         .. deprecated:: 4.0.0
             Use :attr:`service_type` instead.
-
-        Returns:
-            ServiceType: Endpoint Service Type
         """
         Supportability.class_property_deprecated('EndpointDiagnosticsReport.type',
                                                  'EndpointDiagnosticsReport.service_type')
@@ -112,33 +122,35 @@ class EndpointDiagnosticsReport:
 
     @property
     def service_type(self) -> ServiceType:
+        """The service the endpoint belongs to."""
         return ServiceType(self._record.service_type)
 
     @property
     def id(self) -> str | None:
+        """The SDK's identifier for the endpoint's connection."""
         return self._record.id
 
     @property
     def local(self) -> str | None:
+        """The local address of the connection."""
         return self._record.local
 
     @property
     def remote(self) -> str | None:
+        """The address of the node the endpoint connects to."""
         return self._record.remote
 
     @property
     def namespace(self) -> str | None:
+        """The bucket the endpoint is bound to, if it is bound to one."""
         return self._record.bucket
 
     @property
     def last_activity(self) -> timedelta | None:
-        """Endpoint point last activity in us
+        """The time since the endpoint last sent or received anything, if known.
 
         .. deprecated:: 4.0.0
             Use :attr:`last_activity_us` instead.
-
-        Returns:
-            timedelta: last activity in us
         """
         Supportability.class_property_deprecated('EndpointDiagnosticsReport.last_activity',
                                                  'EndpointDiagnosticsReport.last_activity_us')
@@ -146,15 +158,22 @@ class EndpointDiagnosticsReport:
 
     @property
     def last_activity_us(self) -> timedelta | None:
+        """The time since the endpoint last sent or received anything, if known."""
         if self._record.last_activity_us is None:
             return None
         return timedelta(microseconds=self._record.last_activity_us)
 
     @property
     def state(self) -> EndpointState:
+        """The state of the endpoint's connection."""
         return EndpointState(self._record.state)
 
     def as_dict(self) -> dict[str, str | int]:
+        """Get the report as a dict, leaving out the fields that are not set.
+
+        Returns:
+            dict[str, str | int]: The report's fields, by name.
+        """
         r = self._record
         output = {'type': r.service_type,
                   'id': r.id,
@@ -171,45 +190,59 @@ class EndpointDiagnosticsReport:
 
 
 class EndpointPingReport:
+    """One endpoint of a :class:`~couchbase.result.PingResult`."""
 
     def __init__(self, record: _EndpointPingRecord) -> None:
         self._record = record
 
     @property
     def service_type(self) -> ServiceType:
+        """The service the endpoint belongs to."""
         return ServiceType(self._record.service_type)
 
     @property
     def id(self) -> str | None:
+        """The SDK's identifier for the endpoint's connection."""
         return self._record.id
 
     @property
     def local(self) -> str | None:
+        """The local address of the connection."""
         return self._record.local
 
     @property
     def remote(self) -> str | None:
+        """The address of the node the endpoint connects to."""
         return self._record.remote
 
     @property
     def namespace(self) -> str | None:
+        """The bucket the endpoint is bound to, if it is bound to one."""
         return self._record.bucket
 
     @property
     def error(self) -> str | None:
+        """Why the ping failed, if it did."""
         return self._record.error
 
     @property
     def latency(self) -> timedelta | None:
+        """How long the ping took, if it completed."""
         if self._record.latency_us is None:
             return None
         return timedelta(microseconds=self._record.latency_us)
 
     @property
     def state(self) -> PingState:
+        """The outcome of the ping."""
         return PingState(self._record.state)
 
     def as_dict(self) -> dict[str, str | int]:
+        """Get the report as a dict, leaving out the fields that are not set.
+
+        Returns:
+            dict[str, str | int]: The report's fields, by name.
+        """
         r = self._record
         output = {'type': r.service_type,
                   'id': r.id,

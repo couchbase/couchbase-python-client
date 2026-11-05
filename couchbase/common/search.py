@@ -83,25 +83,57 @@ class _SearchMetaDataRecord:
 
 
 class SearchMetrics:
+    """The metrics the search service reported for a search."""
+
     def __init__(self, record: _SearchMetricsRecord) -> None:
         self._record = record
 
     def success_partition_count(self) -> int:
+        """Get the number of index partitions that answered the search.
+
+        Returns:
+            int: The number of partitions that answered.
+        """
         return self._record.success_partition_count
 
     def error_partition_count(self) -> int:
+        """Get the number of index partitions that failed to answer the search.
+
+        Returns:
+            int: The number of partitions that failed.
+        """
         return self._record.error_partition_count
 
     def took(self) -> timedelta:
+        """Get the time the search took.
+
+        Returns:
+            timedelta: The time the search took.
+        """
         return timedelta(microseconds=self._record.took_ns / 1000)
 
     def total_partition_count(self) -> int:
+        """Get the number of index partitions the search was sent to.
+
+        Returns:
+            int: The number of partitions.
+        """
         return self._record.total_partition_count
 
     def max_score(self) -> float:
+        """Get the highest score of any matching document.
+
+        Returns:
+            float: The highest score.
+        """
         return self._record.max_score
 
     def total_rows(self) -> int:
+        """Get the number of documents that matched, which can be more than the rows returned.
+
+        Returns:
+            int: The number of documents that matched.
+        """
         return self._record.total_rows
 
     def __repr__(self) -> str:
@@ -109,20 +141,35 @@ class SearchMetrics:
 
 
 class SearchMetaData:
-    """Represents the meta-data returned along with a search query result."""
+    """The metadata the search service returned with a search's rows."""
 
     def __init__(self, record: _SearchMetaDataRecord) -> None:
         self._record = record
 
     def errors(self) -> dict[str, str]:
+        """Get the errors the index partitions that failed reported.
+
+        Returns:
+            dict[str, str]: Each error, by the partition that reported it.
+        """
         return dict(self._record.errors)
 
     def metrics(self) -> SearchMetrics | None:
+        """Get the metrics the search service reported for the search.
+
+        Returns:
+            :class:`.SearchMetrics` | None: The search's metrics, if the service sent them.
+        """
         if self._record.metrics is None:
             return None
         return SearchMetrics(self._record.metrics)
 
     def client_context_id(self) -> str | None:
+        """Get the client context ID which is associated with the search.
+
+        Returns:
+            str | None: The client context ID, if the service sent it.
+        """
         return self._record.client_context_id
 
     def __repr__(self) -> str:
@@ -131,12 +178,28 @@ class SearchMetaData:
 
 @dataclass
 class SearchTermFacet:
+    """One term of a term facet's result.
+
+    Attributes:
+        term: The term.
+        count: The number of matching documents with the term.
+    """
+
     term: str
     count: int
 
 
 @dataclass
 class SearchNumericRangeFacet:
+    """One range of a numeric range facet's result.
+
+    Attributes:
+        name: The range's name, as the facet named it.
+        count: The number of matching documents in the range.
+        min: The range's lower bound, if it has one.
+        max: The range's upper bound, if it has one.
+    """
+
     name: str
     count: int
     min: int | float | None = None
@@ -145,6 +208,15 @@ class SearchNumericRangeFacet:
 
 @dataclass
 class SearchDateRangeFacet:
+    """One range of a date range facet's result.
+
+    Attributes:
+        name: The range's name, as the facet named it.
+        count: The number of matching documents in the range.
+        start: The range's start, if it has one.
+        end: The range's end, if it has one.
+    """
+
     name: str
     count: int
     start: str | None = None
@@ -153,11 +225,22 @@ class SearchDateRangeFacet:
 
 @dataclass
 class SearchFacetResult:
-    """ An individual facet result has both metadata and details,
-    as each facet can define ranges into which results are categorized.
+    """The result of one facet of a search.
 
-    Each of the three lists is None for a facet of another kind, and for one the server returned
-    without its details."""
+    Attributes:
+        name: The facet's name, as the search named it.
+        field: The field the facet counted.
+        total: The number of values the facet counted.
+        missing: The number of matching documents without the field.
+        other: The number of values counted that fall in none of the returned terms or ranges.
+        terms: The terms of a term facet.
+        numeric_ranges: The ranges of a numeric range facet.
+        date_ranges: The ranges of a date range facet.
+
+    Each of the three lists is ``None`` for a facet of another kind, and for one the server returned
+    without its details.
+    """
+
     name: str
     field: str
     total: int
@@ -181,6 +264,17 @@ class _SearchFinalMetadata:
 
 @dataclass
 class SearchRowLocation:
+    """One place a term of the search matched in a row.
+
+    Attributes:
+        field: The field the term was found in.
+        term: The term.
+        position: The term's position in the field, counted in terms.
+        start: The offset of the term's first byte in the field.
+        end: The offset of the byte after the term's last.
+        array_positions: Where the field sits in the arrays that hold it, if any do.
+    """
+
     field: str | None = None
     term: str | None = None
     position: int | None = None
@@ -190,6 +284,7 @@ class SearchRowLocation:
 
     @classmethod
     def from_server(cls, json_data: dict[str, Any]) -> SearchRowLocation:
+        """**INTERNAL** Build a location from the service's JSON."""
         return cls(json_data.get('field'),
                    json_data.get('term'),
                    json_data.get('position'),
@@ -205,11 +300,26 @@ class SearchRowLocations:
         self._locations = tuple(locations or ())
 
     def get_all(self) -> list[SearchRowLocation]:
-        """list all locations (any field, any term)"""
+        """Get every location, in any field, of any term.
+
+        Returns:
+            list[:class:`.SearchRowLocation`]: The locations.
+        """
         return list(self._locations)
 
     def get(self, field: str, term: str) -> list[SearchRowLocation]:
-        """List all locations for a given field and term"""
+        """Get the locations of a term in a field.
+
+        Args:
+            field: The field.
+            term: The term.
+
+        Returns:
+            list[:class:`.SearchRowLocation`]: The locations.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the term has no location in the field.
+        """
         in_field = [loc for loc in self._locations if loc.field == field]
         if not in_field:
             raise InvalidArgumentException(f'Cannot find "{field}" field in locations.')
@@ -219,21 +329,33 @@ class SearchRowLocations:
         return locations
 
     def fields(self) -> list[str]:
-        """
+        """Get the fields with a location, in the order they first appear.
+
         Returns:
-            the fields in this location
+            list[str]: The fields.
         """
         return list(dict.fromkeys(loc.field for loc in self._locations if loc.field is not None))
 
     def terms(self) -> set[str]:
-        """
-        List all terms in this locations,
-        considering all fields (so a set):
+        """Get the terms with a location, in any field.
+
+        Returns:
+            set[str]: The terms.
         """
         return {loc.term for loc in self._locations if loc.term is not None}
 
     def terms_for(self, field: str) -> list[str]:
-        """ list the terms for a given field """
+        """Get the terms with a location in a field, in the order they first appear.
+
+        Args:
+            field: The field.
+
+        Returns:
+            list[str]: The terms.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the field has no location.
+        """
         terms = [loc.term for loc in self._locations if loc.field == field and loc.term is not None]
         if not terms:
             raise InvalidArgumentException(f'Cannot find "{field}" field in locations.')
@@ -249,15 +371,26 @@ class SearchRowLocations:
 
 
 class SearchRowFields(dict):
+    """The stored fields a search returned for a row, by name."""
+
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
 
 @dataclass
 class SearchRow:
-    """A single entry of search results. The server calls them "hits",
-        and represents as a JSON object. The following interface describes
-        the contents of the result row."""
+    """One document a search matched, which the server calls a hit.
+
+    Attributes:
+        index: The index partition that matched the document.
+        id: The document's ID.
+        score: How well the document matched.
+        fields: The stored fields the search asked for.
+        locations: Where the search's terms matched, if the search asked for them.
+        fragments: Highlighted fragments of each field, if the search asked for them.
+        explanation: How the score was computed, if the search asked for it.
+    """
+
     index: str
     id: str
     score: float
@@ -337,8 +470,8 @@ class _OptionalField(Generic[_T]):
 
 
 def _range(name: str, n1: str, n2: str, r1: JSONType, r2: JSONType) -> _Body:
-    """
-    A facet's named range, keyed under ``n1`` and ``n2``, leaving out a bound that is ``None``.
+    """A facet's named range, keyed under ``n1`` and ``n2``, leaving out a bound that is ``None``.
+
     Raises if both are.
     """
     if r1 is None and r2 is None:
@@ -347,43 +480,33 @@ def _range(name: str, n1: str, n2: str, r1: JSONType, r2: JSONType) -> _Body:
 
 
 class HighlightStyle(Enum):
-    """
-    HighlightStyle
+    """How a search marks the matched terms in the fragments it returns: with ANSI escape codes, or HTML."""
 
-    Can be either:
-
-    Ansi
-        Need Example
-    Html
-        Need Example
-    """
     Ansi = 'ansi'
     Html = 'html'
 
 
 class SearchScanConsistency(Enum):
-    """
-    SearchScanConsistency
+    """How current the search index must be when a search reads it.
 
-    This can be:
-
-    NOT_BOUNDED
-        Which means we just return what is currently in the indexes.
+    ``NOT_BOUNDED`` reads the index as it is.  ``REQUEST_PLUS`` waits until the index holds every
+    mutation made before the search.  ``AT_PLUS`` waits until it holds the mutations given as the
+    ``consistent_with`` option.
     """
+
     NOT_BOUNDED = 'not_bounded'
     REQUEST_PLUS = 'request_plus'
     AT_PLUS = 'at_plus'
 
 
 class MatchOperator(Enum):
-    """
-    **UNCOMMITTED** This API may change in the future.
-    Specifies how the individual match terms should be logically concatenated.
+    """How a match query combines the terms it analyzes its text into.
 
-    Members:
-    OR (default): Specifies that individual match terms are concatenated with a logical OR.
-    AND: Specifies that individual match terms are concatenated with a logical AND.
+    **UNCOMMITTED** This API may change in the future.
+
+    ``OR``, the default, matches a document with any of the terms; ``AND``, one with all of them.
     """
+
     OR = "or"
     AND = "and"
 
@@ -392,9 +515,9 @@ class MatchOperator(Enum):
 
 
 class Sort:
-    """
-    Sorts search results by ``by``, the Search service's name for what to sort on. You probably
-    want one of the subclasses.
+    """Sorts search results by ``by``, the Search service's name for what to sort on.
+
+    You probably want one of the subclasses.
 
     .. seealso:: :class:`SortScore`, :class:`SortID`, :class:`SortField` and :class:`SortGeoDistance`.
     """
@@ -413,8 +536,7 @@ class Sort:
         self.desc = desc if descending is None else descending
 
     def set_prop(self, key: str, value: JSONType) -> None:
-        """
-        Sets ``key`` in the sort's JSON to ``value``, sent as given and without validation.
+        """Sets ``key`` in the sort's JSON to ``value``, sent as given and without validation.
 
         The key is written over whatever the sort's own fields encode under it, and is not read
         back by any of the sort's properties.
@@ -423,9 +545,7 @@ class Sort:
 
     @property
     def descending(self) -> bool | None:
-        """
-        The same as :attr:`desc`
-        """
+        """The same as :attr:`desc`."""
         return self.desc
 
     @descending.setter
@@ -433,9 +553,10 @@ class Sort:
         self.desc = value
 
     def as_encodable(self) -> JSONType:
-        """
-        Returns the sort as the Search service's JSON, in a form suitable for serializing to JSON.
-        Each call builds a new object.
+        """Get the sort as the Search service's JSON.
+
+        Returns:
+            The sort, ready to serialize to JSON.  Each call builds a new object.
         """
         return _encode_sort(self)
 
@@ -444,9 +565,7 @@ class Sort:
 
 
 class SortScore(Sort):
-    """
-    Sorts by the score of each match.
-    """
+    """Sorts by the score of each match."""
 
     def __init__(self,
                  *,
@@ -456,9 +575,7 @@ class SortScore(Sort):
 
 
 class SortID(Sort):
-    """
-    Sorts lexically by the document ID of each match
-    """
+    """Sorts lexically by the document ID of each match."""
 
     def __init__(self,
                  *,
@@ -468,9 +585,7 @@ class SortID(Sort):
 
 
 class SortField(Sort):
-    """
-    Sorts according to the properties of a given field
-    """
+    """Sorts by the value of a field."""
 
     type: _OptionalField[str] = _OptionalField(_as_is, """
         Coerce the field to this type: ``auto``, ``string``, ``number`` or ``date``
@@ -498,9 +613,7 @@ class SortField(Sort):
 
     @property
     def field(self) -> str:
-        """
-        Field to sort by
-        """
+        """The field to sort by."""
         return self._field
 
     @field.setter
@@ -509,9 +622,7 @@ class SortField(Sort):
 
 
 class SortGeoDistance(Sort):
-    """
-    Sorts matches based on their distance from a specific location
-    """
+    """Sorts by each match's distance from a point."""
 
     unit: _OptionalField[str] = _OptionalField(_as_is, """
         Distance unit used for measuring, such as ``m``, ``km`` or ``mi``
@@ -531,9 +642,9 @@ class SortGeoDistance(Sort):
 
     @property
     def location(self) -> list[float]:
-        """
-        The point of origin, as ``(lon, lat)`` or ``{'lon': lon, 'lat': lat}``, read back as
-        ``[lon, lat]``
+        """The point to measure from.
+
+        Set as ``(lon, lat)`` or ``{'lon': lon, 'lat': lat}``, and read back as ``[lon, lat]``.
         """
         return self._location
 
@@ -544,9 +655,7 @@ class SortGeoDistance(Sort):
 
     @property
     def field(self) -> str:
-        """
-        Field that contains the distance
-        """
+        """The field that holds each document's location."""
         return self._field
 
     @field.setter
@@ -558,9 +667,7 @@ class SortGeoDistance(Sort):
 
 
 class Facet:
-    """
-    Base facet class. Each facet must have a field which it aggregates
-    """
+    """The base of the facets, each of which counts the values of one field across the matches."""
 
     limit: _OptionalField[int] = _OptionalField(_as_is, """
         Maximum number of facet results to return
@@ -574,8 +681,7 @@ class Facet:
         self.limit = limit
 
     def set_prop(self, key: str, value: JSONType) -> None:
-        """
-        Sets ``key`` in the facet's JSON to ``value``, sent as given and without validation.
+        """Sets ``key`` in the facet's JSON to ``value``, sent as given and without validation.
 
         The key is written over whatever the facet's own fields encode under it, and is not read
         back by any of the facet's properties.
@@ -584,17 +690,15 @@ class Facet:
 
     @property
     def encodable(self) -> _Body:
-        """
-        Returns the facet as the Search service's JSON, in a form suitable for serializing to JSON.
+        """The facet as the Search service's JSON, ready to serialize to JSON.
+
         Each read builds a new object.
         """
         return _encode_facet(self)
 
     @property
     def field(self) -> str:
-        """
-        Field upon which the facet will aggregate
-        """
+        """The field the facet counts."""
         return self._field
 
     @field.setter
@@ -606,16 +710,13 @@ class Facet:
 
 
 class TermFacet(Facet):
-    """
-    Facet aggregating the most frequent terms used.
-    """
+    """Counts the most frequent terms of a field across the matches."""
 
 
 class DateFacet(Facet):
-    """
-    Facet to aggregate results based on a date range.
-    This facet must have at least one invocation of :meth:`add_range` before
-    it is added to :attr:`~Params.facets`.
+    """Counts the matches whose field falls in each of a set of date ranges.
+
+    Add at least one range with :meth:`add_range` before the facet is used.
     """
 
     def __init__(self,
@@ -628,25 +729,25 @@ class DateFacet(Facet):
                   name: str,
                   start: str | None = None,
                   end: str | None = None) -> DateFacet:
-        """
-        Adds a date range to the given facet.
+        """Add a date range.
 
         Args:
-            name (str): The name by which the results within the range can be accessed
-            start (str): Lower date range. Should be in RFC 3339 format
-            end (str): Upper date range.
+            name: The name the range's count is returned under.
+            start: The range's start, in RFC 3339 format.
+            end: The range's end, in RFC 3339 format.
 
         Returns:
-            The `DateFacet` object, so calls to this method may be chained
+            This facet, so calls can be chained.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If neither ``start`` nor ``end`` is given.
         """
         self.date_ranges.append(_range(name, 'start', 'end', start, end))
         return self
 
     @property
     def date_ranges(self) -> list[_Body]:
-        """
-        The ranges, each a dict of ``name`` and at least one of ``start`` and ``end``
-        """
+        """The ranges, each a dict of ``name`` and at least one of ``start`` and ``end``."""
         return self._date_ranges
 
     @date_ranges.setter
@@ -655,10 +756,9 @@ class DateFacet(Facet):
 
 
 class NumericFacet(Facet):
-    """
-    Facet to aggregate results based on a numeric range.
-    This facet must have at least one invocation of :meth:`add_range`
-    before it is added to :attr:`Params.facets`
+    """Counts the matches whose field falls in each of a set of numeric ranges.
+
+    Add at least one range with :meth:`add_range` before the facet is used.
     """
 
     def __init__(self,
@@ -671,25 +771,25 @@ class NumericFacet(Facet):
                   name: str,
                   min: int | float | None = None,
                   max: int | float | None = None) -> NumericFacet:
-        """
-        Add a numeric range.
+        """Add a numeric range.
 
         Args:
-            name (str): the name by which the range is accessed in the results
-            min (int | float): Lower range bound
-            max (int | float): Upper range bound
+            name: The name the range's count is returned under.
+            min: The range's lower bound.
+            max: The range's upper bound.
 
         Returns:
-            This object; suitable for method chaining
+            This facet, so calls can be chained.
+
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If neither ``min`` nor ``max`` is given.
         """
         self.numeric_ranges.append(_range(name, 'min', 'max', min, max))
         return self
 
     @property
     def numeric_ranges(self) -> list[_Body]:
-        """
-        The ranges, each a dict of ``name`` and at least one of ``min`` and ``max``
-        """
+        """The ranges, each a dict of ``name`` and at least one of ``min`` and ``max``."""
         return self._numeric_ranges
 
     @numeric_ranges.setter

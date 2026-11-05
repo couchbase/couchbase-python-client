@@ -327,6 +327,8 @@ def _parse_subdocument_exists(fields: tuple[_LookupInFieldRecord | _MutateInFiel
 
 
 class Result:
+    """The base of the results of the key-value operations."""
+
     def __init__(self,
                  record: Any,
                  transcoder: Transcoder | None = None,
@@ -339,40 +341,30 @@ class Result:
 
     @property
     def value(self) -> Any | None:
-        """
-            Any | None: The content of the document, if it exists.
-        """
+        """The content of the document, if it exists."""
         if self._decoded_value is None:
             self._decoded_value = self._decode_value()
         return self._decoded_value
 
     @property
     def cas(self) -> int:
-        """
-            int: The CAS of the document.
-        """
+        """The CAS of the document."""
         return self._record.cas
 
     @property
     def flags(self) -> int | None:
-        """
-            int | None: Flags associated with the document.  Used for transcoding.
-        """
+        """The document's flags, which the transcoder reads to decode it."""
         # Only a response that carries a document carries its flags; the rest read 0.
         return 0
 
     @property
     def key(self) -> str | None:
-        """
-            str | None: Key for the operation, if it exists.
-        """
+        """The key of the document the operation was on, if known."""
         return self._key
 
     @property
     def success(self) -> bool:
-        """
-            bool: Indicates if the operation was successful or not.
-        """
+        """Whether the operation succeeded."""
         return self._record.cas != 0
 
     def _decode_value(self) -> Any | None:
@@ -383,29 +375,25 @@ _T = TypeVar('_T')
 
 
 class ContentProxy:
-    """
-    Used to provide access to Result content via Result.content_as[type]
-    """
+    """What a result's ``content_as`` returns: ``content_as[dict]`` is the content as a ``dict``."""
 
     def __init__(self, content: Any) -> None:
         self._content = content
 
     def __getitem__(self, type_: type[_T] | Callable[[Any], _T]) -> _T:
-        """
+        """Get the content, converted by calling ``type_`` on it.
 
         Args:
-            type_: the type to attempt to cast the result to
+            type_: The type, or any callable, to convert the content with.
 
         Returns:
-            the content cast to the given type, if possible
+            The converted content.
         """
         return cast(Callable[[Any], _T], type_)(self._content)
 
 
 class ContentSubdocProxy:
-    """
-    Used to provide access to LookUpResult content via Result.content_as[type](index)
-    """
+    """What a sub-document result's ``content_as`` returns: ``content_as[dict](0)`` is the first field as a ``dict``."""
 
     def __init__(self,
                  serializer: Serializer,
@@ -419,18 +407,20 @@ class ContentSubdocProxy:
         return cast(Callable[[Any], _T], type_)(item)
 
     def __getitem__(self, type_: type[_T] | Callable[[Any], _T]) -> Callable[[int], _T]:
-        """
+        """Get a function that takes a field's index and returns the field, converted by calling ``type_`` on it.
 
         Args:
-            type_: the type to attempt to cast the result to
+            type_: The type, or any callable, to convert the field with.
 
         Returns:
-            the content cast to the given type, if possible
+            The function.
         """
         return lambda index: self._parse_content_at_index(index, type_)
 
 
 class GetReplicaResult(Result):
+    """The result of reading a document from the active node or a replica."""
+
     _record: _GetReplicaRecord
 
     def __init__(self,
@@ -442,14 +432,12 @@ class GetReplicaResult(Result):
 
     @property
     def flags(self) -> int | None:
-        """
-            int | None: Flags associated with the document.  Used for transcoding.
-        """
+        """The document's flags, which the transcoder reads to decode it."""
         return self._record.flags
 
     @property
     def is_active(self) -> bool:
-        """bool: True if the result is the active document, False otherwise.
+        """Whether the document was read from the active node.
 
         .. deprecated:: 4.0.3
             Use :attr:`is_replica` instead.
@@ -459,20 +447,17 @@ class GetReplicaResult(Result):
 
     @property
     def is_replica(self) -> bool:
-        """
-            bool: True if the result is a replica, False otherwise.
-        """
+        """Whether the document was read from a replica."""
         return self._record.is_replica
 
     @property
     def content_as(self) -> ContentProxy:
-        """
-            :class:`ContentProxy`: The contents of the document.
+        """The contents of the document.
 
-            Get the value as a dict::
+        Get the value as a dict::
 
-                res = collection.get_replica(key)
-                value = res.content_as[dict]
+            res = collection.get_replica(key)
+            value = res.content_as[dict]
 
         """
         return ContentProxy(self.value)
@@ -487,6 +472,8 @@ class GetReplicaResult(Result):
 
 
 class GetResult(Result):
+    """The result of reading a document."""
+
     _record: _GetRecord
 
     def __init__(self,
@@ -498,21 +485,17 @@ class GetResult(Result):
 
     @property
     def flags(self) -> int | None:
-        """
-            int | None: Flags associated with the document.  Used for transcoding.
-        """
+        """The document's flags, which the transcoder reads to decode it."""
         return self._record.flags
 
     @property
     def expiry_time(self) -> datetime | None:
-        """
-            datetime | None: The expiry of the document, if it was requested.
-        """
+        """The expiry of the document, if it was requested."""
         return _expiry_as_datetime(self._record.expiry)
 
     @property
     def expiryTime(self) -> datetime | None:
-        """datetime | None: The expiry of the document, if it was requested.
+        """The expiry of the document, if it was requested.
 
         .. deprecated:: 4.0.0
             Use :attr:`expiry_time` instead.
@@ -522,13 +505,12 @@ class GetResult(Result):
 
     @property
     def content_as(self) -> ContentProxy:
-        """
-            :class:`ContentProxy`: The contents of the document.
+        """The contents of the document.
 
-            Get the value as a dict::
+        Get the value as a dict::
 
-                res = collection.get(key)
-                value = res.content_as[dict]
+            res = collection.get(key)
+            value = res.content_as[dict]
 
         """
         return ContentProxy(self.value)
@@ -543,6 +525,8 @@ class GetResult(Result):
 
 
 class ExistsResult(Result):
+    """The result of checking whether a document exists."""
+
     _record: _ExistsRecord
 
     def __init__(self,
@@ -553,17 +537,13 @@ class ExistsResult(Result):
 
     @property
     def flags(self) -> int | None:
-        """
-            int | None: Flags associated with the document.  Used for transcoding.
-        """
+        """The document's flags, which the transcoder reads to decode it."""
         flags = self._record.flags
         return 0 if flags is None else flags
 
     @property
     def exists(self) -> bool:
-        """
-            bool: True if the document exists, false otherwise.
-        """
+        """Whether the document exists."""
         return self._record.exists
 
     def __repr__(self) -> str:
@@ -578,42 +558,49 @@ class _MutationTokenDict(TypedDict):
 
 
 class MutationToken:
+    """Identifies one mutation, so a later query or search can be made consistent with it.
+
+    Pass it to :class:`~couchbase.mutation_state.MutationState`.
+    """
+
     def __init__(self, token: _MutationTokenDict) -> None:
         self._token = token
 
     @property
     def partition_id(self) -> int:
-        """
-            int:  The token's partition id.
-        """
+        """The ID of the partition the document is in."""
         return self._token['partition_id']
 
     @property
     def partition_uuid(self) -> int:
-        """
-            int:  The token's partition uuid.
-        """
+        """The UUID of the partition's history when the mutation was made."""
         return self._token['partition_uuid']
 
     @property
     def sequence_number(self) -> int:
-        """
-            int:  The token's sequence number.
-        """
+        """The mutation's sequence number within the partition."""
         return self._token['sequence_number']
 
     @property
     def bucket_name(self) -> str:
-        """
-            str:  The token's bucket name.
-        """
+        """The name of the bucket the document is in."""
         return self._token['bucket_name']
 
     def as_tuple(self) -> tuple[int, int, int, str]:
+        """Get the token's fields as a tuple.
+
+        Returns:
+            tuple[int, int, int, str]: The partition ID, partition UUID, sequence number and bucket name.
+        """
         return (self.partition_id, self.partition_uuid,
                 self.sequence_number, self.bucket_name)
 
     def as_dict(self) -> _MutationTokenDict:
+        """Get the token's fields as a dict.
+
+        Returns:
+            dict[str, int | str]: The token's fields, by name.
+        """
         return self._token
 
     def __repr__(self) -> str:
@@ -632,6 +619,8 @@ class MutationToken:
 
 
 class MutationResult(Result):
+    """The result of an operation that changed a document."""
+
     _record: _MutationRecord | _CounterRecord | _MutateInRecord
 
     def __init__(self,
@@ -642,7 +631,7 @@ class MutationResult(Result):
         self._mutation_token: MutationToken | None = None
 
     def mutation_token(self) -> MutationToken | None:
-        """Get the operation's mutation token, if it exists.
+        """Get the operation's mutation token, if it has one.
 
         Returns:
             :class:`.MutationToken` | None: The operation's mutation token.
@@ -661,6 +650,8 @@ class MutationResult(Result):
 
 
 class LookupInResult(Result):
+    """The result of reading paths within a document."""
+
     _record: _LookupInRecord
 
     def __init__(self,
@@ -684,13 +675,12 @@ class LookupInResult(Result):
 
     @property
     def content_as(self) -> ContentSubdocProxy:
-        """
-            :class:`.ContentSubdocProxy`: A proxy to return the value at the specified index.
+        """A proxy to return the value at the specified index.
 
-            Get first value as a dict::
+        Get first value as a dict::
 
-                res = collection.lookup_in(key, (SD.get("geo"), SD.exists("city")))
-                value = res.content_as[dict](0)
+            res = collection.lookup_in(key, (SD.get("geo"), SD.exists("city")))
+            value = res.content_as[dict](0)
         """
         return ContentSubdocProxy(self._serializer, self._record.fields)
 
@@ -702,6 +692,8 @@ class LookupInResult(Result):
 
 
 class LookupInReplicaResult(Result):
+    """The result of reading paths within a document from the active node or a replica."""
+
     _record: _LookupInReplicaRecord
 
     def __init__(self,
@@ -725,21 +717,18 @@ class LookupInReplicaResult(Result):
 
     @property
     def content_as(self) -> ContentSubdocProxy:
-        """
-            :class:`.ContentSubdocProxy`: A proxy to return the value at the specified index.
+        """A proxy to return the value at the specified index.
 
-            Get first value as a dict::
+        Get first value as a dict::
 
-                res = collection.lookup_in(key, (SD.get("geo"), SD.exists("city")))
-                value = res.content_as[dict](0)
+            res = collection.lookup_in(key, (SD.get("geo"), SD.exists("city")))
+            value = res.content_as[dict](0)
         """
         return ContentSubdocProxy(self._serializer, self._record.fields)
 
     @property
     def is_replica(self) -> bool:
-        """
-            bool: True if the result is a replica, False otherwise.
-        """
+        """Whether the document was read from a replica."""
         return self._record.is_replica
 
     def _decode_value(self) -> Any | None:
@@ -750,6 +739,8 @@ class LookupInReplicaResult(Result):
 
 
 class MutateInResult(MutationResult):
+    """The result of changing paths within a document."""
+
     _record: _MutateInRecord
 
     def __init__(self,
@@ -762,14 +753,13 @@ class MutateInResult(MutationResult):
 
     @property
     def content_as(self) -> ContentSubdocProxy:
-        """
-            :class:`.ContentSubdocProxy`: A proxy to return the value at the specified index.
+        """A proxy to return the value at the specified index.
 
-            Get first value as a str::
+        Get first value as a str::
 
-                res = collection.mutate_in(key, (SD.upsert("city", "New City"),
-                                                SD.replace("faa", "CTY")))
-                value = res.content_as[str](0)
+            res = collection.mutate_in(key, (SD.upsert("city", "New City"),
+                                            SD.replace("faa", "CTY")))
+            value = res.content_as[str](0)
         """
         return ContentSubdocProxy(self._serializer, self._record.fields)
 
@@ -781,6 +771,8 @@ class MutateInResult(MutationResult):
 
 
 class CounterResult(MutationResult):
+    """The result of incrementing or decrementing a counter document."""
+
     _record: _CounterRecord
 
     def __init__(self,
@@ -794,7 +786,7 @@ class CounterResult(MutationResult):
 
     @property
     def cas(self) -> int:
-        """int: The CAS of the document.
+        """The CAS of the document.
 
         .. deprecated:: 4.0.3
         """
@@ -803,9 +795,7 @@ class CounterResult(MutationResult):
 
     @property
     def content(self) -> int | None:
-        """
-            int | None: The value of the document after the operation completed.
-        """
+        """The value of the document after the operation completed."""
         return self._record.content
 
     def __repr__(self) -> str:
@@ -813,6 +803,8 @@ class CounterResult(MutationResult):
 
 
 class ScanResult(Result):
+    """One document a range scan returned."""
+
     _record: _ScanItemRecord
 
     def __init__(self,
@@ -825,23 +817,17 @@ class ScanResult(Result):
 
     @property
     def id(self) -> str | None:
-        """
-            str | None: Id for the operation, if it exists.
-        """
+        """The document's ID."""
         return self._record.id
 
     @property
     def ids_only(self) -> bool:
-        """
-            bool: True is KV range scan request options set ids_only to True.  False otherwise.
-        """
+        """Whether the scan was asked for IDs only, in which case the result carries no document."""
         return self._ids_only
 
     @property
     def cas(self) -> int:
-        """
-            int | None: The CAS of the document, if it exists
-        """
+        """The CAS of the document."""
         if self.ids_only:
             raise InvalidArgumentException(("No cas available when scan is requested with "
                                             "`ScanOptions` ids_only set to True."))
@@ -850,17 +836,13 @@ class ScanResult(Result):
 
     @property
     def flags(self) -> int | None:
-        """
-            int | None: Flags associated with the document.  Used for transcoding.
-        """
+        """The document's flags, which the transcoder reads to decode it."""
         body = self._record.body
         return 0 if body is None else body.flags
 
     @property
     def expiry_time(self) -> datetime | None:
-        """
-            datetime | None: The expiry of the document, if it was requested.
-        """
+        """The expiry of the document, if it was requested."""
         if self.ids_only:
             raise InvalidArgumentException(("No expiry_time available when scan is requested with "
                                             "`ScanOptions` ids_only set to True."))
@@ -869,18 +851,15 @@ class ScanResult(Result):
 
     @property
     def content_as(self) -> ContentProxy:
-        """
-            :class:`ContentProxy`: The contents of the document.
+        """The contents of the document.
 
-            Get the value as a dict::
+        Get the value as a dict::
 
-                res = collection.get(key)
+            for res in collection.scan(RangeScan()):
                 value = res.content_as[dict]
 
-            Raises:
-                :class:`~couchbase.exceptions.InvalidArgumentException`: If called when KV range scan options set
-                    without_content to True.
-
+        Raises:
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the scan was asked for IDs only.
         """
         if self.ids_only:
             raise InvalidArgumentException(("No content available when scan is requested with "
@@ -898,6 +877,8 @@ class ScanResult(Result):
 
 
 class MultiResult:
+    """The base of the results of ``get_multi`` and the replica ``*_multi`` operations."""
+
     def __init__(self,
                  results: dict[str, Any],
                  all_ok: bool,
@@ -908,17 +889,12 @@ class MultiResult:
 
     @property
     def all_ok(self) -> bool:
-        """
-            bool: True if all operations succeeded, false otherwise.
-        """
+        """Whether every key's operation succeeded."""
         return self._all_ok
 
     @property
     def exceptions(self) -> dict[str, CouchbaseException]:
-        """
-            dict[str, Exception]: Map of keys to their respective exceptions, if the
-                operation had an exception.
-        """
+        """The exception each failed key's operation raised, by key."""
         exc = {}
         for k, v in self._results.items():
             if not isinstance(v, self._result_type) and not isinstance(v, list):
@@ -935,6 +911,8 @@ _ReplicaValueType = TypeVar('_ReplicaValueType',
 
 
 class MultiGetReplicaResult(MultiResult, Generic[_ReplicaValueType]):
+    """The result of ``get_any_replica_multi`` or ``get_all_replicas_multi``."""
+
     def __init__(self,
                  results: dict[str, _ReplicaValueType | CouchbaseException],
                  all_ok: bool) -> None:
@@ -942,10 +920,9 @@ class MultiGetReplicaResult(MultiResult, Generic[_ReplicaValueType]):
 
     @property
     def results(self) -> dict[str, _ReplicaValueType]:
-        """
-            dict[str, _ReplicaValueType]: Map of keys to their respective result, if the operation has a
-                result.  A :class:`.GetReplicaResult` for ``get_any_replica_multi``, a list of
-                :class:`.GetReplicaResult` for ``get_all_replicas_multi``.
+        """The result of each key whose operation succeeded, by key.
+
+        A :class:`.GetReplicaResult` for ``get_any_replica_multi``, a list of them for ``get_all_replicas_multi``.
         """
         res = {}
         for k, v in self._results.items():
@@ -964,6 +941,8 @@ class MultiGetReplicaResult(MultiResult, Generic[_ReplicaValueType]):
 
 
 class MultiGetResult(MultiResult):
+    """The result of ``get_multi``."""
+
     def __init__(self,
                  results: dict[str, GetResult | CouchbaseException],
                  all_ok: bool) -> None:
@@ -971,10 +950,7 @@ class MultiGetResult(MultiResult):
 
     @property
     def results(self) -> dict[str, GetResult]:
-        """
-            dict[str, :class:`.GetResult`]: Map of keys to their respective :class:`.GetResult`, if the
-                operation has a result.
-        """
+        """The result of each key whose operation succeeded, by key."""
         res = {}
         for k, v in self._results.items():
             if isinstance(v, GetResult):
@@ -990,6 +966,8 @@ class MultiGetResult(MultiResult):
 
 
 class MultiExistsResult:
+    """The result of ``exists_multi``."""
+
     def __init__(self,
                  results: dict[str, ExistsResult | CouchbaseException],
                  all_ok: bool) -> None:
@@ -998,17 +976,12 @@ class MultiExistsResult:
 
     @property
     def all_ok(self) -> bool:
-        """
-            bool: True if all operations succeeded, false otherwise.
-        """
+        """Whether every key's operation succeeded."""
         return self._all_ok
 
     @property
     def exceptions(self) -> dict[str, CouchbaseException]:
-        """
-            dict[str, Exception]: Map of keys to their respective exceptions, if the
-                operation had an exception.
-        """
+        """The exception each failed key's operation raised, by key."""
         exc = {}
         for k, v in self._results.items():
             if not isinstance(v, ExistsResult):
@@ -1017,10 +990,7 @@ class MultiExistsResult:
 
     @property
     def results(self) -> dict[str, ExistsResult]:
-        """
-            dict[str, :class:`.MutationResult`]: Map of keys to their respective :class:`.MutationResult`, if the
-                operation has a result.
-        """
+        """The result of each key whose operation succeeded, by key."""
         res = {}
         for k, v in self._results.items():
             if isinstance(v, ExistsResult):
@@ -1036,6 +1006,8 @@ class MultiExistsResult:
 
 
 class MultiMutationResult:
+    """The result of a multi-key mutation such as ``upsert_multi`` or ``remove_multi``."""
+
     def __init__(self,
                  results: dict[str, MutationResult | CouchbaseException],
                  all_ok: bool) -> None:
@@ -1044,17 +1016,12 @@ class MultiMutationResult:
 
     @property
     def all_ok(self) -> bool:
-        """
-            bool: True if all operations succeeded, false otherwise.
-        """
+        """Whether every key's operation succeeded."""
         return self._all_ok
 
     @property
     def exceptions(self) -> dict[str, CouchbaseException]:
-        """
-            dict[str, Exception]: Map of keys to their respective exceptions, if the
-                operation had an exception.
-        """
+        """The exception each failed key's operation raised, by key."""
         exc = {}
         for k, v in self._results.items():
             if not isinstance(v, MutationResult):
@@ -1063,10 +1030,7 @@ class MultiMutationResult:
 
     @property
     def results(self) -> dict[str, MutationResult]:
-        """
-            dict[str, :class:`.MutationResult`]: Map of keys to their respective :class:`.MutationResult`, if the
-                operation has a result.
-        """
+        """The result of each key whose operation succeeded, by key."""
         res = {}
         for k, v in self._results.items():
             if isinstance(v, MutationResult):
@@ -1085,6 +1049,8 @@ MultiResultType = MultiGetResult | MultiMutationResult
 
 
 class MultiCounterResult:
+    """The result of ``increment_multi`` or ``decrement_multi``."""
+
     def __init__(self,
                  results: dict[str, CounterResult | CouchbaseException],
                  all_ok: bool) -> None:
@@ -1093,17 +1059,12 @@ class MultiCounterResult:
 
     @property
     def all_ok(self) -> bool:
-        """
-            bool: True if all operations succeeded, false otherwise.
-        """
+        """Whether every key's operation succeeded."""
         return self._all_ok
 
     @property
     def exceptions(self) -> dict[str, CouchbaseException]:
-        """
-            dict[str, Exception]: Map of keys to their respective exceptions, if the
-                operation had an exception.
-        """
+        """The exception each failed key's operation raised, by key."""
         exc = {}
         for k, v in self._results.items():
             if not isinstance(v, CounterResult):
@@ -1112,10 +1073,7 @@ class MultiCounterResult:
 
     @property
     def results(self) -> dict[str, CounterResult]:
-        """
-            dict[str, :class:`.MutationResult`]: Map of keys to their respective :class:`.MutationResult`, if the
-                operation has a result.
-        """
+        """The result of each key whose operation succeeded, by key."""
         res = {}
         for k, v in self._results.items():
             if isinstance(v, CounterResult):
@@ -1189,6 +1147,7 @@ class _ClusterReport(Result):
 
 
 class DiagnosticsResult(_ClusterReport):
+    """The state of the SDK's connections to the cluster, as ``diagnostics`` reports it."""
 
     def __init__(self, record: _DiagnosticsRecord) -> None:
         self._record = record
@@ -1197,37 +1156,27 @@ class DiagnosticsResult(_ClusterReport):
 
     @property
     def id(self) -> str:
-        """
-            str: The unique identifier for this report.
-        """
+        """The report's ID."""
         return self._record.id
 
     @property
     def version(self) -> int:
-        """
-            int: The version number of this report.
-        """
+        """The version of the report's format."""
         return self._record.version
 
     @property
     def sdk(self) -> str:
-        """
-            str: The name of the SDK which generated this report.
-        """
+        """The name of the SDK which generated this report."""
         return self._record.sdk
 
     @property
     def endpoints(self) -> dict[ServiceType, list[EndpointDiagnosticsReport]]:
-        """
-            dict[ServiceType, list[EndpointDiagnosticsReport]]: A map of service endpoints and their diagnostic status.
-        """
+        """The report on each endpoint, by service."""
         return self._endpoints
 
     @property
     def state(self) -> ClusterState:
-        """
-            :class:`~couchbase.diagnostics.ClusterState`: The cluster state.
-        """
+        """The state of the SDK's connections, summed over every endpoint."""
         num_found = 0
         num_connected = 0
         for endpoints in self._endpoints.values():
@@ -1243,10 +1192,10 @@ class DiagnosticsResult(_ClusterReport):
         return ClusterState.Offline
 
     def as_json(self) -> str:
-        """Returns a JSON formatted diagnostics report.
+        """Get the report as JSON.
 
         Returns:
-            str: JSON formatted diagnostics report.
+            str: The report as a JSON string.
         """
         return_val = {
             'version': self.version,
@@ -1262,6 +1211,7 @@ class DiagnosticsResult(_ClusterReport):
 
 
 class PingResult(_ClusterReport):
+    """The outcome of pinging the cluster's services, as ``ping`` reports it."""
 
     def __init__(self, record: _PingRecord) -> None:
         self._record = record
@@ -1270,37 +1220,29 @@ class PingResult(_ClusterReport):
 
     @property
     def id(self) -> str:
-        """
-            str: The unique identifier for this report.
-        """
+        """The report's ID."""
         return self._record.id
 
     @property
     def version(self) -> int:
-        """
-            int: The version number of this report.
-        """
+        """The version of the report's format."""
         return self._record.version
 
     @property
     def sdk(self) -> str:
-        """
-            str: The name of the SDK which generated this report.
-        """
+        """The name of the SDK which generated this report."""
         return self._record.sdk
 
     @property
     def endpoints(self) -> dict[ServiceType, list[EndpointPingReport]]:
-        """
-            dict[ServiceType, list[EndpointPingReport]]: A map of service endpoints and their ping status.
-        """
+        """The report on each endpoint pinged, by service."""
         return self._endpoints
 
     def as_json(self) -> str:
-        """Returns a JSON formatted diagnostics report.
+        """Get the report as JSON.
 
         Returns:
-            str: JSON formatted diagnostics report.
+            str: The report as a JSON string.
         """
         return_val = {
             'version': self.version,
@@ -1316,6 +1258,11 @@ class PingResult(_ClusterReport):
 
 
 class ClusterInfoResult:
+    """What the cluster reports about its nodes, buckets and version.
+
+    The version is known only when every node runs the same one.
+    """
+
     def __init__(self, record: _ClusterInfoRecord) -> None:
         self._record = record
         versions = {node.version for node in record.nodes}
@@ -1324,6 +1271,7 @@ class ClusterInfoResult:
 
     @property
     def nodes(self) -> list[_ClusterNodeDict]:
+        """The cluster's nodes, each as a dict of its UUID, node name, status, hostname, OS, version and services."""
         return [{'uuid': node.uuid,
                  'otp_node': node.otp_node,
                  'status': node.status,
@@ -1334,9 +1282,7 @@ class ClusterInfoResult:
 
     @property
     def server_version(self) -> str | None:
-        """
-            str | None: The version of the connected Couchbase Server in Major.Minor.Patch-Build form.
-        """
+        """The cluster's version as ``major.minor.patch-build``, if known."""
         v = self._version
         if v is None or v.major is None or v.minor is None or v.patch is None:
             return None
@@ -1346,9 +1292,7 @@ class ClusterInfoResult:
 
     @property
     def server_version_short(self) -> float | None:
-        """
-            float | None: The version of the connected Couchbase Server in Major.Minor form.
-        """
+        """The cluster's version as ``major.minor``, if known."""
         v = self._version
         if v is None or v.major is None or v.minor is None:
             return None
@@ -1356,30 +1300,22 @@ class ClusterInfoResult:
 
     @property
     def server_version_full(self) -> str | None:
-        """
-            str | None: The full version details of the connected Couchbase Server.
-        """
+        """The cluster's version as the server spells it, if known."""
         return None if self._version is None else self._version.full
 
     @property
     def server_version_build(self) -> int | None:
-        """
-            int | None: The build version of the connected Couchbase Server.
-        """
+        """The build number of the cluster's version, if known."""
         return None if self._version is None else self._version.build
 
     @property
     def is_enterprise(self) -> bool | None:
-        """
-            bool: True if connected Couchbase Server is Enterprise edition, false otherwise.
-        """
+        """Whether the cluster is Enterprise Edition, or ``None`` if that is not known."""
         return self._is_edition('ENTERPRISE')
 
     @property
     def is_community(self) -> bool | None:
-        """
-            bool: True if connected Couchbase Server is Community edition, false otherwise.
-        """
+        """Whether the cluster is Community Edition, or ``None`` if that is not known."""
         return self._is_edition('COMMUNITY')
 
     def _is_edition(self, edition: str) -> bool | None:
@@ -1392,7 +1328,8 @@ class ClusterInfoResult:
 
 
 class OperationResult:
-    """
+    """The CAS and mutation token of an operation.
+
     .. deprecated:: 4.0.0
     """
 
@@ -1402,9 +1339,15 @@ class OperationResult:
 
     @property
     def cas(self) -> int | None:
+        """The CAS of the document."""
         return self._cas
 
     def mutation_token(self) -> MutationToken | None:
+        """Get the operation's mutation token, if it has one.
+
+        Returns:
+            :class:`.MutationToken` | None: The operation's mutation token.
+        """
         return self._mutation_token
 
     def __repr__(self) -> str:
@@ -1412,7 +1355,8 @@ class OperationResult:
 
 
 class ValueResult:
-    """
+    """The CAS, mutation token and value of an operation.
+
     .. deprecated:: 4.0.0
     """
 
@@ -1424,13 +1368,20 @@ class ValueResult:
 
     @property
     def cas(self) -> int | None:
+        """The CAS of the document."""
         return self._cas
 
     @property
     def value(self) -> Any | None:
+        """The content of the document."""
         return self._value
 
     def mutation_token(self) -> MutationToken | None:
+        """Get the operation's mutation token, if it has one.
+
+        Returns:
+            :class:`.MutationToken` | None: The operation's mutation token.
+        """
         return self._mutation_token
 
     def __repr__(self) -> str:

@@ -23,13 +23,21 @@ from couchbase.common.transcoder import DefaultJsonSerializer
 
 
 class TransactionQueryResults:
+    """The result of a query run inside a transaction."""
+
     def __init__(self, res: bytes) -> None:
         self._res = DefaultJsonSerializer().deserialize(res)
 
     def rows(self) -> list[Any]:
+        """Get the query's rows.
+
+        Returns:
+            list[Any]: The rows, all of them, already read.
+        """
         return self._res.get("results")
 
     def execute(self) -> None:
+        """Do nothing: the query ran, and its rows were read, before this result was returned."""
         return
 
     def __repr__(self) -> str:
