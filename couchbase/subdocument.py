@@ -21,12 +21,10 @@ every protocol.  They are re-exported here so this import path keeps working.
 """
 
 __all__ = [
-    'ArrayValues',
     'LookupInMacro',
     'MutationMacro',
     'Spec',
     'StoreSemantics',
-    'SubDocOp',
     'SubDocStatus',
     'array_addunique',
     'array_append',

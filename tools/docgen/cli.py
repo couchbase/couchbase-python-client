@@ -113,8 +113,18 @@ def _expected() -> tuple[Layout, dict[pathlib.Path, str]]:
         for problem in found:
             click.echo(f'layout: {problem}', err=True)
         raise click.ClickException(f'{len(found)} disagreement(s) between {LAYOUT.name} and {INVENTORY.name}')
-    pages = Reference(ROOT, layout, inventory, counterparts).render()
-    return layout, {ROOT / layout.docs / f'{docname}.rst': text for docname, text in pages.items()}
+    reference = Reference(ROOT, layout, inventory, counterparts)
+    found = reference.replacement_problems()
+    if found:
+        for problem in found:
+            click.echo(f'layout: {problem}', err=True)
+        raise click.ClickException(f'{len(found)} compat name(s) with a wrong or missing replacement in {LAYOUT.name}')
+    found = reference.internal_problems()
+    if found:
+        for problem in found:
+            click.echo(f'inventory: {problem}', err=True)
+        raise click.ClickException(f'{len(found)} documented name(s) marked internal')
+    return layout, {ROOT / layout.docs / path: text for path, text in reference.render().items()}
 
 
 def _differences(layout: Layout, expected: dict[pathlib.Path, str]) -> tuple[list[pathlib.Path], list[pathlib.Path]]:

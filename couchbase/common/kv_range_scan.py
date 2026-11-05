@@ -64,7 +64,10 @@ class ScanTerm:
 
 
 class ScanType(ABC):
-    """**INTERNAL** The base of the three kinds of scan."""
+    """The kind of scan :meth:`~couchbase.collection.Collection.scan` runs.
+
+    Pass one of :class:`RangeScan`, :class:`PrefixScan` or :class:`SamplingScan`.
+    """
 
 
 class RangeScan(ScanType):

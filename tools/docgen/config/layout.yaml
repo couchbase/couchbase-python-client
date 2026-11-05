@@ -10,6 +10,10 @@
 # A page takes `modules`, or `pages` to gather others.  `slug`, its path in the section, defaults to
 # the first module's path below couchbase, and to the title for a page of pages.  `groups` split a
 # common page of one module, and between them hold each of its public names once.
+#
+# `replacements` feeds the migration guide's table of deprecated import paths.  A compat name that is
+# a documented object, or a deprecated subclass of one, needs no entry; every other compat name says
+# what to import instead (`use`), or that nothing replaces it (`none`, with the reason).
 docs: docs
 output: reference
 sections:
@@ -367,6 +371,8 @@ common:
       - title: Datastructures
         names:
           - QueueEmpty
+  - title: Warnings
+    modules: [couchbase.warnings]
   - title: Durability
     modules: [couchbase.durability]
   - title: Sub-document operations
@@ -374,10 +380,8 @@ common:
     groups:
       - title: Specs
         names:
-          - ArrayValues
           - Spec
           - StoreSemantics
-          - SubDocOp
           - SubDocStatus
       - title: Lookups
         names:
@@ -545,3 +549,41 @@ exclude_members:
     - set_contains
     - set_remove
     - set_size
+replacements:
+  acouchbase.analytics.AnalyticsQuery: {none: internal to the SDK}
+  acouchbase.n1ql.N1QLQuery: {none: internal to the SDK}
+  acouchbase.options.forward_args: {none: internal to the SDK}
+  acouchbase.options.get_valid_args: {none: internal to the SDK}
+  acouchbase.options.get_valid_multi_args: {none: internal to the SDK}
+  acouchbase.search.SearchQueryBuilder: {none: internal to the SDK}
+  acouchbase.subdocument.ArrayValues: {none: internal to the SDK}
+  acouchbase.subdocument.SubDocOp: {none: internal to the SDK}
+  acouchbase.views.ViewQuery: {none: internal to the SDK}
+  couchbase.analytics.AnalyticsQuery: {none: internal to the SDK}
+  couchbase.n1ql.N1QLQuery: {none: internal to the SDK}
+  couchbase.options.DurabilityParser: {none: internal to the SDK}
+  couchbase.options.Supportability: {none: internal to the SDK}
+  couchbase.options.forward_args: {none: internal to the SDK}
+  couchbase.options.get_valid_args: {none: internal to the SDK}
+  couchbase.options.get_valid_multi_args: {none: internal to the SDK}
+  couchbase.options.timedelta_as_milliseconds: {none: internal to the SDK}
+  couchbase.options.timedelta_as_timestamp: {none: internal to the SDK}
+  couchbase.options.validate_int: {none: internal to the SDK}
+  couchbase.result.HttpResult: {none: nothing in the SDK returns one}
+  couchbase.search.SearchQueryBuilder: {none: internal to the SDK}
+  couchbase.subdocument.ArrayValues: {none: internal to the SDK}
+  couchbase.subdocument.SubDocOp: {none: internal to the SDK}
+  couchbase.tracing.CouchbaseSpan: {use: couchbase.observability.tracing.RequestSpan}
+  couchbase.tracing.CouchbaseTracer: {use: couchbase.observability.tracing.RequestTracer}
+  couchbase.transcoder.FMT_BYTES: {use: couchbase.constants.FMT_BYTES}
+  couchbase.transcoder.FMT_COMMON_MASK: {use: couchbase.constants.FMT_COMMON_MASK}
+  couchbase.transcoder.FMT_JSON: {use: couchbase.constants.FMT_JSON}
+  couchbase.transcoder.FMT_LEGACY_MASK: {use: couchbase.constants.FMT_LEGACY_MASK}
+  couchbase.transcoder.FMT_PICKLE: {use: couchbase.constants.FMT_PICKLE}
+  couchbase.transcoder.FMT_UTF8: {use: couchbase.constants.FMT_UTF8}
+  couchbase.views.ViewQuery: {none: internal to the SDK}
+  txcouchbase.options.forward_args: {none: internal to the SDK}
+  txcouchbase.options.get_valid_args: {none: internal to the SDK}
+  txcouchbase.options.get_valid_multi_args: {none: internal to the SDK}
+  txcouchbase.subdocument.ArrayValues: {none: internal to the SDK}
+  txcouchbase.subdocument.SubDocOp: {none: internal to the SDK}

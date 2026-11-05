@@ -36,6 +36,7 @@ import couchbase.vector_search
 from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
                             PasswordAuthenticator)
+from couchbase.common.subdocument import ArrayValues
 from couchbase.common.transactions.transaction_query_results import TransactionQueryResults
 from couchbase.common.warnings import CouchbaseDeprecationWarning
 from couchbase.durability import ClientDurability
@@ -68,7 +69,7 @@ from couchbase.options import ClusterOptions, UnsignedInt64
 from couchbase.result import ValueResult
 from couchbase.search import SearchRequest
 from couchbase.search_scoring import ReciprocalRankFusion
-from couchbase.subdocument import ArrayValues, MutationMacro
+from couchbase.subdocument import MutationMacro
 from couchbase.transactions import TransactionKeyspace
 from couchbase.vector_search import VectorQuery, VectorSearch
 
@@ -83,6 +84,8 @@ for _module in (couchbase.encryption, couchbase.kv_range_scan, couchbase.managem
                 couchbase.options, couchbase.search, couchbase.search_scoring, couchbase.subdocument,
                 couchbase.transactions, couchbase.vector_search):
     _NAMESPACE.update({name: getattr(_module, name) for name in _module.__all__})
+# Internal, so in no __all__, and an array operation's spec prints it.
+_NAMESPACE['ArrayValues'] = ArrayValues
 
 
 class ReprUnitTests:

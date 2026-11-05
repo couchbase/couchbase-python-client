@@ -1,0 +1,12 @@
+{% include 'header.rst.jinja2' %}
+
+.. list-table::
+   :header-rows: 1
+   :widths: auto
+
+   * - Old path
+     - Import instead
+{% for row in rows %}
+   * - ``{{ row.path }}``
+     - {{ row.instead }}
+{% endfor %}

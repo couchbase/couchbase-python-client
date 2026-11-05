@@ -14,6 +14,7 @@ The options, results, exceptions and other types shared by every API.  An ``acou
    /reference/common/options
    /reference/common/management/options
    /reference/common/exceptions
+   /reference/common/warnings
    /reference/common/durability
    /reference/common/subdocument
    /reference/common/kv_range_scan

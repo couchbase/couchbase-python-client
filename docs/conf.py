@@ -61,6 +61,7 @@ extensions = [
     'sphinx_copybutton',
     'enum_tools.autoenum',
     'type_checking_names',
+    'internal_members',
 ]
 
 intersphinx_mapping = {

@@ -43,14 +43,6 @@ from couchbase.common._logging import (  # nopep8 # isort:skip # noqa: F401, E40
     enable_protocol_logger_to_save_network_traffic_to_file,
 )
 
-# The categories a user writes a warnings filter against
-from couchbase.common.warnings import (  # nopep8 # isort:skip # noqa: F401, E402
-    CouchbaseApplicabilityWarning,
-    CouchbaseDeprecationWarning,
-    CouchbaseOptionWarning,
-    CouchbaseWarning,
-)
-
 if TYPE_CHECKING:
     from couchbase.protocol.classic._pycbc_core.core_metadata import get_metadata  # noqa: F401
     from couchbase.protocol.classic._pycbc_core.core_metadata import get_transactions_protocol  # noqa: F401

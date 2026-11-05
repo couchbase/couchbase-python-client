@@ -131,8 +131,8 @@ class Transactions:
                 def txn_logic(ctx):
                     doc1 = ctx.get(coll, doc1_id)
                     doc2 = ctx.get(coll, doc2_id)
-                    ctx.update(doc1, {"some_key": f"I'm in {doc1_id}, and updated"})
-                    ctx.update(doc2, {"some_key": f"I'm in {doc2_id}, and updated"})
+                    ctx.replace(doc1, {"some_key": f"I'm in {doc1_id}, and updated"})
+                    ctx.replace(doc2, {"some_key": f"I'm in {doc2_id}, and updated"})
 
                 cluster.transactions.run(txn_logic)
 

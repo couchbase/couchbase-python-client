@@ -4,7 +4,8 @@ The API reference under `docs/reference/` is generated, and the generated pages 
 
 ```
 tools/public_api.yaml           which modules are documented (`docs: true`), and what each API has at a path
-tools/docgen/config/layout.yaml each page's title and order, the groups a long page splits into, members left out
+tools/docgen/config/layout.yaml each page's title and order, the groups a long page splits into, members left out,
+                                and what replaces a compat name the generator cannot place
 docs/reference/                 generated, tracked, do not edit
 docs/*.rst                      the guide and the front page, hand-written
 ```
@@ -65,3 +66,14 @@ Flag it `docs: true` in `tools/public_api.yaml`, place it in `layout.yaml`, then
 `generate --write`. `check` fails until all three agree, and names what is missing.
 
 A new public name in a module with `groups` has to go in one of them; `check` names it.
+
+## The deprecated import paths
+
+`docs/reference/deprecated_paths.inc` is the table of every compat name in the inventory and what to
+import instead, included by `docs/migration.rst`. It is an include rather than a page, so it has no
+title and no place in a toctree.
+
+A compat name that is a documented object, or a deprecated subclass of exactly one, as the options
+classes at `couchbase.cluster` are, finds its replacement by itself. Every other one needs an entry in
+`replacements` in `layout.yaml`: `use: <path>` for what to import instead, or `none: <reason>`. `check`
+fails on a compat name with neither, and on an entry the generator would have found by itself.

@@ -6,10 +6,22 @@ Guide
 -----
 
 :doc:`using_the_python_sdk`
-   Installing the SDK, connecting to a cluster, and migrating from earlier versions.
+   Installing the SDK and connecting to a cluster.
+
+:doc:`migration`
+   The import paths kept for existing code and what replaces each, and moving from 3.x to 4.x.
+
+:doc:`logging_and_telemetry`
+   Logging, the reports of slow operations and latencies, and sending traces and metrics to OpenTelemetry.
+
+:doc:`transactions`
+   Running a transaction, handling its errors, and configuring it.
 
 :doc:`parallelism`
    Sharing a cluster across threads, and using the SDK from more than one process.
+
+:doc:`environment_variables`
+   The variables the SDK reads at run time, for logging, option validation and loading OpenSSL.
 
 Reference
 ---------
@@ -42,7 +54,11 @@ Indices and tables
    :hidden:
 
    using_the_python_sdk
+   migration
+   logging_and_telemetry
+   transactions
    parallelism
+   environment_variables
 
 .. toctree::
    :caption: Reference

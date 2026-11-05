@@ -24,13 +24,18 @@ __all__ = [
 
 
 class CouchbaseWarning(UserWarning):
-    """Every warning the SDK emits, so that one filter can silence all of them.
+    """The base of every warning the SDK emits, so that one filter covers all of them.
 
-    Rooted at `UserWarning` rather than at `DeprecationWarning` because CPython's default
-    filter set carries `ignore::DeprecationWarning`, lifted only for the frame the warning is
-    attributed to when that frame is `__main__`.  A diagnostic the default configuration hides
-    is not a diagnostic, and a library has no way to unhide it: installing a filter of its own
-    would invalidate every de-duplication registry in the process, including its users'.
+    It derives from ``UserWarning`` rather than ``DeprecationWarning`` so that Python's default
+    filters show it: they hide a ``DeprecationWarning`` unless it is raised from ``__main__``.
+
+    Example:
+        Turn every SDK warning into an error, as a test suite might::
+
+            import warnings
+            from couchbase.warnings import CouchbaseWarning
+
+            warnings.simplefilter('error', CouchbaseWarning)
     """
 
 
@@ -39,13 +44,16 @@ class CouchbaseDeprecationWarning(CouchbaseWarning):
 
 
 class CouchbaseOptionWarning(CouchbaseWarning):
-    """A key the options class does not carry, with the closest one it does where there is one."""
+    """An option key the options class does not carry, naming the closest key it does carry where there is one.
+
+    Emitted when option validation is ``warn``; ``strict`` raises
+    :class:`~couchbase.exceptions.InvalidArgumentException` instead.  See :envvar:`PYCBC_OPTION_VALIDATION`.
+    """
 
 
 class CouchbaseApplicabilityWarning(CouchbaseWarning):
-    """A key the caller set that the protocol in use cannot honour.
+    """An option key the protocol in use cannot act on, so that setting it changes nothing.
 
-    Separate from `CouchbaseOptionWarning` so that one configuration run against two protocols
-    can silence what does not apply while still hearing about what is misspelled.  That is the
-    off switch, and it is why the validation mode needs no fourth value for it.
+    Separate from :class:`~couchbase.warnings.CouchbaseOptionWarning` so that configuration shared
+    between protocols can silence this one and still hear about a misspelled key.
     """

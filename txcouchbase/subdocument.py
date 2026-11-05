@@ -20,12 +20,10 @@ package.
 """
 
 __all__ = [
-    'ArrayValues',
     'LookupInMacro',
     'MutationMacro',
     'Spec',
     'StoreSemantics',
-    'SubDocOp',
     'SubDocStatus',
     'array_addunique',
     'array_append',

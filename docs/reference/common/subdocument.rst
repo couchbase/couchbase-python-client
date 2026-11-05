@@ -11,23 +11,14 @@ Specs
 
 .. autosummary::
 
-   ArrayValues
    Spec
    StoreSemantics
-   SubDocOp
    SubDocStatus
-
-.. autoclass:: ArrayValues
-   :members:
 
 .. autoclass:: Spec
    :members:
 
 .. autoclass:: StoreSemantics
-   :members:
-   :undoc-members:
-
-.. autoclass:: SubDocOp
    :members:
    :undoc-members:
 

@@ -683,12 +683,10 @@ modules:
     compat: []
   acouchbase.subdocument:
     public:
-      - ArrayValues
       - LookupInMacro
       - MutationMacro
       - Spec
       - StoreSemantics
-      - SubDocOp
       - SubDocStatus
       - array_addunique
       - array_append
@@ -707,7 +705,9 @@ modules:
       - replace
       - upsert
       - with_expiry
-    compat: []
+    compat:
+      - ArrayValues
+      - SubDocOp
   acouchbase.transactions:
     public:
       - AttemptContext
@@ -779,6 +779,13 @@ modules:
       - ViewScanConsistency
     compat:
       - ViewQuery
+  acouchbase.warnings:
+    public:
+      - CouchbaseApplicabilityWarning
+      - CouchbaseDeprecationWarning
+      - CouchbaseOptionWarning
+      - CouchbaseWarning
+    compat: []
   couchbase:
     docs: true
     public:
@@ -2356,12 +2363,10 @@ modules:
   couchbase.subdocument:
     docs: true
     public:
-      - ArrayValues
       - LookupInMacro
       - MutationMacro
       - Spec
       - StoreSemantics
-      - SubDocOp
       - SubDocStatus
       - array_addunique
       - array_append
@@ -2381,7 +2386,9 @@ modules:
       - upsert
       - with_expiry
     compat:
+      - ArrayValues
       - MutateInOptions
+      - SubDocOp
   couchbase.tracing:
     public: []
     compat:
@@ -2470,6 +2477,14 @@ modules:
       - ViewScanConsistency
     compat:
       - ViewQuery
+  couchbase.warnings:
+    docs: true
+    public:
+      - CouchbaseApplicabilityWarning
+      - CouchbaseDeprecationWarning
+      - CouchbaseOptionWarning
+      - CouchbaseWarning
+    compat: []
   txcouchbase:
     docs: true
     public:
@@ -3096,12 +3111,10 @@ modules:
     compat: []
   txcouchbase.subdocument:
     public:
-      - ArrayValues
       - LookupInMacro
       - MutationMacro
       - Spec
       - StoreSemantics
-      - SubDocOp
       - SubDocStatus
       - array_addunique
       - array_append
@@ -3120,7 +3133,9 @@ modules:
       - replace
       - upsert
       - with_expiry
-    compat: []
+    compat:
+      - ArrayValues
+      - SubDocOp
   txcouchbase.transcoder:
     public:
       - JSONTranscoder
@@ -3143,6 +3158,13 @@ modules:
       - ViewOrdering
       - ViewRow
       - ViewScanConsistency
+    compat: []
+  txcouchbase.warnings:
+    public:
+      - CouchbaseApplicabilityWarning
+      - CouchbaseDeprecationWarning
+      - CouchbaseOptionWarning
+      - CouchbaseWarning
     compat: []
 
 # Per public couchbase module outside common/, what each other API has at its path: own, a module
@@ -3327,5 +3349,8 @@ counterparts:
     acouchbase: shim
     txcouchbase: shim
   couchbase.views:
+    acouchbase: shim
+    txcouchbase: shim
+  couchbase.warnings:
     acouchbase: shim
     txcouchbase: shim

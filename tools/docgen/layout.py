@@ -2,9 +2,10 @@
 
 ``tools/public_api.yaml`` says which modules are documented, ``docs: true``, and what each API has at
 a ``couchbase`` path.  The layout adds only what the inventory cannot: a title and an order for each
-page, the pages that gather others, the groups a long page is split into, and the members a page
-leaves out.  Every placement is checked against the inventory, so a module cannot be documented twice,
-or not at all, and a page cannot claim a section its counterparts contradict.
+page, the pages that gather others, the groups a long page is split into, the members a page leaves
+out, and what replaces a deprecated import path the generator cannot work out for itself.  Every
+placement is checked against the inventory, so a module cannot be documented twice, or not at all,
+and a page cannot claim a section its counterparts contradict.
 """
 
 from __future__ import annotations
@@ -61,6 +62,13 @@ class Section:
 
 
 @dataclasses.dataclass(frozen=True)
+class Replacement:
+    """What replaces a compat name: the dotted path to import instead, or none, for ``reason``."""
+    use: str | None
+    reason: str = ''
+
+
+@dataclasses.dataclass(frozen=True)
 class Layout:
     """``docs`` is the Sphinx source directory, and ``output`` the generated tree inside it."""
     docs: str
@@ -69,6 +77,7 @@ class Layout:
     common: tuple[Page, ...]
     apis: tuple[Page, ...]
     exclude_members: dict[str, tuple[str, ...]]
+    replacements: dict[str, Replacement] = dataclasses.field(default_factory=dict)
 
     def pages(self, pages: tuple[Page, ...]) -> Iterator[Page]:
         for page in pages:
@@ -111,19 +120,30 @@ def _page(where: str, raw: dict[str, Any]) -> Page:
     return Page(title, raw.get('slug') or default_slug(modules[0]), modules, tuple(groups))
 
 
+def _replacement(where: str, raw: dict[str, Any]) -> Replacement:
+    if not isinstance(raw, dict) or len(raw) != 1 or set(raw) - {'use', 'none'}:
+        raise LayoutError(f'{where}: expected one of use: <path> or none: <reason>, found {raw!r}')
+    if 'use' in raw:
+        return Replacement(raw['use'])
+    return Replacement(None, raw['none'])
+
+
 def load(path: pathlib.Path = LAYOUT) -> Layout:
     raw = yaml.safe_load(path.read_text())
-    _keys(path.name, raw, {'docs', 'output', 'sections', 'common', 'apis'}, {'exclude_members'})
+    _keys(path.name, raw, {'docs', 'output', 'sections', 'common', 'apis'},
+          {'exclude_members', 'replacements'})
     _keys(f'{path.name} sections', raw['sections'], set(SECTIONS))
     sections = {}
     for key in SECTIONS:
         _keys(f'{path.name} sections.{key}', raw['sections'][key], {'title', 'intro'})
         sections[key] = Section(raw['sections'][key]['title'], raw['sections'][key]['intro'].strip())
     excluded = {target: tuple(names) for target, names in (raw.get('exclude_members') or {}).items()}
+    replacements = {target: _replacement(f'{path.name} replacements.{target}', value)
+                    for target, value in (raw.get('replacements') or {}).items()}
     return Layout(raw['docs'], raw['output'], sections,
                   tuple(_page(f'{path.name} common', p) for p in raw['common']),
                   tuple(_page(f'{path.name} apis', p) for p in raw['apis']),
-                  excluded)
+                  excluded, replacements)
 
 
 def problems(layout: Layout, inventory: dict[str, Entry], counterparts: dict[str, dict[str, str]]) -> list[str]:
@@ -153,6 +173,22 @@ def problems(layout: Layout, inventory: dict[str, Entry], counterparts: dict[str
             found.append(f'exclude_members: {target} is not a public name of a documented couchbase module')
         if list(names) != sorted(set(names)):
             found.append(f'exclude_members: {target} is not sorted, or names a member twice')
+    for target, replacement in sorted(layout.replacements.items()):
+        found += _replacement_problems(target, replacement, inventory)
+    return found
+
+
+def _replacement_problems(target: str, replacement: Replacement, inventory: dict[str, Entry]) -> list[str]:
+    found = []
+    module, _, name = target.rpartition('.')
+    if module not in inventory or name not in inventory[module].compat:
+        found.append(f'replacements: {target} is not a compat name')
+    if replacement.use is not None:
+        module, _, name = replacement.use.rpartition('.')
+        if module not in inventory or name not in inventory[module].public:
+            found.append(f'replacements: {target} uses {replacement.use}, which is not a public name')
+    elif not replacement.reason:
+        found.append(f'replacements: {target} has none, and no reason')
     return found
 
 

@@ -7,6 +7,12 @@ An object is described once, on the first page that publishes it, taking the syn
 first, then the common reference, then the asyncio and Twisted APIs.  So ``acouchbase.result``
 describes its own results and links to ``couchbase.result`` for the ones it shares.  Two names are the
 same object when they lead to one definition, following re-exports, so this needs no native binding.
+
+It also renders the table of deprecated import paths that the migration guide includes: each compat name,
+and what to import instead.
+
+A documented name cannot open its docstring with ``**INTERNAL**``.  The docs build leaves such members
+out, so on a public name the marker contradicts the inventory, which says it is public.
 """
 
 from __future__ import annotations
@@ -24,6 +30,7 @@ from jinja2 import (Environment,
 
 from tools.check_public_api import (APIS,
                                     BINDING,
+                                    INVENTORY,
                                     OWN,
                                     PACKAGES,
                                     SHIM,
@@ -33,11 +40,15 @@ from tools.check_public_api import (APIS,
 from tools.docgen.layout import (COMMON,
                                  SYNC,
                                  Layout,
-                                 Page)
+                                 Page,
+                                 Replacement)
 
 TEMPLATES = pathlib.Path(__file__).parent / 'templates'
 # Heading underlines, by depth below the page title.
 RULES = '=-~^'
+# Included by the migration guide, so it is not a page of its own.
+DEPRECATED = 'deprecated_paths.inc'
+INTERNAL = '**INTERNAL**'
 
 
 @dataclasses.dataclass(frozen=True)
@@ -61,8 +72,14 @@ class Link:
     docname: str
 
 
+@dataclasses.dataclass(frozen=True)
+class Row:
+    path: str
+    instead: str
+
+
 class Reference:
-    """Every page of the reference, as a docname and its text."""
+    """Every file of the reference, as a path below the docs directory and its text."""
 
     def __init__(self, root: pathlib.Path, layout: Layout, inventory: dict[str, Entry],
                  counterparts: dict[str, dict[str, str]]) -> None:
@@ -74,6 +91,7 @@ class Reference:
                                keep_trailing_newline=True, trim_blocks=True, lstrip_blocks=True)
         self.canonical: dict[tuple[str, str], str] = {}
         self._described: set[int] | None = None
+        self._by_identity: dict[int, str] | None = None
         for section, pages in ((SYNC, layout.apis), (COMMON, layout.common),
                                *((api, layout.apis) for api in APIS)):
             for page in layout.pages(pages):
@@ -106,6 +124,64 @@ class Reference:
         return section in APIS and any(self.counterparts[m][section] == SHIM for m in page.modules)
 
     def render(self) -> dict[str, str]:
+        files = {f'{docname}.rst': text for docname, text in self._pages().items()}
+        files[f'{self.layout.output}/{DEPRECATED}'] = self.env.get_template('deprecated.rst.jinja2').render(
+            rows=self._deprecated())
+        return files
+
+    def replacement_problems(self) -> list[str]:
+        """The compat names whose replacement the layout gives when it need not, or omits when it must."""
+        found = []
+        for path in self._compat():
+            module, _, name = path.rpartition('.')
+            if path in self.layout.replacements:
+                if self._found(module, name):
+                    found.append(f'replacements: {path} resolves to {self._found(module, name)}; remove it')
+            elif not self._found(module, name):
+                found.append(f'replacements: {path} has no documented counterpart; say what replaces it')
+        return found
+
+    def internal_problems(self) -> list[str]:
+        """The documented names whose docstring says they are internal."""
+        return [f'{target}: documented, and its docstring opens with {INTERNAL}; drop the marker, '
+                f'or take it out of public in {INVENTORY.name}'
+                for target in sorted(set(self.canonical.values())) if _is_internal(_resolve(target))]
+
+    def _compat(self) -> list[str]:
+        return sorted(f'{module}.{name}' for module, entry in self.inventory.items() for name in entry.compat)
+
+    def _found(self, module: str, name: str) -> str | None:
+        """The documented name a compat name is, or the one a deprecated subclass of it wraps.
+
+        Only classes and functions are matched by identity: two equal constants may be one object.
+        """
+        if self._by_identity is None:
+            objects = ((target, _resolve(target)) for target in self.canonical.values())
+            self._by_identity = {id(obj): target for target, obj in objects
+                                 if inspect.isclass(obj) or inspect.isfunction(obj)}
+        obj = _resolve(f'{module}.{name}')
+        found = self._by_identity.get(id(obj)) if inspect.isclass(obj) or inspect.isfunction(obj) else None
+        if found is None and inspect.isclass(obj) and len(obj.__bases__) == 1:
+            found = self._by_identity.get(id(obj.__bases__[0]))
+        return found
+
+    def _deprecated(self) -> list[Row]:
+        documented = set(self.canonical.values())
+        rows = []
+        for path in self._compat():
+            module, _, name = path.rpartition('.')
+            found = self._found(module, name)
+            replacement = Replacement(found) if found else self.layout.replacements.get(path, Replacement(None))
+            if replacement.use is None:
+                instead = f'Nothing: {replacement.reason}'
+            elif replacement.use in documented:
+                instead = f':py:obj:`{replacement.use}`'
+            else:
+                instead = f'``{replacement.use}``'
+            rows.append(Row(path, instead))
+        return rows
+
+    def _pages(self) -> dict[str, str]:
         out: dict[str, str] = {}
         for page in self.layout.common:
             self._render_page(COMMON, page, out)
@@ -207,6 +283,13 @@ class Reference:
                    and id(base) not in self._described
                    and any(not k.startswith('_') for k in vars(base))
                    for base in cls.__mro__[1:])
+
+
+def _is_internal(obj: object) -> bool:
+    if not (inspect.isclass(obj) or inspect.isroutine(obj)):
+        return False
+    doc = obj.__doc__
+    return isinstance(doc, str) and doc.lstrip().startswith(INTERNAL)
 
 
 def _resolve(target: str) -> object:
