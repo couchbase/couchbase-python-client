@@ -33,8 +33,9 @@ from couchbase.common._utils import fields_repr
 
 
 class ReplicateTo(IntEnum):
-    """
-    Specify the number of nodes to wait for replication.
+    """How many replicas a mutation must reach before the SDK reports it done.
+
+    The SDK confirms it by polling the replicas after the write.
     """
     NONE = 0    # Do not apply replication requirements.
     ONE = 1     # Wait for replication to atleast one replica nodes
@@ -43,11 +44,10 @@ class ReplicateTo(IntEnum):
 
 
 class PersistTo(IntEnum):
-    """
-    Specify the number of nodes to wait for persistance.
+    """How many nodes must have written a mutation to disk before the SDK reports it done.
 
-    Use `~couchbase.durability.PersistToExtended` for extended functionality.  The
-    `~couchbase.durability.PersistToExtended` is the preferred enum for to use for the 4.x SDK.
+    The SDK confirms it by polling the nodes after the write. :class:`PersistToExtended` has the same members and also
+    ACTIVE and FOUR.
     """
     NONE = 0    # Do not apply persistance requirements.
     ONE = 2     # cxx: Wait for persistence to at least one node.
@@ -56,9 +56,9 @@ class PersistTo(IntEnum):
 
 
 class PersistToExtended(IntEnum):
-    """
-    Extends the `~couchbase.durability.PersistTo` enum to match the cxx client options.  This is the
-    preferred Enum, wihle the `~couchbase.durability.PersistTo` enum is around for 3.x compatibility.
+    """How many nodes must have written a mutation to disk before the SDK reports it done.
+
+    ACTIVE is the node holding the active copy, and FOUR is the active node and all three replicas.
     """
     NONE = 0    # Do not apply persistance requirements.
     ACTIVE = 1  # Wait for persistence to active node.
@@ -70,7 +70,7 @@ class PersistToExtended(IntEnum):
 
 
 class Durability(IntEnum):
-    """Synchronous Durability Level
+    """**DEPRECATED** The durability levels.
 
     .. deprecated:: 4.0.0
         Use :class:`DurabilityLevel` instead.
@@ -82,6 +82,13 @@ class Durability(IntEnum):
 
 
 class DurabilityLevel(IntEnum):
+    """How durable the server makes a mutation before it acknowledges it.
+
+    MAJORITY holds the mutation in memory on a majority of the bucket's nodes. MAJORITY_AND_PERSIST_TO_ACTIVE also
+    writes it to disk on the active node, and PERSIST_TO_MAJORITY writes it to disk on a majority. NONE asks for no
+    durability.
+    """
+
     NONE = 0
     MAJORITY = 1
     MAJORITY_AND_PERSIST_TO_ACTIVE = 2
@@ -89,6 +96,7 @@ class DurabilityLevel(IntEnum):
 
     @classmethod
     def to_server_str(cls, value: int) -> str:
+        """**INTERNAL** The level as Couchbase Server names it."""
         if value == cls.MAJORITY_AND_PERSIST_TO_ACTIVE:
             return 'majority_and_persist_to_active'
         elif value == cls.NONE:
@@ -102,9 +110,11 @@ class DurabilityLevel(IntEnum):
 
     @classmethod
     def from_server_str(cls, value: str) -> DurabilityLevel:
-        """
+        """**DEPRECATED** The level Couchbase Server named, NONE for a name it does not know.
+
         .. deprecated:: 4.7.0
-            The SDK returns a :class:`DurabilityLevel` member wherever it reads a durability level from the server.
+            The SDK returns a :class:`DurabilityLevel` member wherever it reads a durability level from the
+            server.
         """
         Supportability.method_deprecated('from_server_str', message=DURABILITY_LEVEL_READ)
         if value == 'majority_and_persist_to_active':
@@ -120,28 +130,30 @@ class DurabilityLevel(IntEnum):
 
 
 class ClientDurability:
+    """Durability the SDK confirms by polling the nodes after a write.
+
+    Args:
+        replicate_to (:class:`ReplicateTo`, optional): How many replicas must hold the mutation.
+            Defaults to ``ReplicateTo.NONE``.
+        persist_to (:class:`PersistTo` | :class:`PersistToExtended`, optional): How many nodes must have
+            written the mutation to disk. Defaults to ``PersistTo.NONE``.
+    """
 
     def __init__(self,
                  replicate_to: ReplicateTo = ReplicateTo.NONE,
                  persist_to: PersistTo | PersistToExtended = PersistTo.NONE
                  ) -> None:
-        """
-        Client Durability
-
-        Args:
-            persist_to: If set, wait for the item to be removed from the storage of at least these many nodes
-            replicate_to: If set, wait for the item to be removed from the cache of at least these many nodes (excluding
-                the master)
-        """
         self._replicate_to = replicate_to
         self._persist_to = persist_to
 
     @property
     def replicate_to(self) -> ReplicateTo:
+        """How many replicas must hold the mutation."""
         return self._replicate_to
 
     @property
     def persist_to(self) -> PersistTo | PersistToExtended:
+        """How many nodes must have written the mutation to disk."""
         return self._persist_to
 
     def __repr__(self) -> str:
@@ -149,18 +161,18 @@ class ClientDurability:
 
 
 class ServerDurability:
+    """Durability the server applies before it acknowledges a write.
+
+    Args:
+        level (:class:`DurabilityLevel`): How durable the server makes the mutation.
+    """
 
     def __init__(self, level: DurabilityLevel) -> None:
-        """
-        Server-based Durability (Synchronous Replication)
-
-        Args:
-            level (Durability): durability level
-        """
         self._level = level
 
     @property
     def level(self) -> DurabilityLevel:
+        """How durable the server makes the mutation."""
         return self._level
 
     def __repr__(self) -> str:

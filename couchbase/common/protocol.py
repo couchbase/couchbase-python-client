@@ -23,10 +23,9 @@ from enum import IntEnum
 
 
 class CouchbaseProtocol(IntEnum):
-    """**INTERNAL**
+    """**INTERNAL** The wire protocol a client adapter speaks.
 
-    The wire protocol a client adapter speaks. Set once, where the connection
-    string is parsed, and read by everything below it through the adapter.
+    Set once, where the connection string is parsed, and read by everything below it through the adapter.
     """
 
     CLASSIC = 0
@@ -34,10 +33,9 @@ class CouchbaseProtocol(IntEnum):
 
     @classmethod
     def from_connstr(cls, connstr: str) -> CouchbaseProtocol:
-        """**INTERNAL**
+        """**INTERNAL** The protocol a connection string's scheme selects.
 
-        Read from the scheme alone: only couchbase2:// selects couchbase2.  Every other scheme, and
-        a connection string with none, is classic.
+        Only couchbase2:// selects couchbase2. Every other scheme, and a connection string with none, is classic.
         """
         scheme, sep, _ = connstr.partition('://')
         if sep and scheme == 'couchbase2':

@@ -428,7 +428,7 @@ class SearchQueryBuilder:
             self._sort = value
         else:
             raise InvalidArgumentException(
-                message='sort option must be either List[str] | List[Sort] | List[Sort | str]')
+                message='sort option must be list[str] | list[Sort] | list[Sort | str]')
 
     @property
     def raw(self) -> dict[str, Any] | None:
@@ -437,7 +437,7 @@ class SearchQueryBuilder:
     @raw.setter
     def raw(self, value: dict[str, Any]) -> None:
         if not isinstance(value, dict):
-            raise TypeError("Raw option must be of type Dict[str, Any].")
+            raise TypeError("Raw option must be of type dict[str, Any].")
         for k in value.keys():
             if not isinstance(k, str):
                 raise TypeError("key for raw value must be str")

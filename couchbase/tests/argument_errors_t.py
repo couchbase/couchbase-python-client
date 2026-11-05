@@ -148,7 +148,7 @@ _VALIDATORS = [
     (transforms.validate_int, 'x', 'Expected value to be of type int.'),
     (transforms.validate_bool, 'x', 'Expected value to be of type bool.'),
     (transforms.validate_str, 1, 'Expected value to be of type str.'),
-    (transforms.to_milliseconds, 'x', 'Expected timeout to be of type Union[timedelta, float, int] instead of x'),
+    (transforms.to_milliseconds, 'x', 'Expected timeout to be of type timedelta | float | int instead of x'),
     (transforms.timedelta_as_milliseconds, 'x', "Expected timedelta instead of <class 'str'>"),
 ]
 

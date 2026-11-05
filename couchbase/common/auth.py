@@ -31,6 +31,12 @@ from couchbase.common.exceptions import InvalidArgumentException
 
 
 class Authenticator(dict):
+    """The credentials a cluster connects with.
+
+    Each subclass is one authentication mechanism. An instance is a dict of the settings the connection takes, and its
+    repr hides the password, the token and the key path.
+    """
+
     _REDACTED_KEYS = frozenset({'password', 'jwt_token', 'key_path'})
 
     def __repr__(self) -> str:
@@ -38,8 +44,7 @@ class Authenticator(dict):
 
 
 class PasswordAuthenticator(Authenticator):
-    """
-    Password authentication mechanism.
+    """Password authentication mechanism.
 
     Args:
         username (str): Username to use for authentication.
@@ -83,9 +88,11 @@ class PasswordAuthenticator(Authenticator):
         super().__init__(**self.as_dict())
 
     def valid_keys(self) -> list[str]:
+        """**INTERNAL** The names of the cluster options this authenticator takes settings from."""
         return ['username', 'password', 'cert_path', 'sasl_mech_force', 'allowed_sasl_mechanisms']
 
     def as_dict(self) -> dict[str, Any]:
+        """**INTERNAL** The settings the connection takes."""
         d = {
             'username': self._username,
             'password': self._password,
@@ -103,13 +110,23 @@ class PasswordAuthenticator(Authenticator):
 
     @staticmethod
     def ldap_compatible(username: str, password: str) -> PasswordAuthenticator:
+        """A password authenticator that sends the password with SASL PLAIN, which LDAP users need.
+
+        PLAIN sends the password as it is, so use it over TLS.
+
+        Args:
+            username (str): The name of the user.
+            password (str): The user's password.
+
+        Returns:
+            :class:`.PasswordAuthenticator`: An authenticator allowing only the PLAIN mechanism.
+        """
         auth = PasswordAuthenticator(username, password, allowed_sasl_mechanisms=['PLAIN'])
         return auth
 
 
 class JwtAuthenticator(Authenticator):
-    """
-    JWT (JSON Web Token) authentication mechanism.
+    """JWT (JSON Web Token) authentication mechanism.
 
     Uses OAUTHBEARER SASL mechanism for KV connections and Bearer token
     for HTTP services.
@@ -132,20 +149,21 @@ class JwtAuthenticator(Authenticator):
         super().__init__(**self.as_dict())
 
     def valid_keys(self) -> list[str]:
+        """**INTERNAL** The names of the cluster options this authenticator takes settings from."""
         return ['jwt_token']
 
     def __repr__(self) -> str:
         return fields_repr(self, token=redacted(self._token))
 
     def as_dict(self) -> dict[str, Any]:
+        """**INTERNAL** The settings the connection takes."""
         return {
             'jwt_token': self._token
         }
 
 
 class CertificateAuthenticator(Authenticator):
-    """
-    Certificate authentication mechanism.
+    """Certificate authentication mechanism.
 
     Args:
         cert_path (str): Path to the client certificate. Defaults to None.
@@ -178,6 +196,7 @@ class CertificateAuthenticator(Authenticator):
         super().__init__(**self.as_dict())
 
     def valid_keys(self) -> list[str]:
+        """**INTERNAL** The names of the cluster options this authenticator takes settings from."""
         return ['cert_path', 'key_path', 'trust_store_path']
 
     def __repr__(self) -> str:
@@ -185,6 +204,7 @@ class CertificateAuthenticator(Authenticator):
                            trust_store_path=self._trust_store_path)
 
     def as_dict(self) -> dict[str, Any]:
+        """**INTERNAL** The settings the connection takes."""
         d = {
             'cert_path': self._cert_path,
             'key_path': self._key_path
@@ -196,16 +216,16 @@ class CertificateAuthenticator(Authenticator):
 
 
 class AuthDomain(IntEnum):
-    """
-    The Authentication domain for a user.
-    Local: Users managed by Couchbase Server.
-    External: Users managed by an external resource, eg LDAP.
+    """Where a user is managed.
+
+    Local users are managed by Couchbase Server, and External users by an outside service such as LDAP.
     """
     Local = 0
     External = 1
 
     @classmethod
     def to_str(cls, value: AuthDomain) -> str:
+        """**INTERNAL** The domain as Couchbase Server names it."""
         if value == cls.External:
             return "external"
         else:
@@ -213,6 +233,7 @@ class AuthDomain(IntEnum):
 
     @classmethod
     def from_str(cls, value: str | None) -> AuthDomain:
+        """**INTERNAL** The domain Couchbase Server named, Local for any name but ``external``."""
         if value == "external":
             return cls.External
         else:

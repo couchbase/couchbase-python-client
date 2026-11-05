@@ -35,14 +35,15 @@ SpanAttributes = Mapping[str, SpanAttributeValue]
 
 
 class SpanStatusCode(Enum):
+    """The outcome a span records: UNSET until it is known, then OK or ERROR."""
+
     UNSET = 0
     OK = 1
     ERROR = 2
 
 
 class RequestSpan(ABC):
-    """
-    Represents a single traced operation (span) in distributed tracing.
+    """Represents a single traced operation (span) in distributed tracing.
 
     A RequestSpan provides methods to add metadata (attributes), record events,
     set the final status, and mark the completion of an operation.
@@ -50,28 +51,20 @@ class RequestSpan(ABC):
 
     @property
     def is_recording(self) -> bool:
-        """Whether this span is recording trace data.
+        """Whether the span records what is set on it.
 
-        Returns True by default for backward compatibility with existing
-        RequestSpan implementations. Subclasses may override to return
-        False when the span is not being sampled (e.g., OTel NonRecordingSpan).
-
-        When False, the SDK will skip expensive span attribute setting,
-        encoding span creation, and dispatch span tree building.
+        A span that is not sampled can return False, and the SDK then sets nothing on it. Defaults to True.
         """
         return True
 
     @property
     @abstractmethod
     def name(self) -> str:
-        """
-        The name of the span, describing the operation being traced.
-        """
+        """The name of the operation the span traces."""
 
     @abstractmethod
     def set_attribute(self, key: str, value: SpanAttributeValue) -> None:
-        """
-        Sets a single attribute (key-value pair) on the span.
+        """Sets a single attribute (key-value pair) on the span.
 
         Args:
             key: The attribute key.
@@ -80,8 +73,7 @@ class RequestSpan(ABC):
 
     @abstractmethod
     def set_attributes(self, attributes: SpanAttributes) -> None:
-        """
-        Sets multiple attributes on the span.
+        """Sets multiple attributes on the span.
 
         Args:
             attributes: A mapping of attribute keys to values.
@@ -92,19 +84,17 @@ class RequestSpan(ABC):
                   name: str,
                   attributes: SpanAttributes | None = None,
                   timestamp: int | None = None) -> None:
-        """
-        Adds a timestamped event to the span.
+        """Add a timestamped event to the span.
 
         Args:
-            name: The event name.
-            attributes: Optional attributes to associate with the event.
-            timestamp: Optional timestamp for the event.
+            name: The event's name.
+            attributes: Attributes of the event. Defaults to None.
+            timestamp: When the event happened, in nanoseconds since the epoch. Defaults to None, which is now.
         """
 
     @abstractmethod
     def set_status(self, status: SpanStatusCode) -> None:
-        """
-        Sets the final status of the span.
+        """Sets the final status of the span.
 
         Args:
             status: The span status.
@@ -112,17 +102,15 @@ class RequestSpan(ABC):
 
     @abstractmethod
     def end(self, end_time: int | None) -> None:
-        """
-        Marks the span as complete and records the end time.
+        """Mark the span complete.
 
         Args:
-            end_time: Optional end time; defaults to current time if not provided.
+            end_time: When the operation ended, in nanoseconds since the epoch, or None for now.
         """
 
 
 class RequestTracer(ABC):
-    """
-    Interface for creating and managing distributed tracing spans.
+    """Interface for creating and managing distributed tracing spans.
 
     A RequestTracer is responsible for creating new spans to track operations.
     """
@@ -134,14 +122,14 @@ class RequestTracer(ABC):
         parent_span: RequestSpan | None = None,
         start_time: int | None = None
     ) -> RequestSpan:
-        """
-        Creates a new span to trace an operation.
+        """Start a span for an operation.
 
         Args:
-            name: The name of the span, describing the operation being traced.
-            parent_span: Optional parent span for creating hierarchical traces.
-            start_time: Optional start time; defaults to current time if not provided.
+            name: The name of the operation.
+            parent_span: The span of the operation this one is part of. Defaults to None.
+            start_time: When the operation started, in nanoseconds since the epoch. Defaults to None, which is
+                now.
 
         Returns:
-            A new RequestSpan instance.
+            A new :class:`RequestSpan`.
         """

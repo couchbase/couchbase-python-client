@@ -27,6 +27,19 @@ from couchbase.common.exceptions import CryptoKeyNotFoundException, InvalidArgum
 
 
 class EncryptionResult:
+    """An encrypted value and what is needed to decrypt it, stored in place of the plain field.
+
+    Args:
+        alg (str): The name of the algorithm that encrypted the value.
+        kid (str, optional): The ID of the key that encrypted it.
+        ciphertext (str, optional): The encrypted value, base64 encoded. A value that is not valid base64
+            is left out.
+        **kwargs: Any other entries the algorithm needs, stored as given.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If ``alg`` is empty.
+    """
+
     def __init__(self,
                  alg: str = '',
                  kid: str | None = None,
@@ -49,17 +62,51 @@ class EncryptionResult:
 
     @classmethod
     def new_encryption_result_from_dict(cls, values: dict[str, Any]) -> EncryptionResult:
+        """Create an encrypted value from its dict form.
+
+        Args:
+            values (dict[str, Any]): The entries, which must include ``alg``.
+
+        Returns:
+            :class:`~couchbase.encryption.EncryptionResult`: The encrypted value.
+        """
         return EncryptionResult(**values)
 
     def put(self, key: str, val: Any) -> None:
+        """Set an entry.
+
+        Args:
+            key (str): The entry's name.
+            val (Any): Its value.
+        """
         self._map[key] = val
 
     def put_and_base64_encode(self, key: str, val: bytes) -> None:
+        """Set an entry to bytes, base64 encoded.
+
+        Args:
+            key (str): The entry's name.
+            val (bytes): The bytes to encode.
+
+        Raises:
+            ValueError: If ``val`` is not bytes.
+        """
         if not isinstance(val, bytes):
             raise ValueError('Provided value must be of type bytes.')
         self._map[key] = base64.b64encode(val)
 
     def get(self, key: str) -> Any:
+        """Get an entry.
+
+        Args:
+            key (str): The entry's name.
+
+        Returns:
+            Any: The entry's value.
+
+        Raises:
+            :class:`~couchbase.exceptions.CryptoKeyNotFoundException`: If the entry is missing or empty.
+        """
         val = self._map.get(key, None)
         if not val:
             raise CryptoKeyNotFoundException(message=f"No mapping to EncryptionResult value found for key: '{key}'.")
@@ -67,9 +114,25 @@ class EncryptionResult:
         return val
 
     def algorithm(self) -> str:
+        """Get the name of the algorithm that encrypted the value.
+
+        Returns:
+            str: The ``alg`` entry.
+        """
         return self._map['alg']
 
     def get_with_base64_decode(self, key: str) -> bytes:
+        """Get an entry, base64 decoded.
+
+        Args:
+            key (str): The entry's name.
+
+        Returns:
+            bytes: The decoded value.
+
+        Raises:
+            :class:`~couchbase.exceptions.CryptoKeyNotFoundException`: If the entry is missing or empty.
+        """
         val = self._map.get(key, None)
         if not val:
             raise CryptoKeyNotFoundException(message=f"No mapping to EncryptionResult value found for key: '{key}'.")
@@ -77,6 +140,11 @@ class EncryptionResult:
         return base64.b64decode(val)
 
     def asdict(self) -> dict:
+        """Get every entry.
+
+        Returns:
+            dict: The entries, as stored in the document.
+        """
         return self._map
 
     def _valid_base64(self, val: str | bytes | bytearray) -> bool:

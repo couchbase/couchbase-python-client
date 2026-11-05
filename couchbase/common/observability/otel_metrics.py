@@ -17,9 +17,15 @@ from __future__ import annotations
 
 __all__ = ['get_otel_meter']
 
+import sys
 import typing
 from collections.abc import Mapping
 from typing import Any
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 from couchbase._version import __version__
 from couchbase.common.observability.metrics import Meter, ValueRecorder
@@ -41,8 +47,14 @@ if _HAS_OTEL:
     __all__ += ['OtelWrapperMeter', 'OtelWrapperValueRecorder']
 
     class OtelWrapperValueRecorder(ValueRecorder):
-        """
-        Wraps an OpenTelemetry Histogram to implement SDK's ValueRecorder interface.
+        """A :class:`~couchbase.observability.metrics.ValueRecorder` over an OpenTelemetry histogram.
+
+        A duration recorded in microseconds is reported in seconds when the unit is ``s``.
+
+        Args:
+            histogram (opentelemetry.metrics.Histogram): The histogram it records to.
+            tags (dict[str, Any]): The attributes each measurement carries.
+            unit (str): The unit the histogram reports in.
         """
 
         def __init__(self, histogram: otel_metrics.Histogram, tags: dict[str, Any], unit: str) -> None:
@@ -50,6 +62,7 @@ if _HAS_OTEL:
             self._attributes = tags if tags else {}
             self._unit = unit
 
+        @override
         def record_value(self, value: int) -> None:
             # The SDK records value in micros and will place a special __unit tag in the tags set to 's'
             # So self._unit == 's' is indication that we should convert from micros to seconds
@@ -57,14 +70,19 @@ if _HAS_OTEL:
             self._histogram.record(recorded, attributes=self._attributes)
 
     class OtelWrapperMeter(Meter):
-        """
-        Wraps an OpenTelemetry Meter to implement SDK's Meter interface.
+        """A :class:`~couchbase.observability.metrics.Meter` over an OpenTelemetry meter.
+
+        It creates one histogram per metric name, in the unit the ``__unit`` tag names.
+
+        Args:
+            otel_meter (opentelemetry.metrics.Meter): The meter it creates histograms with.
         """
 
         def __init__(self, otel_meter: otel_metrics.Meter) -> None:
             self._otel_meter = otel_meter
             self._histograms: dict[str, otel_metrics.Histogram] = {}
 
+        @override
         def value_recorder(self, name: str, tags: Mapping[str, Any]) -> ValueRecorder:
             local_tags = dict(tags) if tags else {}
             unit = local_tags.pop('__unit', '')
@@ -76,18 +94,16 @@ if _HAS_OTEL:
 
 
 def get_otel_meter(provider: MeterProvider | None = None) -> Meter:
-    """
-    Creates an OpenTelemetry wrapper meter.
+    """Create a meter that sends the SDK's metrics to OpenTelemetry.
 
     Args:
-        provider: Optional OpenTelemetry MeterProvider. If not provided,
-                  falls back to the global OTel meter provider.
+        provider: The meter provider to get the meter from. Defaults to None, which uses the global one.
 
     Returns:
-        OtelWrapperMeter instance implementing SDK's Meter interface
+        The meter, an ``OtelWrapperMeter``.
 
     Raises:
-        ImportError: If OpenTelemetry is not installed
+        ImportError: If OpenTelemetry is not installed.
     """
     if not _HAS_OTEL:
         raise ImportError(

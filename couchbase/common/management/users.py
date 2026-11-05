@@ -47,6 +47,17 @@ SetInputType: TypeAlias = set[_T] | list[_T] | tuple[_T, ...] | _T
 
 
 class Role:
+    """A role, optionally limited to a bucket, a scope or a collection.
+
+    Args:
+        name (str): The name of the role.
+        bucket (str, optional): The bucket the role is limited to.
+        scope (str, optional): The scope the role is limited to, within ``bucket``.
+        collection (str, optional): The collection the role is limited to, within ``scope``.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If ``name`` is missing or empty.
+    """
 
     def __init__(self,
                  name: str | None = None,
@@ -65,21 +76,26 @@ class Role:
 
     @property
     def name(self) -> str:
+        """The name of the role."""
         return self._name
 
     @property
     def bucket(self) -> str | None:
+        """The bucket the role is limited to, or ``None`` if it is not limited to one."""
         return self._bucket
 
     @property
     def scope(self) -> str | None:
+        """The scope the role is limited to, or ``None`` if it is not limited to one."""
         return self._scope
 
     @property
     def collection(self) -> str | None:
+        """The collection the role is limited to, or ``None`` if it is not limited to one."""
         return self._collection
 
     def as_dict(self) -> dict[str, str | None]:
+        """**INTERNAL** The role as the dict the management request is built from."""
         return {
             'name': self._name,
             'bucket': self._bucket,
@@ -100,6 +116,7 @@ class Role:
 
     @classmethod
     def create_role(cls, raw_data: dict[str, str]) -> Role:
+        """**INTERNAL** The role the server described."""
         return cls(
             name=raw_data.get("name", None),
             bucket=raw_data.get("bucket", None),
@@ -112,6 +129,7 @@ class Role:
 
 
 class RoleAndDescription:
+    """A role the cluster offers, with its description, as :meth:`.UserManager.get_roles` returns it."""
 
     def __init__(self,
                  role: Role | None = None,
@@ -127,22 +145,27 @@ class RoleAndDescription:
 
     @property
     def role(self) -> Role | None:
+        """The role."""
         return self._role
 
     @property
     def display_name(self) -> str | None:
+        """The role's name as the server displays it."""
         return self._display_name
 
     @property
     def description(self) -> str | None:
+        """What the role allows."""
         return self._description
 
     @property
     def ce(self) -> bool | None:
+        """Whether the role is available in Couchbase Server Community Edition."""
         return self._ce
 
     @classmethod
     def create_role_and_description(cls, raw_data: dict[str, Any]) -> RoleAndDescription:
+        """**INTERNAL** The role the server described."""
         return cls(
             role=Role.create_role(raw_data),
             display_name=raw_data.get('display_name', None),
@@ -156,12 +179,10 @@ class RoleAndDescription:
 
 
 class Origin:
-    """
-        Indicates why the user has a specific role.
-        If the type is "user" it means the role is assigned
-        directly to the user. If the type is "group" it means
-        the role is inherited from the group identified by
-        the "name" field.
+    """Why a user has a role.
+
+    A ``type`` of ``user`` means the role is assigned to the user directly. A ``type`` of ``group`` means the user has
+    it through the group that ``name`` names.
     """
 
     def __init__(self, type: str | None = None, name: str | None = None) -> None:
@@ -170,10 +191,12 @@ class Origin:
 
     @property
     def type(self) -> str | None:
+        """``user`` if the role is assigned to the user directly, ``group`` if it comes from a group."""
         return self._type
 
     @property
     def name(self) -> str | None:
+        """The name of the group the role comes from, when ``type`` is ``group``."""
         return self._name
 
     def __repr__(self) -> str:
@@ -181,6 +204,7 @@ class Origin:
 
 
 class RoleAndOrigins:
+    """A role a user has, with every reason the user has it."""
 
     def __init__(self, role: Role | None = None, origins: list[Origin] | None = None) -> None:
         self._role = role
@@ -188,16 +212,19 @@ class RoleAndOrigins:
 
     @property
     def role(self) -> Role | None:
+        """The role."""
         return self._role
 
     @property
     def origins(self) -> list[Origin] | None:
+        """Every reason the user has the role."""
         return self._origins
 
     @classmethod
     def create_role_and_origins(cls, raw_data: dict[str, Any]) -> RoleAndOrigins:
 
         # RBAC prior to v6.5 does not have origins
+        """**INTERNAL** The role the server described."""
         origin_data = raw_data.get("origins", None)
 
         return cls(
@@ -211,6 +238,20 @@ class RoleAndOrigins:
 
 
 class User:
+    """A user, as :meth:`.UserManager.upsert_user` takes it.
+
+    Args:
+        username (str): The name the user authenticates with.
+        display_name (str, optional): The name the server displays for the user.
+        groups (SetInputType[str], optional): The names of the groups the user is in, as a set, list or tuple, or a
+        single name.
+        roles (SetInputType[:class:`.Role`], optional): The roles assigned to the user directly. A set, list or tuple of
+        roles, or a single role.
+        password (str, optional): The password to set for the user.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If ``username`` is missing or empty.
+    """
 
     def __init__(self,
                  username: str | None = None,
@@ -231,10 +272,12 @@ class User:
 
     @property
     def username(self) -> str:
+        """The name the user authenticates with."""
         return self._username
 
     @property
     def display_name(self) -> str | None:
+        """The name the server displays for the user."""
         return self._display_name
 
     @display_name.setter
@@ -243,7 +286,7 @@ class User:
 
     @property
     def groups(self) -> set[str]:
-        """names of the groups"""
+        """The names of the groups the user is in."""
         return self._groups
 
     @groups.setter
@@ -252,7 +295,7 @@ class User:
 
     @property
     def roles(self) -> set[Role]:
-        """only roles assigned directly to the user (not inherited from groups)"""
+        """The roles assigned to the user directly, leaving out those it has through a group."""
         return self._roles
 
     @roles.setter
@@ -261,9 +304,15 @@ class User:
 
     @property
     def password(self) -> str:
-        # Write-only.  The previous spelling was ``password = property(None, password)``, whose
-        # absent getter made every read raise AttributeError; raising here keeps that, in a
-        # shape a checker reads as a property rather than as a method being overwritten.
+        """The password to set for the user.
+
+        It is write-only.
+
+        Raises:
+            AttributeError: On every read.
+        """
+        # A getter that raises, rather than none, so a checker reads this as a property and not
+        # as a method being overwritten.
         raise AttributeError('The password property is write-only.')
 
     @password.setter
@@ -273,6 +322,7 @@ class User:
     def as_dict(self) -> dict[str, Any]:
         # Annotated because the literal below infers dict[str, str | None], which the roles
         # list and the groups set that follow do not fit.
+        """**INTERNAL** The user as the dict the management request is built from."""
         output: dict[str, Any] = {
             "username": self.username,
             "display_name": self.display_name,
@@ -289,7 +339,7 @@ class User:
 
     @classmethod
     def create_user(cls, raw_data: dict[str, Any], roles: SetInputType[Role] | None = None) -> User:
-
+        """**INTERNAL** The user the server described."""
         user_roles = roles
         if not user_roles:
             user_roles = set(map(lambda r: Role.create_role(r),
@@ -311,12 +361,9 @@ class User:
 
 
 class UserAndMetadata:
-    """
-        Models the "get user" / "get all users" response.
+    """A user and what the server derives from it, as :meth:`.UserManager.get_user` returns it.
 
-        Associates the mutable properties of a user with
-        derived properties such as the effective roles
-        inherited from groups.
+    Besides the user itself, it holds what only the server knows, such as the roles the user has through its groups.
     """
 
     def __init__(self,
@@ -337,37 +384,40 @@ class UserAndMetadata:
 
     @property
     def domain(self) -> AuthDomain | None:
-        """ AuthDomain is an enumeration with values "local" and "external".
-        It MAY alternatively be represented as String."""
+        """Whether the user is local to the cluster or comes from an external directory."""
         return self._domain
 
     @property
     def user(self) -> User | None:
-        """returns a new mutable User object each time this method is called.
-            Modifying the fields of the returned User MUST have no effect on the
-            UserAndMetadata object it came from."""
+        """A copy of the user.
+
+        Changing the copy, to pass it to :meth:`.UserManager.upsert_user`, does not change this object.
+        """
         return deepcopy(self._user)
 
     @property
     def effective_roles(self) -> list[RoleAndOrigins] | None:
-        """all roles, regardless of origin."""
+        """Every role the user has, whether assigned directly or through a group."""
         return self._effective_roles
 
     @property
     def password_changed(self) -> datetime | None:
+        """When the user's password was last changed, if the server reported it."""
         return self._password_changed
 
     @property
     def external_groups(self) -> set[str] | None:
+        """The groups in the external directory the user is in."""
         return self._external_groups
 
     @property
     def raw_data(self) -> dict[str, Any] | None:
+        """The server's description of the user, as it was received."""
         return self._raw_data
 
     @classmethod
     def create_user_and_metadata(cls, raw_data: dict[str, Any]) -> UserAndMetadata:
-
+        """**INTERNAL** The user the server described."""
         effective_roles = list(map(lambda r: RoleAndOrigins.create_role_and_origins(r),
                                    raw_data["effective_roles"]))
 
@@ -409,6 +459,19 @@ class UserAndMetadata:
 
 
 class Group:
+    """A group of users, which gives every user in it the same roles.
+
+    Args:
+        name (str): The name of the group.
+        description (str, optional): What the group is for.
+        roles (SetInputType[:class:`.Role`], optional): The roles the group gives its users. A set, list or tuple of
+        roles, or a single role.
+        ldap_group_reference (str, optional): The LDAP group whose members the group takes in.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If ``name`` is missing or empty.
+    """
+
     def __init__(self,
                  name: str | None = None,
                  description: str | None = None,
@@ -428,10 +491,12 @@ class Group:
 
     @property
     def name(self) -> str:
+        """The name of the group."""
         return self._name
 
     @property
     def description(self) -> str | None:
+        """What the group is for."""
         return self._description
 
     @description.setter
@@ -440,6 +505,7 @@ class Group:
 
     @property
     def roles(self) -> set[Role]:
+        """The roles the group gives its users."""
         return self._roles
 
     @roles.setter
@@ -448,6 +514,7 @@ class Group:
 
     @property
     def ldap_group_reference(self) -> str | None:
+        """The LDAP group whose members the group takes in."""
         return self._ldap_group_reference
 
     @ldap_group_reference.setter
@@ -456,9 +523,11 @@ class Group:
 
     @property
     def raw_data(self) -> dict[str, Any] | None:
+        """The data the group was created from, if it was given any."""
         return self._raw_data
 
     def as_dict(self) -> dict[str, Any]:
+        """**INTERNAL** The group as the dict the management request is built from."""
         rs = list(map(lambda r: r.as_dict(), self.roles))
         return {
             'name': self.name,
@@ -469,6 +538,7 @@ class Group:
 
     @classmethod
     def create_group(cls, raw_data: dict[str, Any]) -> Group:
+        """**INTERNAL** The group the server described."""
         return cls(
             raw_data.get('name'),
             description=raw_data.get('description', None),

@@ -591,7 +591,7 @@ class CollectionMultiRequestBuilder:
                 op_keys_cas[k] = v.cas
         else:
             raise InvalidArgumentException(
-                'keys type must be Union[MultiGetResult, MultiMutationResult, Dict[str, int].')
+                'keys type must be MultiGetResult | MultiMutationResult | dict[str, int].')
         # use the non-mutation logic even though unlock is a mutation
         req = self._get_multi_op_non_value_req(list(op_keys_cas.keys()),
                                                UnlockMultiOptions,

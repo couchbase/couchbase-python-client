@@ -57,6 +57,7 @@ if TYPE_CHECKING:
 
 
 class CollectionManager:
+    """Performs management operations on a bucket's scopes and collections."""
 
     def __init__(self, impl: TxCollectionMgmtInterface) -> None:
         self._impl = impl
@@ -139,7 +140,7 @@ class CollectionManager:
                           ) -> Deferred[None]:
         ...
 
-    def create_collection(self, *args: object, **kwargs: object) -> Deferred[None]:
+    def create_collection(self, *args: object, **kwargs: object) -> Deferred[None]:  # noqa: D417
         """Creates a new collection in a specified scope.
 
         .. deprecated:: 4.1.9
@@ -206,7 +207,7 @@ class CollectionManager:
                         **kwargs: Unpack[DropCollectionOptionsKwargs]) -> Deferred[None]:
         ...
 
-    def drop_collection(self, *args: object, **kwargs: object) -> Deferred[None]:
+    def drop_collection(self, *args: object, **kwargs: object) -> Deferred[None]:  # noqa: D417
         """Drops a collection from a scope.
 
         .. deprecated:: 4.1.9

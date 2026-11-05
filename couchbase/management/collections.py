@@ -58,6 +58,7 @@ if TYPE_CHECKING:
 
 
 class CollectionManager:
+    """Performs management operations on a bucket's scopes and collections."""
 
     def __init__(self, impl: CollectionMgmtInterface) -> None:
         self._impl = impl
@@ -129,7 +130,7 @@ class CollectionManager:
                           ) -> None:
         ...
 
-    def create_collection(self, *args: object, **kwargs: object) -> None:
+    def create_collection(self, *args: object, **kwargs: object) -> None:  # noqa: D417
         """Creates a new collection in a specified scope.
 
         .. deprecated:: 4.1.9
@@ -167,7 +168,7 @@ class CollectionManager:
                         **kwargs: Unpack[DropCollectionOptionsKwargs]) -> None:
         ...
 
-    def drop_collection(self, *args: object, **kwargs: object) -> None:
+    def drop_collection(self, *args: object, **kwargs: object) -> None:  # noqa: D417
         """Drops a collection from the specified scope.
 
         .. deprecated:: 4.1.9

@@ -60,9 +60,7 @@ class SearchScoring(ABC):
             self._params[name] = value
 
     def as_encodable(self) -> dict[str, Any]:
-        """
-            **INTERNAL**
-        """
+        """**INTERNAL** The scoring mode as the search request takes it."""
         return self._params
 
     def __repr__(self) -> str:

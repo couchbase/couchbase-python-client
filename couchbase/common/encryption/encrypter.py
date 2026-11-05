@@ -23,6 +23,12 @@ from couchbase.common.encryption import EncryptionResult, Keyring
 
 
 class Encrypter(ABC):
+    """The interface an encrypter for one algorithm and key implements.
+
+    Args:
+        keyring (:class:`~couchbase.encryption.Keyring`): Where the encrypter finds its key.
+        key (str): The ID of the key it encrypts with.
+    """
 
     def __init__(self, keyring: Keyring, key: str) -> None:
         self._keyring = keyring
@@ -30,24 +36,25 @@ class Encrypter(ABC):
 
     @property
     def keyring(self) -> Keyring:
+        """Where the encrypter finds its key."""
         return self._keyring
 
     @property
     def key(self) -> str:
+        """The ID of the key the encrypter encrypts with."""
         return self._key
 
     @abstractmethod
     def encrypt(self, plaintext: str | bytes | bytearray) -> EncryptionResult:
-        """Encrypts the given plaintext
+        """Encrypt a value.
 
         Args:
-            plaintext (str | bytes | bytearray): The plaintext to be encrypted
+            plaintext (str | bytes | bytearray): The value to encrypt.
 
         Returns:
-            :class:``~couchbase.encryption.EncryptionResult`: a :class:`~couchbase.encryption.EncryptionResult`
-            containing all the necessary information required for decryption.
+            :class:`~couchbase.encryption.EncryptionResult`: The ciphertext and everything needed to decrypt it.
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidCryptoKeyException`: If the :class:`.Encrypter` has an invalid
-            key for encryption.
+            :class:`~couchbase.exceptions.InvalidCryptoKeyException`: If the encrypter's key is not valid for
+                its algorithm.
         """

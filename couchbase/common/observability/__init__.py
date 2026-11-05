@@ -13,8 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""
-Observability integrations for the Couchbase Python SDK.
+"""Observability integrations for the Couchbase Python SDK.
 
 This package provides integrations with observability platforms:
 - OpenTelemetry tracing (otel_tracing)

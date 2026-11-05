@@ -21,16 +21,25 @@ from couchbase.common._utils import fields_repr, redacted
 
 
 class Key:
+    """An encryption key.
+
+    Args:
+        id (str): The key's ID, which an encrypted value records.
+        bytes_ (bytes | bytearray): The key itself. The repr hides it.
+    """
+
     def __init__(self, id: str, bytes_: bytes | bytearray) -> None:
         self._id = id
         self._bytes = bytes_ if isinstance(bytes_, bytes) else bytes(bytes_)
 
     @property
     def id(self) -> str:
+        """The key's ID, which an encrypted value records."""
         return self._id
 
     @property
     def bytes(self) -> bytes:
+        """The key itself."""
         return self._bytes
 
     def __repr__(self) -> str:

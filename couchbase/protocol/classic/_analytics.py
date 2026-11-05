@@ -187,7 +187,7 @@ class AnalyticsQuery:
     @raw.setter
     def raw(self, value: dict[str, Any]) -> None:
         if not isinstance(value, dict):
-            raise TypeError("Raw option must be of type Dict[str, Any].")
+            raise TypeError("Raw option must be of type dict[str, Any].")
         for k in value.keys():
             if not isinstance(k, str):
                 raise TypeError("key for raw value must be str")

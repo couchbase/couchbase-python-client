@@ -63,8 +63,9 @@ if TYPE_CHECKING:
 
 
 class SearchIndexManager:
-    """
-    Allows to manage search indexes in a Couchbase cluster.
+    """Performs management operations on search indexes.
+
+    For managing the search indexes of a scope, :class:`.ScopeSearchIndexManager` should be used.
     """
 
     def __init__(self, impl: SearchIndexMgmtInterface) -> None:
@@ -310,8 +311,9 @@ class SearchIndexManager:
     def get_all_index_stats(self,
                             options: GetAllSearchIndexStatsOptions | None = None,
                             **kwargs: Unpack[GetAllSearchIndexStatsOptionsKwargs]) -> dict[str, Any]:
-        """Retrieves statistics on search service. Information is provided on documents, partition indexes, mutations,
-        compactions, queries, and more.
+        """Retrieves statistics on the search service.
+
+        The statistics cover documents, partition indexes, mutations, compactions, queries, and more.
 
         **UNCOMMITTED**
         This is an uncommitted API call that is unlikely to change, but may still change as
@@ -329,9 +331,7 @@ class SearchIndexManager:
 
 
 class ScopeSearchIndexManager:
-    """
-    Allows to manage scope-level search indexes in a Couchbase cluster.
-    """
+    """Performs management operations on the search indexes of a scope."""
 
     def __init__(self, impl: SearchIndexMgmtInterface) -> None:
         self._impl = impl
@@ -577,8 +577,9 @@ class ScopeSearchIndexManager:
     def get_all_index_stats(self,
                             options: GetAllSearchIndexStatsOptions | None = None,
                             **kwargs: Unpack[GetAllSearchIndexStatsOptionsKwargs]) -> dict[str, Any]:
-        """Retrieves statistics on search service. Information is provided on documents, partition indexes, mutations,
-        compactions, queries, and more.
+        """Retrieves statistics on the search service.
+
+        The statistics cover documents, partition indexes, mutations, compactions, queries, and more.
 
         .. note::
             **UNCOMMITTED:**

@@ -32,6 +32,11 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Generic)
 
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
+
 if sys.version_info >= (3, 13):
     from typing import TypeVar
 else:
@@ -63,14 +68,14 @@ for fl in _UNIFIED_FORMATS:
 
 
 def _get_decode_format(flags: int | None) -> int | None:
-    """ Decode the flags value for transcoding.
+    """Decode the flags value for transcoding.
 
-        Args:
-            flags (int, optional): The flags to decode.
+    Args:
+        flags (int, optional): The flags to decode.
 
-        Returns:
-            int | None: The common flags or legacy flags format.  If None
-                is returned the format is UNKNOWN.
+    Returns:
+        int | None: The common flags or legacy flags format.  If None
+            is returned the format is UNKNOWN.
     """
     # return None for unknown format
     if flags is None:
@@ -94,15 +99,42 @@ _V_contra = TypeVar('_V_contra', contravariant=True, default=Any)
 
 
 class Transcoder(ABC, Generic[_V_contra]):
-    """Interface a Custom Transcoder must implement
+    """The interface a custom transcoder implements.
+
+    A transcoder turns a value into the bytes a document stores and the flags that record their format, and turns stored
+    bytes and flags back into a value.
     """
 
     @abstractmethod
     def encode_value(self, value: _V_contra) -> tuple[bytes, int]:
+        """Encode a value for storage.
+
+        Args:
+            value (Any): The value to store.
+
+        Returns:
+            tuple[bytes, int]: The bytes to store and the flags recording their format.
+
+        Raises:
+            :class:`~couchbase.exceptions.ValueFormatException`: If the transcoder cannot encode the value.
+        """
         raise NotImplementedError()
 
     @abstractmethod
     def decode_value(self, value: bytes, flags: int | None) -> Any:
+        """Decode stored bytes into a value.
+
+        Args:
+            value (bytes): The bytes the document stores.
+            flags (int | None): The flags stored with them.
+
+        Returns:
+            Any: The decoded value.
+
+        Raises:
+            :class:`~couchbase.exceptions.ValueFormatException`: If the transcoder cannot decode the format the
+                flags record.
+        """
         raise NotImplementedError()
 
     @classmethod
@@ -114,6 +146,16 @@ class Transcoder(ABC, Generic[_V_contra]):
 
 
 class JSONTranscoder(Transcoder[Any]):
+    """The default transcoder, which stores every value as JSON.
+
+    It encodes a str, list, tuple, dict, bool, int, float or None, and refuses bytes. It decodes a document flagged as
+    JSON, or with no flags, and returns the raw bytes if that is not valid JSON. It refuses a document flagged as binary
+    or as a string.
+
+    Args:
+        serializer (:class:`~couchbase.serializer.Serializer`, optional): The serializer that does the JSON
+            encoding and decoding. Defaults to :class:`~couchbase.serializer.DefaultJsonSerializer`.
+    """
 
     def __init__(self, serializer: Serializer | None = None) -> None:
 
@@ -122,6 +164,7 @@ class JSONTranscoder(Transcoder[Any]):
         else:
             self._serializer = serializer
 
+    @override
     def encode_value(self, value: Any) -> tuple[bytes, int]:
 
         if isinstance(value, str):
@@ -140,6 +183,7 @@ class JSONTranscoder(Transcoder[Any]):
 
         return self._serializer.serialize(value), FMT_JSON
 
+    @override
     def decode_value(self, value: bytes, flags: int | None) -> Any:
 
         format = _get_decode_format(flags)
@@ -160,7 +204,13 @@ class JSONTranscoder(Transcoder[Any]):
 
 
 class RawJSONTranscoder(Transcoder[str | bytes | bytearray]):
+    """A transcoder for JSON that is already encoded.
 
+    It stores a str as UTF-8 and bytes as given, both flagged as JSON, and returns a JSON document's bytes undecoded. It
+    refuses any other value, and a document flagged as binary or as a string.
+    """
+
+    @override
     def encode_value(self, value: str | bytes | bytearray) -> tuple[bytes, int]:
 
         if isinstance(value, str):
@@ -172,6 +222,7 @@ class RawJSONTranscoder(Transcoder[str | bytes | bytearray]):
         else:
             raise ValueFormatException("Only binary and string data supported by RawJSONTranscoder")
 
+    @override
     def decode_value(self, value: bytes, flags: int | None) -> str | bytes:
 
         format = _get_decode_format(flags)
@@ -191,7 +242,13 @@ class RawJSONTranscoder(Transcoder[str | bytes | bytearray]):
 
 
 class RawStringTranscoder(Transcoder[str]):
+    """A transcoder for plain strings.
 
+    It stores a str as UTF-8 flagged as a string, and decodes a document so flagged back to a str. It refuses any other
+    value, and a document flagged as binary or as JSON.
+    """
+
+    @override
     def encode_value(self, value: str) -> tuple[bytes, int]:
 
         if isinstance(value, str):
@@ -199,6 +256,7 @@ class RawStringTranscoder(Transcoder[str]):
         else:
             raise ValueFormatException("Only string data supported by RawStringTranscoder")
 
+    @override
     def decode_value(self, value: bytes, flags: int | None) -> str | bytes:
 
         format = _get_decode_format(flags)
@@ -214,6 +272,13 @@ class RawStringTranscoder(Transcoder[str]):
 
 
 class RawBinaryTranscoder(Transcoder[bytes | bytearray]):
+    """A transcoder for binary data.
+
+    It stores bytes or a bytearray flagged as binary, and returns a document so flagged as bytes. It refuses any other
+    value, and a document flagged as a string or as JSON.
+    """
+
+    @override
     def encode_value(self, value: bytes | bytearray) -> tuple[bytes, int]:
 
         if isinstance(value, (bytes, bytearray)):
@@ -223,6 +288,7 @@ class RawBinaryTranscoder(Transcoder[bytes | bytearray]):
         else:
             raise ValueFormatException("Only binary data supported by RawBinaryTranscoder")
 
+    @override
     def decode_value(self, value: bytes, flags: int | None) -> bytes:
 
         format = _get_decode_format(flags)
@@ -240,7 +306,17 @@ class RawBinaryTranscoder(Transcoder[bytes | bytearray]):
 
 
 class LegacyTranscoder(Transcoder[Any]):
+    """A transcoder that picks the format from the value's type.
 
+    It stores a str as a string, bytes as binary, a list, tuple, dict, bool, int, float or None as JSON, and pickles
+    anything else. Decoding follows the flags, and returns the raw bytes for a JSON document that does not parse and for
+    a format it does not know.
+
+    Decoding unpickles a document flagged as pickled, which can run arbitrary code, so read with it only documents
+    written by code you trust.
+    """
+
+    @override
     def encode_value(self, value: Any) -> tuple[bytes, int]:
 
         if isinstance(value, str):
@@ -267,6 +343,7 @@ class LegacyTranscoder(Transcoder[Any]):
         else:  # default to JSON
             return json.dumps(value, ensure_ascii=False).encode('utf-8'), FMT_JSON
 
+    @override
     def decode_value(self, value: bytes, flags: int | None) -> Any:
 
         format = _get_decode_format(flags)

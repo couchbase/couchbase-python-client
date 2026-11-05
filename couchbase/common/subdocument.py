@@ -55,6 +55,8 @@ if TYPE_CHECKING:
 
 
 class SubDocOp(IntEnum):
+    """**INTERNAL** The sub-document opcodes of the memcached protocol."""
+
     GET_DOC = 0
     SET_DOC = 1
     REMOVE_DOC = 4
@@ -74,6 +76,8 @@ class SubDocOp(IntEnum):
 
 
 class SubDocStatus(IntEnum):
+    """The sub-document status codes of the memcached protocol."""
+
     PathNotFound = 192
     PathMismatch = 193
     PathInvalid = 194
@@ -95,7 +99,9 @@ class SubDocStatus(IntEnum):
 
 
 class StoreSemantics(IntEnum):
-    """Define subdocument mutation operation store semantics.
+    """What ``mutate_in`` does about the document itself.
+
+    REPLACE requires the document to exist, UPSERT creates it if it does not, and INSERT requires that it does not.
     """
     REPLACE = 0
     UPSERT = 1
@@ -103,58 +109,84 @@ class StoreSemantics(IntEnum):
 
 
 class LookupInMacro():
+    """Paths to the virtual attributes the server keeps on every document, for ``lookup_in``.
+
+    Each is read with ``xattr=True``.
+    """
 
     @staticmethod
     def document() -> str:
+        """The path to all of the document's metadata, as one object."""
         return '$document'
 
     @staticmethod
     def expiry_time() -> str:
+        """The path to the document's expiry time, in seconds since the epoch, 0 if it has none."""
         return '$document.exptime'
 
     @staticmethod
     def cas() -> str:
+        """The path to the document's CAS, as a hex string."""
         return '$document.CAS'
 
     @staticmethod
     def seq_no() -> str:
+        """The path to the document's sequence number, as a hex string."""
         return '$document.seqno'
 
     @staticmethod
     def last_modified() -> str:
+        """The path to when the document last changed, in seconds since the epoch."""
         return '$document.last_modified'
 
     @staticmethod
     def is_deleted() -> str:
+        """The path to whether the document is a tombstone."""
         return '$document.deleted'
 
     @staticmethod
     def value_size_bytes() -> str:
+        """The path to the size of the document's body, in bytes."""
         return '$document.value_bytes'
 
     @staticmethod
     def rev_id() -> str:
+        """The path to the document's revision ID."""
         return '$document.revid'
 
 
 class MutationMacro():
+    """A value the server fills in from the mutation that writes it.
+
+    Args:
+        value (str): The macro, as the server names it. The class methods return the ones it knows.
+    """
+
     def __init__(self, value: str) -> None:
         self._value = value
 
     @property
     def value(self) -> str:
+        """The macro, as the server names it."""
         return self._value
 
     @classmethod
     def cas(cls) -> MutationMacro:
+        """The mutation's CAS.
+
+        The server writes it as a hex string in little-endian byte order; :func:`convert_macro_cas_to_cas` reads it back
+        as the CAS a result reports.
+        """
         return cls("${Mutation.CAS}")
 
     @classmethod
     def seq_no(cls) -> MutationMacro:
+        """The mutation's sequence number, as a hex string."""
         return cls("${Mutation.seqno}")
 
     @classmethod
     def value_crc32c(cls) -> MutationMacro:
+        """The CRC32C checksum of the document's body after the mutation, as a hex string."""
         return cls("${Mutation.value_crc32c}")
 
     def __repr__(self) -> str:
@@ -162,9 +194,10 @@ class MutationMacro():
 
 
 class Spec(tuple):
-    """Represents a sub-operation to perform."""
+    """One operation of a ``lookup_in`` or ``mutate_in``, as the functions in this module create it."""
 
     def __new__(cls, *args: Any, **kwargs: Any) -> Spec:
+        """**INTERNAL** The operation from its opcode and arguments."""
         return super().__new__(cls, tuple(args))
 
     def __repr__(self) -> str:
@@ -172,7 +205,10 @@ class Spec(tuple):
 
 
 class ArrayValues(tuple):
+    """**INTERNAL** The values an array operation adds, kept apart from its other arguments."""
+
     def __new__(cls, *args: Any, **kwargs: Any) -> ArrayValues:
+        """**INTERNAL** The values, in order."""
         return super(ArrayValues, cls).__new__(cls, tuple(args))
 
     def __repr__(self) -> str:
@@ -236,20 +272,23 @@ def insert(path: str,
            xattr: bool | None = False,
            **kwargs: Any
            ) -> Spec:
-    """Creates a :class:`.Spec` for inserting a field into the document. Failing if the field already
-    exists at the specified path.
+    """Creates a :class:`.Spec` that adds a field, failing if the field already exists.
+
+    A :class:`MutationMacro` value is written to the extended attributes, whatever ``xattr`` says, with the macro
+    expanded by the server.
 
     Args:
         path (str): The path to the field.
-        value (JSONType | MutationMacro): The value to insert.
-        create_parents (bool, optional): Whether or not the path to the field should be created
-            if it does not already exist.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
+        value (JSONType | MutationMacro): The value to add.
+        create_parents (bool, optional): Whether to create the path's missing parent fields. Defaults to
+            False.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
+        **kwargs: ``expand_macros`` (bool) asks the server to expand macros in a str value. A
+            :class:`MutationMacro` value sets it.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
-
+        :class:`.Spec`: The operation, for ``mutate_in``.
     """
     expand_macros = kwargs.get('expand_macros', False)
     if isinstance(value, MutationMacro):
@@ -264,20 +303,21 @@ def upsert(path: str,
            create_parents: bool | None = False,
            xattr: bool | None = False
            ) -> Spec:
-    """Creates a :class:`.Spec` for upserting a field into the document. This updates the value of the specified field,
-    or creates the field if it does not exits.
+    """Creates a :class:`.Spec` that sets a field, adding it if it does not exist.
+
+    A :class:`MutationMacro` value is written to the extended attributes, whatever ``xattr`` says, with the macro
+    expanded by the server.
 
     Args:
         path (str): The path to the field.
-        value (JSONType | MutationMacro): The value to upsert.
-        create_parents (bool, optional): Whether or not the path to the field should be created
-            if it does not already exist.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
+        value (JSONType | MutationMacro): The value to set.
+        create_parents (bool, optional): Whether to create the path's missing parent fields. Defaults to
+            False.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
-
+        :class:`.Spec`: The operation, for ``mutate_in``.
     """
     expand_macros = False
     if isinstance(value, MutationMacro):
@@ -291,18 +331,19 @@ def replace(path: str,
             value: JSONType | MutationMacro,
             xattr: bool | None = False,
             ) -> Spec:
-    """Creates a :class:`.Spec` for replacing a field into the document. Failing if the field already
-    exists at the specified path.
+    """Creates a :class:`.Spec` that sets a field, failing if the field does not exist.
+
+    An empty path replaces the whole body. A :class:`MutationMacro` value is written to the extended attributes,
+    whatever ``xattr`` says, with the macro expanded by the server.
 
     Args:
-        path (str): The path to the field.
-        value (JSONType | MutationMacro): The value to write.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
+        path (str): The path to the field, or an empty str for the whole body.
+        value (JSONType | MutationMacro): The value to set.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
-
+        :class:`.Spec`: The operation, for ``mutate_in``.
     """
     expand_macros = False
     if isinstance(value, MutationMacro):
@@ -317,16 +358,17 @@ def replace(path: str,
 def remove(path: str,
            xattr: bool | None = False,
            ) -> Spec:
-    """Creates a :class:`.Spec` for removing a field from a document.
+    """Creates a :class:`.Spec` that removes a field.
+
+    An empty path removes the whole document.
 
     Args:
-        path (str): The path to the field.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
+        path (str): The path to the field, or an empty str for the whole document.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
-
+        :class:`.Spec`: The operation, for ``mutate_in``.
     """
     if not path:
         return Spec(SubDocOp.REMOVE_DOC, '', False, xattr, False)
@@ -338,19 +380,21 @@ def array_append(path: str,
                  create_parents: bool | None = False,
                  xattr: bool | None = False
                  ) -> Spec:
-    """Creates a :class:`.Spec` for adding a value to the end of an array in a document.
+    """Creates a :class:`.Spec` that adds values to the end of an array.
+
+    A :class:`MutationMacro` value is written to the extended attributes, whatever ``xattr`` says, with the macro
+    expanded by the server.
 
     Args:
-        path (str): The path to an element of an array.
-        *values (JSONType | MutationMacro): The values to add.
-        create_parents (bool, optional): Whether or not the path to the field should be created
-            if it does not already exist.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
+        path (str): The path to the array.
+        *values (JSONType | MutationMacro): The values to add, in order.
+        create_parents (bool, optional): Whether to create the path's missing parent fields. Defaults to
+            False.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
-
+        :class:`.Spec`: The operation, for ``mutate_in``.
     """
     expand_macros = False
     if any(map(lambda m: isinstance(m, MutationMacro), values)):
@@ -365,19 +409,21 @@ def array_prepend(path: str,
                   create_parents: bool | None = False,
                   xattr: bool | None = False
                   ) -> Spec:
-    """Creates a :class:`.Spec` for adding a value to the beginning of an array in a document.
+    """Creates a :class:`.Spec` that adds values to the start of an array.
+
+    A :class:`MutationMacro` value is written to the extended attributes, whatever ``xattr`` says, with the macro
+    expanded by the server.
 
     Args:
-        path (str): The path to an element of an array.
-        *values (JSONType | MutationMacro): The values to add.
-        create_parents (bool, optional): Whether or not the path to the field should be created
-            if it does not already exist.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
+        path (str): The path to the array.
+        *values (JSONType | MutationMacro): The values to add, in order.
+        create_parents (bool, optional): Whether to create the path's missing parent fields. Defaults to
+            False.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
-
+        :class:`.Spec`: The operation, for ``mutate_in``.
     """
     expand_macros = False
     if any(map(lambda m: isinstance(m, MutationMacro), values)):
@@ -392,20 +438,21 @@ def array_insert(path: str,
                  create_parents: bool | None = False,
                  xattr: bool | None = False
                  ) -> Spec:
-    """Creates a :class:`.Spec` for adding a value to a specified location in an array in a document.
-    The path should specify a specific index in the array and the new values are inserted at this location.
+    """Creates a :class:`.Spec` that adds values at a position in an array.
+
+    The path ends in the index to insert at, as in ``tags[2]``. A :class:`MutationMacro` value is written to the
+    extended attributes, whatever ``xattr`` says, with the macro expanded by the server.
 
     Args:
-        path (str): The path to an element of an array.
-        *values (JSONType | MutationMacro): The values to add.
-        create_parents (bool, optional): Whether or not the path to the field should be created
-            if it does not already exist.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
+        path (str): The path to the array, ending in the index.
+        *values (JSONType | MutationMacro): The values to add, in order.
+        create_parents (bool, optional): Whether to create the path's missing parent fields. Defaults to
+            False.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
-
+        :class:`.Spec`: The operation, for ``mutate_in``.
     """
     expand_macros = False
     if any(map(lambda m: isinstance(m, MutationMacro), values)):
@@ -420,20 +467,21 @@ def array_addunique(path: str,
                     create_parents: bool | None = False,
                     xattr: bool | None = False
                     ) -> Spec:
-    """Creates a :class:`.Spec` for adding unique values to an array in a document. This operation will only
-    add values if they do not already exist elsewhere in the array.
+    """Creates a :class:`.Spec` that adds a value to an array unless the array already holds it.
+
+    A :class:`MutationMacro` value is written to the extended attributes, whatever ``xattr`` says, with the macro
+    expanded by the server.
 
     Args:
-        path (str): The path to an element of an array.
-        value (str | int | float | bool | MutationMacro | None): The value to add into the array.
-        create_parents (bool, optional): Whether or not the path to the field should be created
-            if it does not already exist.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
+        path (str): The path to the array.
+        value (str | int | float | bool | MutationMacro | None): The value to add.
+        create_parents (bool, optional): Whether to create the path's missing parent fields. Defaults to
+            False.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
-
+        :class:`.Spec`: The operation, for ``mutate_in``.
     """
     expand_macros = False
     if isinstance(value, MutationMacro):
@@ -448,23 +496,26 @@ def counter(path: str,
             xattr: bool | None = False,
             create_parents: bool | None = False
             ) -> Spec:
-    """Creates a :class:`.Spec` for incrementing or decrementing the value of a field in a document. If
-    the provided delta is >= 0 :meth:`~couchbase.subdocument.increment` is called, otherwise
-    :meth:`~couchbase.subdocument.decrement` is called.
+    """**DEPRECATED** Creates a :class:`.Spec` that adds a delta to a number.
+
+    A positive delta calls :func:`increment`, and a negative one :func:`decrement`.
 
     .. deprecated:: 4.0.0
-        Use :meth:`~couchbase.subdocument.increment` or :meth:`~couchbase.subdocument.decrement` instead.
+        Use :func:`increment` or :func:`decrement` instead.
 
     Args:
         path (str): The path to the field.
-        delta (int): The value to increment or decrement from the document.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
-        create_parents (bool, optional): Whether or not the path to the field should be created
-            if it does not already exist.
+        delta (int): The amount to add. Must not be 0.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
+        create_parents (bool, optional): Whether to create the path's missing parent fields. Defaults to
+            False.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
+        :class:`.Spec`: The operation, for ``mutate_in``.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the delta is 0 or not an int.
     """
     Supportability.method_deprecated('counter', 'increment or decrement')
     if delta >= 0:
@@ -478,29 +529,27 @@ def increment(path: str,
               xattr: bool | None = False,
               create_parents: bool | None = False
               ) -> Spec:
-    """Creates a :class:`.Spec` for incrementing the value of a field in a document.
+    """Creates a :class:`.Spec` that adds to a number.
 
     Args:
         path (str): The path to the field.
-        delta (int): The value to increment from the document.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
-        create_parents (bool, optional): Whether or not the path to the field should be created
-            if it does not already exist.
+        delta (int): The amount to add. Must be greater than 0.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
+        create_parents (bool, optional): Whether to create the path's missing parent fields. Defaults to
+            False.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
-
+        :class:`.Spec`: The operation, for ``mutate_in``.
 
     Raises:
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If the delta arugment is not >= 0 or not
-            of type int.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the delta is not an int greater than 0.
     """
     if not isinstance(delta, int):
         raise InvalidArgumentException("Delta must be integer")
     if delta <= 0:
         raise InvalidArgumentException(
-            "Delta must be integer greater than or equal to 0")
+            "Delta must be an integer greater than 0.")
 
     return Spec(SubDocOp.COUNTER, path, create_parents, xattr, False, delta)
 
@@ -510,57 +559,60 @@ def decrement(path: str,
               xattr: bool | None = False,
               create_parents: bool | None = False
               ) -> Spec:
-    """Creates a :class:`.Spec` for decrementing the value of a field in a document.
+    """Creates a :class:`.Spec` that subtracts from a number.
 
     Args:
         path (str): The path to the field.
-        delta (int): The value to decrement from the document.
-        xattr (bool, optional): Whether this operation should reference the document body or the
-            extended attributes data for the document.
-        create_parents (bool, optional): Whether or not the path to the field should be created
-            if it does not already exist.
+        delta (int): The amount to subtract. Must be greater than 0.
+        xattr (bool, optional): Whether the path is in the document's extended attributes rather than its
+            body. Defaults to False.
+        create_parents (bool, optional): Whether to create the path's missing parent fields. Defaults to
+            False.
 
     Returns:
-        :class:`.Spec`: An instance of :class:`.Spec`.
-
+        :class:`.Spec`: The operation, for ``mutate_in``.
 
     Raises:
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If the delta arugment is not >= 0 or not
-            of type int.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the delta is not an int greater than 0.
     """
     if not isinstance(delta, int):
         raise InvalidArgumentException("Delta must be integer")
     if delta <= 0:
         raise InvalidArgumentException(
-            "Delta must be integer greater than or equal to 0")
+            "Delta must be an integer greater than 0.")
 
     return Spec(SubDocOp.COUNTER, path, create_parents, xattr, False, -1 * delta)
 
 
 def get_full() -> Spec:
-    """
-    Fetches the entire document.
+    """Creates a :class:`.Spec` that reads the whole body.
 
     Returns:
-        Spec
+        :class:`.Spec`: The operation, for ``lookup_in``.
     """
     return Spec(SubDocOp.GET_DOC, '', False)
 
 
 def with_expiry() -> Spec:
-    """
-    Fetches the expiry from the xattrs of the doc
+    """Creates a :class:`.Spec` that reads the document's expiry time.
 
     Returns:
-        Spec
+        :class:`.Spec`: The operation, for ``lookup_in``.
     """
     return Spec(SubDocOp.GET, LookupInMacro.expiry_time(), True)
 
 
 def convert_macro_cas_to_cas(cas: str) -> int:
-    """
-    Utility method to help encode CAS coming from MutationMacro.cas() stored in the xattr.
-    Due to a server bug, CAS is encoded backwards, but b/c of legacy users we cannot make a change.
+    """The CAS a :meth:`MutationMacro.cas` field holds, as the int a result reports.
+
+    The server writes that macro as a hex string in little-endian byte order, so its bytes are reversed before they are
+    read.
+
+    Args:
+        cas (str): The field's value, with or without a ``0x`` prefix.
+
+    Returns:
+        int: The CAS.
     """
     reversed_bytes = bytearray.fromhex(cas[2:] if cas.startswith('0x') else cas)
     reversed_bytes.reverse()

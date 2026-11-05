@@ -18,37 +18,32 @@ if TYPE_CHECKING:
 
 
 class VectorQueryCombination(Enum):
-    """ Specifies how multiple vector searches are combined.
+    """How a vector search combines its queries' results.
 
-    This can be one of:
-        AND: Indicates that multiple vector queries should be combined with logical AND.
-
-        OR: Indicates that multiple vector queries should be combined with logical OR.
-
+    AND keeps the documents every query returns, and OR the documents any of them returns.
     """
     AND = 'and'
     OR = 'or'
 
 
 class VectorQuery:
-    """ Represents a vector query.
+    """A query for the documents whose vectors are nearest a given vector.
 
     Args:
-        field_name (str): The name of the field in the search index that stores the vector.
-        vector (list[float] | str): The vector to use in the query.
-        num_candidates (int, optional): Specifies the number of results returned. If provided, must be greater or equal
-            to 1.
-        boost (float, optional): Add boost to query.
-        prefilter (`~couchbase.search.SearchQuery`, optional): Specifies a pre-filter to use for the vector query.
+        field_name (str): The index field that holds the vectors.
+        vector (list[float] | str): The vector to search near, as floats or as a str of its little-endian
+            32-bit floats, base64 encoded.
+        num_candidates (int, optional): How many nearest neighbours the query returns. Must be 1 or more.
+            Defaults to None, which returns 3.
+        boost (float, optional): A multiplier on the query's part of a hit's score.
+        prefilter (:class:`~couchbase.search.SearchQuery`, optional): A query a document must match to be
+            a candidate.
 
     Raises:
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not a list or str.
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If vector is a list and all values of the provided
-            vector are not instances of float.
-
-    Returns:
-        :class:`~couchbase.vector_search.VectorQuery`: The created vector query.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the field name is empty, or the vector
+            is empty, not a list of floats or a str.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If ``num_candidates`` is not an int of 1 or
+            more, ``boost`` is not a float, or ``prefilter`` is not a search query.
     """
 
     def __init__(self,
@@ -75,9 +70,7 @@ class VectorQuery:
 
     @property
     def boost(self) -> float | None:
-        """
-        float | None: Returns vector query's boost value, if it exists.
-        """
+        """A multiplier on the query's part of a hit's score, or None if not set."""
         return self._boost
 
     @boost.setter
@@ -88,16 +81,12 @@ class VectorQuery:
 
     @property
     def field_name(self) -> str:
-        """
-        str: Returns vector query's field name
-        """
+        """The index field that holds the vectors."""
         return self._field_name
 
     @property
     def num_candidates(self) -> int | None:
-        """
-        int | None: Returns vector query's num candidates value, if it exists.
-        """
+        """How many nearest neighbours the query returns, or None for the default of 3."""
         return self._num_candidates
 
     @num_candidates.setter
@@ -110,9 +99,7 @@ class VectorQuery:
 
     @property
     def prefilter(self) -> SearchQuery | None:
-        """
-        SearchQuery | None: Returns vector query's prefilter query, if it exists.
-        """
+        """A query a document must match to be a candidate, or None if not set."""
         return self._prefilter
 
     @prefilter.setter
@@ -125,16 +112,12 @@ class VectorQuery:
 
     @property
     def vector(self) -> list[float] | None:
-        """
-        list[float] | None: Returns the vector query's vector.
-        """
+        """The vector as floats, or None if it was given base64 encoded."""
         return self._vector
 
     @property
     def vector_base64(self) -> str | None:
-        """
-        str | None: Returns the vector query's base64 vector str.
-        """
+        """The vector base64 encoded, or None if it was given as floats."""
         return self._vector_base64
 
     def _validate_and_set_vector(self, vector: list[float] | str) -> None:
@@ -148,7 +131,7 @@ class VectorQuery:
             self._vector = vector
             return
         elif not isinstance(vector, str):
-            raise InvalidArgumentException('Provided vector must be either a List[float] or base64 encoded str.')
+            raise InvalidArgumentException('Provided vector must be either a list[float] or a base64 encoded str.')
 
         if len(vector) == 0:
             raise InvalidArgumentException('Provided base64 encoded vector cannot be empty.')
@@ -162,24 +145,26 @@ class VectorQuery:
                num_candidates: int | None = None,
                boost: float | None = None,
                prefilter: SearchQuery | None = None) -> VectorQuery:
-        """ Creates a :class:`~couchbase.vector_search.VectorQuery`.
+        """Creates a :class:`~couchbase.vector_search.VectorQuery`.
 
         Args:
-            field_name (str): The name of the field in the search index that stores the vector.
-            vector (list[float] | str): The vector to use in the query.
-            num_candidates (int, optional): Specifies the number of results returned. If provided, must be greater or
-                equal to 1.
-            boost (float, optional): Add boost to query.
-            prefilter (`~couchbase.search.SearchQuery`, optional): Specifies a pre-filter to use for the vector query.
+            field_name (str): The index field that holds the vectors.
+            vector (list[float] | str): The vector to search near, as floats or as a str of its little-endian
+                32-bit floats, base64 encoded.
+            num_candidates (int, optional): How many nearest neighbours the query returns. Must be 1 or more.
+                Defaults to None, which returns 3.
+            boost (float, optional): A multiplier on the query's part of a hit's score.
+            prefilter (:class:`~couchbase.search.SearchQuery`, optional): A query a document must match to be
+                a candidate.
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not provided.
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If the vector is not a list or str.
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If vector is a list and all values of the provided
-                vector are not instances of float.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the field name is empty, or the vector
+                is empty, not a list of floats or a str.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If ``num_candidates`` is not an int of 1 or
+                more, ``boost`` is not a float, or ``prefilter`` is not a search query.
 
         Returns:
-            :class:`~couchbase.vector_search.VectorQuery`: The created vector query.
+            :class:`~couchbase.vector_search.VectorQuery`: The query.
         """
         return cls(field_name, vector, num_candidates=num_candidates, boost=boost, prefilter=prefilter)
 
@@ -190,21 +175,16 @@ class VectorQuery:
 
 
 class VectorSearch:
-    """ Represents a vector search.
+    """One or more vector queries, sent together as a search request's vector search.
 
     Args:
-        queries (list[:class:`~couchbase.vector_search.VectorQuery`]):
-            The list of :class:`~couchbase.vector_search.VectorQuery`'s to use for the vector search.
-        options (:class:`~couchbase.options.VectorSearchOptions`, optional): Options to set for the vector search.
+        queries (list[:class:`~couchbase.vector_search.VectorQuery`]): The queries.
+        options (:class:`~couchbase.options.VectorSearchOptions`, optional): How the queries' results are
+            combined.
 
     Raises:
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If a list of
-            :class:`~couchbase.vector_search.VectorQuery` is not provided.
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If all values of the provided queries are not instances
-            of :class:`~couchbase.vector_search.VectorQuery`.
-
-    Returns:
-        :class:`~couchbase.vector_search.VectorSearch`: The created vector search.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If ``queries`` is empty or holds anything
+            but vector queries.
     """
 
     def __init__(self, queries: list[VectorQuery], options: VectorSearchOptions | None = None):
@@ -218,33 +198,26 @@ class VectorSearch:
 
     @property
     def queries(self) -> list[VectorQuery]:
-        """
-            **INTERNAL**
-        """
+        """**INTERNAL** The queries."""
         return self._queries
 
     @property
     def options(self) -> VectorSearchOptions | None:
-        """
-            **INTERNAL**
-        """
+        """**INTERNAL** How the queries' results are combined, or None if not set."""
         return self._options
 
     @classmethod
     def from_vector_query(cls, query: VectorQuery) -> VectorSearch:
-        """ Creates a :class:`~couchbase.vector_search.VectorSearch` from a single
-        :class:`~couchbase.vector_search.VectorQuery`.
+        """Creates a :class:`~couchbase.vector_search.VectorSearch` of one query.
 
         Args:
-            query (:class:`~couchbase.vector_search.VectorQuery`):
-                A :class:`~couchbase.vector_search.VectorQuery`'s to use for the vector search.
+            query (:class:`~couchbase.vector_search.VectorQuery`): The query.
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided query is not an instance of
-                :class:`~couchbase.vector_search.VectorQuery`.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If ``query`` is not a vector query.
 
         Returns:
-            :class:`~couchbase.vector_search.VectorSearch`: The created vector search.
+            :class:`~couchbase.vector_search.VectorSearch`: The vector search.
         """
         return cls([query])
 

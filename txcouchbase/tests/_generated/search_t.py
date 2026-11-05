@@ -508,10 +508,8 @@ class SearchTestSuite(SuiteRequirements):
         q = search.TermQuery('auto')
 
         sort = search.SortField(field=sort_field, type='number', mode='min', missing='last')
-        # The list is annotated, and the spec object is reused rather than rebuilt.  Both are
-        # deliberate: SearchOptions declares sort as List[str] | List[Sort], and list is
-        # invariant, so a bare [SortField(...)] literal is a list[SortField] and does not match.
-        sort_specs: list[search.Sort] = [sort]
+        # The spec object is reused: setting desc on it reverses the second query's order.
+        sort_specs = [sort]
         opts = SearchOptions(limit=10, sort=sort_specs, fields=[sort_field])
         res = run_in_reactor_thread(cb_env.cluster.search_query, idx, q, opts)
         rows = TwistedSearchEnvironment.assert_rows_at_least(res, 1)

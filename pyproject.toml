@@ -99,12 +99,6 @@ convention = "google"
 "**/_[!_]*.py" = ["D"]
 "{setup,conftest,couchbase_version,pycbc_build_setup}.py" = ["D"]
 # Not yet brought to the docstring rules.  Each line goes as its area is done.
-"{couchbase,acouchbase,txcouchbase}/management/*.py" = ["D"]
-"couchbase/common/management/{analytics,buckets,collections,eventing,queries,search,users,views}.py" = ["D"]
-"couchbase/common/{search_queries,search_request,search_scoring,vector_search,subdocument}.py" = ["D"]
-"couchbase/common/{kv_range_scan,durability,transcoder,serializer,auth,config_profiles}.py" = ["D"]
-"couchbase/common/{otel_tracer,replica_reads,protocol}.py" = ["D"]
-"couchbase/common/{encryption,observability}/*.py" = ["D"]
 "{couchbase,acouchbase,txcouchbase}/{__init__,cluster,bucket,scope,collection,binary_collection,datastructures}.py" = ["D"]
 "{couchbase,acouchbase,txcouchbase}/transactions/transactions.py" = ["D"]
 

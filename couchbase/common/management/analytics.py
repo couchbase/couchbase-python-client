@@ -28,10 +28,16 @@ __all__ = [
     'S3ExternalAnalyticsLink',
 ]
 
+import sys
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 from couchbase.common._utils import (fields_repr,
                                      is_null_or_empty,
@@ -41,18 +47,28 @@ from couchbase.common.exceptions import InvalidArgumentException
 
 
 class AnalyticsDataType(Enum):
+    """The type of a field an analytics index covers."""
+
     STRING = 'string'
     INT64 = 'int64'
     DOUBLE = 'double'
 
 
 class AnalyticsLinkType(Enum):
+    """The kind of data source an analytics link connects to."""
+
     S3External = 's3'
     AzureBlobExternal = 'azureblob'
     CouchbaseRemote = 'couchbase'
 
 
 class AnalyticsEncryptionLevel(Enum):
+    """How a remote Couchbase analytics link encrypts its connection.
+
+    ``NONE`` sends everything in plain text, ``HALF`` encrypts only the credentials, and ``FULL`` encrypts the whole
+    connection with TLS.
+    """
+
     NONE = 'none'
     HALF = 'half'
     FULL = 'full'
@@ -60,6 +76,15 @@ class AnalyticsEncryptionLevel(Enum):
 
 @dataclass
 class AnalyticsDataset:
+    """An analytics dataset, as the analytics service describes it.
+
+    Attributes:
+        dataset_name (str | None): The name of the dataset.
+        dataverse_name (str | None): The name of the dataverse the dataset is in.
+        link_name (str | None): The name of the link the dataset reads from.
+        bucket_name (str | None): The name of the bucket the dataset reads from.
+    """
+
     dataset_name: str | None = None
     dataverse_name: str | None = None
     link_name: str | None = None
@@ -67,6 +92,7 @@ class AnalyticsDataset:
 
     @classmethod
     def from_server(cls, json_data: dict[str, str]) -> AnalyticsDataset:
+        """**INTERNAL** The dataset the analytics service described."""
         return cls(json_data['name'],
                    json_data['dataverse_name'],
                    json_data['link_name'],
@@ -75,6 +101,15 @@ class AnalyticsDataset:
 
 @dataclass
 class AnalyticsIndex:
+    """An analytics index, as the analytics service describes it.
+
+    Attributes:
+        name (str | None): The name of the index.
+        dataset_name (str | None): The name of the dataset the index is on.
+        dataverse_name (str | None): The name of the dataverse the dataset is in.
+        is_primary (bool | None): Whether the index is the dataset's primary index.
+    """
+
     name: str | None = None
     dataset_name: str | None = None
     dataverse_name: str | None = None
@@ -82,74 +117,69 @@ class AnalyticsIndex:
 
 
 class AnalyticsLink(ABC):
-    """AnalytcsLinks are only available on Couchbase Server 7.0+
+    """A link from the analytics service to a source of data outside the local cluster.
+
+    A link is one of :class:`.CouchbaseRemoteAnalyticsLink`, :class:`.S3ExternalAnalyticsLink` or
+    :class:`.AzureBlobExternalAnalyticsLink`. Links are available on Couchbase Server 7.0 and later.
     """
 
     @abstractmethod
     def name(self) -> str:
-        """Returns the name of the :class:`couchbase.analytics.AnalyticsLink`
+        """Get the name of the link.
 
         Returns:
-            The name of the :class:`couchbase.analytics.AnalyticsLink`
+            str: The name of the link.
         """
         pass
 
     @abstractmethod
     def dataverse_name(self) -> str:
-        """Returns the name of the dataverse the :class:`couchbase.analytics.AnalyticsLink` belongs to
+        """Get the name of the dataverse the link is in.
 
         Returns:
-            The name of the dataverse
+            str: The name of the dataverse the link is in.
         """
         pass
 
     @abstractmethod
     def form_encode(self) -> bytes:
-        """Encodes the :class:`couchbase.analytics.AnalyticsLink` into a form data representation,
-            to send as the body of a :func:`couchbase.management.analytics.CreateLink` or
-            :func:`couchbase.management.analytics.ReplaceLink`
-
-        Returns:
-            A form encoded :class:`couchbase.analytics.AnalyticsLink`
-        """
+        """**INTERNAL** The link as the form-encoded body of a create or replace request."""
         pass
 
     @abstractmethod
     def validate(self) -> None:
-        """Ensures the :class:`couchbase.analytics.AnalyticsLink` is valid.
-        Raises a :class:`couchbase.exceptions.InvalidArgumentException` if link is invalid.
-
-        Returns:
-            None
+        """Check that the link has every setting its kind requires.
 
         Raises:
-            :class:`couchbase.exceptions.InvalidArgumentException`: If the link is invalid.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If a required setting is missing.
         """
         pass
 
     @abstractmethod
     def link_type(self) -> AnalyticsLinkType:
-        """Returns the :class:`couchbase.analytics.AnalyticsLinkType` of
-        the :class:`couchbase.analytics.AnalyticsLink`
+        """Get the kind of data source the link connects to.
 
         Returns:
-            The corresponding :class:`couchbase.analytics.AnalyticsLinkType`
-            of the :class:`couchbase.analytics.AnalyticsLink`
+            :class:`.AnalyticsLinkType`: The kind of data source the link connects to.
         """
         pass
 
     @abstractmethod
     def as_dict(self) -> dict[str, Any]:
-        """Returns the :class:`couchbase.analytics.AnalyticsLink` as a dict,
-            in the form the management API sends it in
-
-        Returns:
-            A dict representation of the :class:`couchbase.analytics.AnalyticsLink`
-        """
+        """**INTERNAL** The link as the dict the management request is built from."""
         pass
 
 
 class CouchbaseAnalyticsEncryptionSettings:
+    """The encryption a remote Couchbase analytics link uses.
+
+    Args:
+        encryption_level (:class:`.AnalyticsEncryptionLevel`, optional): How the link encrypts its connection. Defaults
+            to ``NONE``.
+        certificate (bytes | bytearray, optional): The remote cluster's certificate, required for ``FULL``.
+        client_certificate (bytes | bytearray, optional): The client certificate, required for ``FULL``.
+        client_key (bytes | bytearray, optional): The client certificate's key, required for ``FULL``.
+    """
 
     def __init__(self,
                  encryption_level: AnalyticsEncryptionLevel | None = None,
@@ -164,6 +194,7 @@ class CouchbaseAnalyticsEncryptionSettings:
 
     @property
     def encryption_level(self) -> AnalyticsEncryptionLevel:
+        """How the link encrypts its connection."""
         return self._encryption_level
 
     @encryption_level.setter
@@ -172,6 +203,7 @@ class CouchbaseAnalyticsEncryptionSettings:
 
     @property
     def certificate(self) -> bytes | bytearray | None:
+        """The remote cluster's certificate."""
         return self._certificate
 
     @certificate.setter
@@ -180,6 +212,7 @@ class CouchbaseAnalyticsEncryptionSettings:
 
     @property
     def client_certificate(self) -> bytes | bytearray | None:
+        """The client certificate."""
         return self._client_certificate
 
     @client_certificate.setter
@@ -188,6 +221,7 @@ class CouchbaseAnalyticsEncryptionSettings:
 
     @property
     def client_key(self) -> bytes | bytearray | None:
+        """The client certificate's key."""
         return self._client_key
 
     @client_key.setter
@@ -195,6 +229,7 @@ class CouchbaseAnalyticsEncryptionSettings:
         self._client_key = value
 
     def as_dict(self) -> dict[str, str]:
+        """**INTERNAL** The settings as the dict the management request is built from."""
         encryption_dict = {
             'encryption_level': self.encryption_level.value
         }
@@ -208,7 +243,7 @@ class CouchbaseAnalyticsEncryptionSettings:
 
     @classmethod
     def from_server_json(cls, raw_data: dict[str, Any]) -> CouchbaseAnalyticsEncryptionSettings:
-
+        """**INTERNAL** The settings the analytics service described."""
         encryption_settings = CouchbaseAnalyticsEncryptionSettings(AnalyticsEncryptionLevel(raw_data['level']))
 
         certificate = raw_data.get('certificate', None)
@@ -227,6 +262,17 @@ class CouchbaseAnalyticsEncryptionSettings:
 
 
 class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
+    """A link to a bucket on another Couchbase cluster.
+
+    Args:
+        dataverse (str): The name of the dataverse the link is in.
+        link_name (str): The name of the link.
+        hostname (str): The hostname of the remote cluster.
+        encryption (:class:`.CouchbaseAnalyticsEncryptionSettings`): How the link encrypts its connection.
+        username (str, optional): The username to authenticate with, required unless the encryption level is ``FULL``.
+        password (str, optional): The password to authenticate with, required unless the encryption level is ``FULL``.
+    """
+
     def __init__(self,
                  dataverse: str,
                  link_name: str,
@@ -243,12 +289,15 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
         self._username = username
         self._password = password
 
-    def name(self,) -> str:
+    @override
+    def name(self) -> str:
         return self._link_name
 
+    @override
     def dataverse_name(self) -> str:
         return self._dataverse
 
+    @override
     def form_encode(self) -> bytes:
         params: dict[str, str | None] = {}
 
@@ -282,6 +331,7 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
 
         return to_form_str(params).encode()
 
+    @override
     def validate(self) -> None:
         if is_null_or_empty(self._dataverse):
             raise InvalidArgumentException(message="Dataverse must be set for couchbase analytics links.")
@@ -310,9 +360,11 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
                     message=("When encryption level is full the client "
                              "certificate and key must be set for couchbase analytics links."))
 
+    @override
     def link_type(self) -> AnalyticsLinkType:
         return AnalyticsLinkType.CouchbaseRemote
 
+    @override
     def as_dict(self) -> dict[str, Any]:
         link_dict: dict[str, Any] = {
             'link_name': self.name(),
@@ -331,7 +383,7 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
 
     @classmethod
     def link_from_server_json(cls, raw_data: dict[str, Any]) -> CouchbaseRemoteAnalyticsLink:
-
+        """**INTERNAL** The link the analytics service described."""
         dataverse = raw_data['dataverse']
         link_name = raw_data['link_name']
         hostname = raw_data['hostname']
@@ -349,6 +401,18 @@ class CouchbaseRemoteAnalyticsLink(AnalyticsLink):
 
 
 class S3ExternalAnalyticsLink(AnalyticsLink):
+    """A link to data in Amazon S3.
+
+    Args:
+        dataverse (str): The name of the dataverse the link is in.
+        link_name (str): The name of the link.
+        access_key_id (str): The AWS access key ID.
+        region (str): The AWS region the data is in.
+        secret_access_key (str, optional): The AWS secret access key. The link is not valid without it.
+        session_token (str, optional): The AWS session token, for temporary credentials.
+        service_endpoint (str, optional): The S3 endpoint, in place of the region's default.
+    """
+
     def __init__(
             self,
             dataverse: str,
@@ -368,12 +432,15 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
         self._session_token = session_token
         self._service_endpoint = service_endpoint
 
+    @override
     def name(self) -> str:
         return self._link_name
 
+    @override
     def dataverse_name(self) -> str:
         return self._dataverse
 
+    @override
     def form_encode(self) -> bytes:
         params: dict[str, str | None] = {}
 
@@ -394,6 +461,7 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
 
         return to_form_str(params).encode()
 
+    @override
     def validate(self) -> None:
         if is_null_or_empty(self._dataverse):
             raise InvalidArgumentException(
@@ -415,9 +483,11 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
             raise InvalidArgumentException(
                 message="Region must be set for S3 external analytics links.")
 
+    @override
     def link_type(self) -> AnalyticsLinkType:
         return AnalyticsLinkType.S3External
 
+    @override
     def as_dict(self) -> dict[str, Any]:
         link_dict = {
             'link_name': self.name(),
@@ -436,7 +506,7 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
 
     @classmethod
     def link_from_server_json(cls, raw_data: dict[str, Any]) -> S3ExternalAnalyticsLink:
-
+        """**INTERNAL** The link the analytics service described."""
         dataverse = raw_data['dataverse']
         link_name = raw_data['link_name']
         access_key_id = raw_data['access_key_id']
@@ -455,6 +525,22 @@ class S3ExternalAnalyticsLink(AnalyticsLink):
 
 
 class AzureBlobExternalAnalyticsLink(AnalyticsLink):
+    """A link to data in Azure Blob Storage.
+
+    The link authenticates with a connection string, or with an account name and either an account key or a shared
+    access signature.
+
+    Args:
+        dataverse (str): The name of the dataverse the link is in.
+        link_name (str): The name of the link.
+        connection_string (str, optional): The Azure connection string.
+        account_name (str, optional): The storage account name.
+        account_key (str, optional): The storage account key.
+        shared_access_signature (str, optional): A shared access signature for the account.
+        blob_endpoint (str, optional): The blob service endpoint.
+        endpoint_suffix (str, optional): The endpoint suffix.
+    """
+
     def __init__(
             self,
             dataverse: str,
@@ -476,12 +562,15 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
         self._blob_endpoint = blob_endpoint
         self._endpoint_suffix = endpoint_suffix
 
+    @override
     def name(self) -> str:
         return self._link_name
 
+    @override
     def dataverse_name(self) -> str:
         return self._dataverse
 
+    @override
     def form_encode(self) -> bytes:
         params: dict[str, str | None] = {}
 
@@ -511,6 +600,7 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
 
         return to_form_str(params).encode()
 
+    @override
     def validate(self) -> None:
         if is_null_or_empty(self._dataverse):
             raise InvalidArgumentException("Dataverse must be set for Azure blob external analytics links.")
@@ -527,9 +617,11 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
             if not (acct_name_and_key or acct_name_and_sas):
                 raise InvalidArgumentException("AccessKeyId must be set for Azure blob external analytics links.")
 
+    @override
     def link_type(self) -> AnalyticsLinkType:
         return AnalyticsLinkType.AzureBlobExternal
 
+    @override
     def as_dict(self) -> dict[str, Any]:
         link_dict = {
             'link_name': self.name(),
@@ -552,7 +644,7 @@ class AzureBlobExternalAnalyticsLink(AnalyticsLink):
 
     @classmethod
     def link_from_server_json(cls, raw_data: dict[str, Any]) -> AzureBlobExternalAnalyticsLink:
-
+        """**INTERNAL** The link the analytics service described."""
         dataverse = raw_data['dataverse']
         link_name = raw_data['link_name']
         account_name = raw_data.get('account_name', None)

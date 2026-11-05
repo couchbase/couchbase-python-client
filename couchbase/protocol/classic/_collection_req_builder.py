@@ -627,7 +627,7 @@ class CollectionRequestBuilder:
             if scan_type.seed is not None:
                 scan_type_dict['seed'] = scan_type.seed
         else:
-            raise InvalidArgumentException('scan_type must be Union[RangeScan, PrefixScan, SamplingScan]')
+            raise InvalidArgumentException('scan_type must be RangeScan | PrefixScan | SamplingScan')
 
         return scan_type_dict
 

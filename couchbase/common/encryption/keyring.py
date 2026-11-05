@@ -23,18 +23,18 @@ from couchbase.common.encryption import Key
 
 
 class Keyring(ABC):
+    """The interface a store of encryption keys implements."""
 
     @abstractmethod
     def get_key(self, key_id: str) -> Key:
-        """Returns requested key
+        """Get a key by its ID.
 
         Args:
-            key_id (str): Key ID to retrieve
+            key_id (str): The key's ID.
 
         Returns:
-            :class:`~couchbase.encryption.Key`: The corresponding :class:`~couchbase.encryption.Key`
-            of the provided key_id.
+            :class:`~couchbase.encryption.Key`: The key.
 
         Raises:
-            :class:`~couchbase.exceptions.CryptoKeyNotFoundException`: If the key is not found.
+            :class:`~couchbase.exceptions.CryptoKeyNotFoundException`: If the keyring has no key with that ID.
         """

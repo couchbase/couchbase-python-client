@@ -56,11 +56,17 @@ class SearchIndex:
     plan_params: dict[str, Any] = field(default_factory=dict)
 
     def is_valid(self) -> bool:
+        """Check that the index has a name, a type and a source type.
+
+        Returns:
+            bool: True if none of the three is empty.
+        """
         return not (is_null_or_empty(self.name)
                     or is_null_or_empty(self.idx_type)
                     or is_null_or_empty(self.source_type))
 
     def as_dict(self) -> dict[str, Any]:
+        """**INTERNAL** The index as the dict the management request is built from."""
         output = {
             'name': self.name,
             'type': self.idx_type,
@@ -82,6 +88,7 @@ class SearchIndex:
 
     @classmethod
     def from_server(cls, json_data: dict[str, Any]) -> SearchIndex:
+        """**INTERNAL** The index the search service described."""
         params = {}
         params_json = json_data.get('params_json', None)
         if params_json:
@@ -110,7 +117,7 @@ class SearchIndex:
 
     @classmethod
     def from_json(cls, json_input: str | dict[str, Any]) -> SearchIndex:
-        """ Creates a :class:`.SearchIndex` from a provided JSON str or Python dict derived from JSON.
+        """Creates a :class:`.SearchIndex` from a provided JSON str or Python dict derived from JSON.
 
         Args:
             json_input (str | dict[str, Any]): JSON representation of the search index.

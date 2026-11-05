@@ -22,40 +22,42 @@ from typing import Any
 
 
 class CryptoManager(ABC):
-    """Interface a CryptoManager must implement
+    """The interface field-level encryption is built on.
 
+    A crypto manager encrypts and decrypts field values, and mangles the names of encrypted fields so a reader can tell
+    them apart.
     """
 
     _DEFAULT_ENCRYPTER_ALIAS = '__DEFAULT__'
 
     @abstractmethod
     def encrypt(self, plaintext: str | bytes | bytearray, encrypter_alias: str | None = None) -> dict[str, Any]:
-        """Encrypts the given plaintext using the given encrypter alias.
+        """Encrypt a value with the encrypter registered under an alias.
 
         Args:
-            plaintext (str | bytes | bytearray): Input to be encrypted
-            encrypter_alias (str, optional):  Alias of encrypter to use, if None, default alias is used.
+            plaintext (str | bytes | bytearray): The value to encrypt.
+            encrypter_alias (str, optional): The alias of the encrypter to use. Defaults to None, which uses the
+                default encrypter.
 
         Returns:
-            dict: A :class:`~couchbase.encryption.EncryptionResult` as a dict
+            dict[str, Any]: An :class:`~couchbase.encryption.EncryptionResult` as a dict.
 
         Raises:
-            :class:`~couchbase.exceptions.EncryptionFailureException`
+            :class:`~couchbase.exceptions.EncryptionFailureException`: If the value could not be encrypted.
         """
 
     @abstractmethod
     def decrypt(self, encrypted: dict[str, Any]) -> bytes:
-        """Decrypts the given encrypted result based on the 'alg' key in the encrypted result.
+        """Decrypt a value with the decrypter its ``alg`` key names.
 
         Args:
-            encrypted (dict[str, Any]): A dict containing encryption information, must have an 'alg' key.
+            encrypted (dict[str, Any]): An encrypted value, which must have an ``alg`` key.
 
         Returns:
-            bytes: A decrypted result based on the given encrypted input.
+            bytes: The decrypted value.
 
         Raises:
-            :class:`~couchbase.exceptions.DecryptionFailureException`
-
+            :class:`~couchbase.exceptions.DecryptionFailureException`: If the value could not be decrypted.
         """
 
     @abstractmethod

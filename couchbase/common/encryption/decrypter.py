@@ -23,8 +23,11 @@ from couchbase.common.encryption import EncryptionResult, Keyring
 
 
 class Decrypter(ABC):
-    """Interface a Decrypter must implement
+    """The interface a decrypter for one algorithm implements.
 
+    Args:
+        keyring (:class:`~couchbase.encryption.Keyring`): Where the decrypter finds its keys.
+        alg (str, optional): The name of the algorithm the decrypter handles.
     """
 
     def __init__(self, keyring: Keyring, alg: str | None = None) -> None:
@@ -33,30 +36,30 @@ class Decrypter(ABC):
 
     @property
     def keyring(self) -> Keyring:
+        """Where the decrypter finds its keys."""
         return self._keyring
 
     def algorithm(self) -> str | None:
-        """Provides name of algorithm associated with Decrypter
+        """Get the name of the algorithm the decrypter handles.
 
         Returns:
-            str | None: The name of the decryption algorithm, or None if none was given.
+            str | None: The name of the algorithm, or None if none was given.
         """
         return self._alg
 
     @abstractmethod
     def decrypt(self, encrypted: EncryptionResult) -> bytes:
-        """Decrypts the given :class:`~couchbase.encryption.EncryptionResult` ciphertext.
+        """Decrypt an encrypted value.
 
-        The Decrypter's algorithm should match the `alg` property of the given
-        :class:`~couchbase.encryption.EncryptionResult`
+        The decrypter's algorithm should match the value's ``alg``.
 
         Args:
-            encrypted (:class:`~couchbase.encryption.EncryptionResult`): The encrypted value to decrypt.
+            encrypted (:class:`~couchbase.encryption.EncryptionResult`): The value to decrypt.
 
         Returns:
-            bytes: The decrypted ciphertext.
+            bytes: The decrypted value.
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidCryptoKeyException`
-            :class:`~couchbase.exceptions.InvalidCipherTextException`
+            :class:`~couchbase.exceptions.InvalidCryptoKeyException`: If the key is not valid for the algorithm.
+            :class:`~couchbase.exceptions.InvalidCipherTextException`: If the ciphertext cannot be decrypted.
         """

@@ -30,10 +30,16 @@ __all__ = [
     'WanDevelopmentProfile',
 ]
 
+import sys
 from abc import ABC, abstractmethod
 from datetime import timedelta
 from enum import Enum
 from typing import TYPE_CHECKING
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 from couchbase.common.exceptions import InvalidArgumentException
 
@@ -42,8 +48,7 @@ if TYPE_CHECKING:
 
 
 class KnownConfigProfiles(Enum):
-    """
-    **VOLATILE** This API is subject to change at any time.
+    """**VOLATILE** This API is subject to change at any time.
 
     Represents the name of a specific configuration profile that is associated with predetermined cluster options.
 
@@ -52,6 +57,7 @@ class KnownConfigProfiles(Enum):
 
     @classmethod
     def from_str(cls, value: str) -> KnownConfigProfiles:
+        """**INTERNAL** The profile a name refers to."""
         if isinstance(value, str):
             if value == cls.WanDevelopment.value:
                 return cls.WanDevelopment
@@ -61,6 +67,7 @@ class KnownConfigProfiles(Enum):
 
     @classmethod
     def to_str(cls, value: KnownConfigProfiles | str) -> str:
+        """**INTERNAL** The name of a profile, which a str is taken to be already."""
         if isinstance(value, KnownConfigProfiles):
             return value.value
 
@@ -75,8 +82,7 @@ class KnownConfigProfiles(Enum):
 
 
 class ConfigProfile(ABC):
-    """
-    **VOLATILE** This API is subject to change at any time.
+    """**VOLATILE** This API is subject to change at any time.
 
     This is an abstract base class intended to use with creating Configuration Profiles.  Any derived class
     will need to implement the :meth:`apply` method.
@@ -87,8 +93,7 @@ class ConfigProfile(ABC):
 
     @abstractmethod
     def apply(self, options: ClusterOptions) -> None:
-        """
-        **VOLATILE** This API is subject to change at any time.
+        """**VOLATILE** This API is subject to change at any time.
 
         Apply the provided options to ClusterOptions. This method will need to be implemented in derived classes.
 
@@ -99,15 +104,18 @@ class ConfigProfile(ABC):
 
 
 class WanDevelopmentProfile(ConfigProfile):
-    """
-    **VOLATILE** This API is subject to change at any time.
+    """**VOLATILE** This API is subject to change at any time.
 
-    The WAN Development profile sets various timeout options that are useful when develoption in a WAN environment.
+    Timeouts long enough for developing against a cluster across a WAN.
+
+    It sets 20 seconds for KV, durable KV, connect, DNS SRV and hostname resolution, and 120 seconds for analytics,
+    query, search, management, views and bootstrap.
     """
 
     def __init__(self) -> None:
         super().__init__()
 
+    @override
     def apply(self, options: ClusterOptions) -> None:
         # Every key set here has to be one ClusterTimeoutOptions accepts, which is
         # cluster_keys('ClusterTimeoutOptions') in couchbase/common/_option_args.py.
@@ -125,8 +133,7 @@ class WanDevelopmentProfile(ConfigProfile):
 
 
 class ConfigProfiles():
-    """
-    **VOLATILE** This API is subject to change at any time.
+    """**VOLATILE** This API is subject to change at any time.
 
     The `ConfigProfiles` class is responsible for keeping track of registered/known Configuration
     Profiles.
@@ -137,8 +144,7 @@ class ConfigProfiles():
         self.register_profile(KnownConfigProfiles.WanDevelopment.value, WanDevelopmentProfile())
 
     def apply_profile(self, profile_name: str, options: ClusterOptions) -> None:
-        """
-        **VOLATILE** This API is subject to change at any time.
+        """**VOLATILE** This API is subject to change at any time.
 
         Apply the provided ConfigProfile options.
 
@@ -156,8 +162,7 @@ class ConfigProfiles():
         self._profiles[profile_name].apply(options)
 
     def register_profile(self, profile_name: str, profile: ConfigProfile) -> None:
-        """
-        **VOLATILE** This API is subject to change at any time.
+        """**VOLATILE** This API is subject to change at any time.
 
         Register a :class:`~couchbase.options.ConfigProfile`.
 
@@ -177,19 +182,17 @@ class ConfigProfiles():
         self._profiles[profile_name] = profile
 
     def unregister_profile(self, profile_name: str) -> ConfigProfile | None:
-        """
-        **VOLATILE** This API is subject to change at any time.
+        """**VOLATILE** This API is subject to change at any time.
 
         Unregister a :class:`~couchbase.options.ConfigProfile`.
 
         Args:
-            profile_name (str):  The name of the :class:`~couchbase.options.ConfigProfile` to unregister.
+            profile_name (str): The name of the :class:`~couchbase.options.ConfigProfile` to unregister.
 
-        Returns
-            Optional(:class:`~couchbase.options.ConfigProfile`): The unregistered
-            :class:`~couchbase.options.ConfigProfile`
+        Returns:
+            :class:`~couchbase.options.ConfigProfile` | None: The profile that was registered under the name, or
+            None if none was.
         """
-
         return self._profiles.pop(profile_name, None)
 
 

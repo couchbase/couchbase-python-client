@@ -169,7 +169,7 @@ def _get_per_key_opts(per_key_opts: dict[str, Any],
     final_key_opts = {}
     for key, opts in per_key_opts.items():
         if not isinstance(opts, (opt_type, dict)):
-            raise InvalidArgumentException(message=f'Expected options to be of type Union[{opt_type.__name__}, dict]')
+            raise InvalidArgumentException(message=f'Expected options to be of type {opt_type.__name__} | dict')
         key_opts = {}
         opts = _judged(per_key_block, entry, opts, mode, protocol)
         for opt_key, opt_value in opts.items():

@@ -64,6 +64,7 @@ if TYPE_CHECKING:
 
 
 class UserManager:
+    """Performs management operations on users, groups and roles."""
 
     def __init__(self, impl: AsyncUserMgmtInterface) -> None:
         self._impl = impl
@@ -146,19 +147,20 @@ class UserManager:
                               new_password: str,
                               options: ChangePasswordOptions | None = None,
                               **kwargs: Unpack[ChangePasswordOptionsKwargs]) -> None:
-        """Changes the password of the currently authenticated user. SDK must be re-started and a new connection
-         established after running, as the previous credentials will no longer be valid.
+        """Changes the password of the currently authenticated user.
 
-         Args:
-             new_password (str): The new password for the user
-             options (:class:`~couchbase.management.options.ChangePasswordOptions`): Optional parameters for this
+        The previous credentials stop being valid, so the SDK must be restarted and a new connection established
+        with the new password.
+
+        Args:
+            new_password (str): The new password for the user.
+            options (:class:`~couchbase.management.options.ChangePasswordOptions`): Optional parameters for this
                 operation.
             **kwargs (dict[str, Any]): keyword arguments that can be used as optional parameters
                 for this operation.
 
         Raises:
-            :class:`~couchbase.exceptions.InvalidArgumentException`: If the provided group argument contains an
-                invalid value or type.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If the new password is not a valid value or type.
         """
         await self._impl.change_password(new_password, options, **kwargs)
 

@@ -23,5 +23,11 @@ from enum import IntEnum
 
 
 class ReadPreference(IntEnum):
+    """Which replicas a replica read may read from.
+
+    NO_PREFERENCE reads from any replica. SELECTED_SERVER_GROUP reads only from nodes in the server group the
+    ``preferred_server_group`` cluster option names.
+    """
+
     NO_PREFERENCE = 0
     SELECTED_SERVER_GROUP = 1

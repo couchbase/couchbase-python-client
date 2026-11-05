@@ -33,9 +33,7 @@ if TYPE_CHECKING:
 
 
 class CreateCollectionSettings:
-    """
-        Specifies settings for a collection that will be created.
-    """
+    """Specifies settings for a collection that will be created."""
 
     def __init__(self, max_expiry: timedelta | None = None, history: bool | None = None) -> None:
         self._max_expiry = max_expiry
@@ -43,16 +41,14 @@ class CreateCollectionSettings:
 
     @property
     def max_expiry(self) -> timedelta | None:
-        """
-            timedelta | None: The maximum expiry for documents in the collection.
-        """
+        """The maximum expiry for documents in the collection."""
         return self._max_expiry
 
     @property
     def history(self) -> bool | None:
-        """
-            bool | None: Whether history retention override should be enabled in the collection. If not set, it will
-            default to the bucket-level setting
+        """Whether the collection keeps a change history.
+
+        ``None`` leaves it to the bucket's ``history_retention_collection_default``.
         """
         return self._history
 
@@ -61,9 +57,7 @@ class CreateCollectionSettings:
 
 
 class UpdateCollectionSettings:
-    """
-        Specifies settings for a collection that will be updated.
-    """
+    """Specifies settings for a collection that will be updated."""
 
     def __init__(self, max_expiry: timedelta | None = None, history: bool | None = None) -> None:
         self._max_expiry = max_expiry
@@ -71,16 +65,14 @@ class UpdateCollectionSettings:
 
     @property
     def max_expiry(self) -> timedelta | None:
-        """
-            timedelta | None: The maximum expiry for documents in the collection.
-        """
+        """The maximum expiry for documents in the collection."""
         return self._max_expiry
 
     @property
     def history(self) -> bool | None:
-        """
-            bool | None: Whether history retention override should be enabled in the collection. If not set, it will
-            default to the bucket-level setting
+        """Whether the collection keeps a change history.
+
+        ``None`` leaves it to the bucket's ``history_retention_collection_default``.
         """
         return self._history
 
@@ -89,6 +81,16 @@ class UpdateCollectionSettings:
 
 
 class CollectionSpec:
+    """A collection, as :meth:`.CollectionManager.get_all_scopes` describes it.
+
+    Args:
+        collection_name (str): The name of the collection.
+        scope_name (str, optional): The name of the collection's scope. Defaults to ``_default``.
+        max_expiry (timedelta, optional): The longest expiry a document in the collection can have.
+        max_ttl (timedelta, optional): **DEPRECATED** Use ``max_expiry``.
+        history (bool, optional): Whether the collection keeps a change history.
+    """
+
     def __init__(self,
                  collection_name: str,
                  scope_name: str = '_default',
@@ -107,14 +109,12 @@ class CollectionSpec:
 
     @property
     def max_expiry(self) -> timedelta | None:
-        """
-            timedelta | None: The expiry for documents in the collection.
-        """
+        """The longest expiry a document in the collection can have."""
         return self._max_expiry
 
     @property
     def max_ttl(self) -> timedelta | None:
-        """timedelta | None: The expiry for documents in the collection.
+        """The longest expiry a document in the collection can have.
 
         .. deprecated:: 4.3.5
             Use :attr:`max_expiry` instead.
@@ -124,24 +124,20 @@ class CollectionSpec:
 
     @property
     def history(self) -> bool | None:
-        """
-            bool | None: Whether history retention is enabled in the collection. None represents the bucket-level
-            setting.
+        """Whether the collection keeps a change history.
+
+        ``None`` means the collection follows the bucket's setting.
         """
         return self._history
 
     @property
     def name(self) -> str:
-        """
-            str: The name of the collection
-        """
+        """The name of the collection."""
         return self._name
 
     @property
     def scope_name(self) -> str:
-        """
-            str: The name of the collection's scope
-        """
+        """The name of the collection's scope."""
         return self._scope_name
 
     def __repr__(self) -> str:
@@ -150,22 +146,25 @@ class CollectionSpec:
 
 
 class ScopeSpec:
+    """A scope and its collections, as :meth:`.CollectionManager.get_all_scopes` describes them.
+
+    Args:
+        name (str): The name of the scope.
+        collections (Iterable[:class:`.CollectionSpec`]): The scope's collections.
+    """
+
     def __init__(self, name: str, collections: Iterable[CollectionSpec]) -> None:
         self._name = name
         self._collections = collections
 
     @property
     def name(self) -> str:
-        """
-            str: The name of the scope
-        """
+        """The name of the scope."""
         return self._name
 
     @property
     def collections(self) -> Iterable[CollectionSpec]:
-        """
-            list[:class:`.CollectionSpec`]: A list of the scope's collections.
-        """
+        """The scope's collections."""
         return self._collections
 
     def __repr__(self) -> str:

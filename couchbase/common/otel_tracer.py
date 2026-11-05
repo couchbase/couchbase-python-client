@@ -19,7 +19,13 @@ __all__ = [
     'CouchbaseOtelTracer',
 ]
 
+import sys
 from typing import Any
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 from opentelemetry.trace import (Span,
                                  Tracer,
@@ -29,21 +35,52 @@ from couchbase.common._tracing import CouchbaseSpan, CouchbaseTracer
 
 
 class CouchbaseOtelSpan(CouchbaseSpan):
+    """**DEPRECATED** A span over an OpenTelemetry span, for the deprecated tracer interface.
+
+    .. deprecated:: 4.6.0
+        Use :func:`~couchbase.observability.get_otel_tracer`, whose spans are
+        :class:`~couchbase.observability.tracing.RequestSpan`.
+
+    Args:
+        otel_span (opentelemetry.trace.Span): The span it writes to.
+    """
+
     def __init__(self, otel_span: Span) -> None:
         super().__init__(otel_span)
 
+    @override
     def set_attribute(self, key: str, value: Any) -> None:
         self.span.set_attribute(key=key, value=value)
 
+    @override
     def finish(self) -> None:
         self.span.end()
 
 
 class CouchbaseOtelTracer(CouchbaseTracer):
+    """**DEPRECATED** A tracer over an OpenTelemetry tracer, for the deprecated tracer interface.
+
+    .. deprecated:: 4.6.0
+        Use :func:`~couchbase.observability.get_otel_tracer`, which returns a
+        :class:`~couchbase.observability.tracing.RequestTracer`.
+
+    Args:
+        otel_tracer (opentelemetry.trace.Tracer): The tracer it starts spans with.
+    """
+
     def __init__(self, otel_tracer: Tracer) -> None:
         super().__init__(otel_tracer)
 
     def start_span(self, name: str, parent: CouchbaseSpan | None = None) -> CouchbaseOtelSpan:
+        """Start a span, as a child of a parent span if one is given.
+
+        Args:
+            name (str): The name of the operation.
+            parent (CouchbaseSpan, optional): The span of the operation this one is part of.
+
+        Returns:
+            :class:`CouchbaseOtelSpan`: The new span.
+        """
         kwargs: dict[str, Any] = {}
         if parent:
             kwargs['context'] = set_span_in_context(parent.span)
@@ -51,8 +88,7 @@ class CouchbaseOtelTracer(CouchbaseTracer):
             self._external_tracer.start_span(name, **kwargs))
 
     def __deepcopy__(self, memo: dict[int, Any]) -> None:
-        """
-        This prevents deepcopies, as the underlying opentelemetry tracer doesn't support a deepcopy.
+        """This prevents deepcopies, as the underlying opentelemetry tracer doesn't support a deepcopy.
 
         Args:
             memo: The object that we are copying into.

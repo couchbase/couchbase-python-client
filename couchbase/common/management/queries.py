@@ -25,6 +25,24 @@ from typing import Any
 
 @dataclass
 class QueryIndex:
+    """A query index, as the query service describes it.
+
+    Attributes:
+        name (str): The name of the index.
+        is_primary (bool): Whether the index is a primary index.
+        type (str): The kind of index, such as ``gsi``.
+        state (str): The state of the index, such as ``online`` or ``deferred``.
+        namespace (str | None): The namespace the index is in, if the service reports it.
+        datastore_id (str | None): The datastore the index is in, if the service reports it.
+        keyspace (str | None): What the index is on: its collection, or its bucket for an index on the bucket itself.
+        index_key (list[str]): The expressions the index keys on.
+        condition (str | None): The ``WHERE`` clause of a partial index.
+        bucket_name (str | None): The name of the bucket the index is in.
+        scope_name (str | None): The name of the scope the index is in.
+        collection_name (str | None): The name of the collection the index is on.
+        partition (str | None): The ``PARTITION BY`` clause of a partitioned index.
+    """
+
     name: str
     is_primary: bool
     type: str
@@ -42,7 +60,7 @@ class QueryIndex:
 
     @classmethod
     def from_server(cls, json_data: dict[str, Any]) -> QueryIndex:
-
+        """**INTERNAL** The index the query service described."""
         bucket_name = json_data.get('bucket_name', None)
         if bucket_name is None:
             bucket_name = json_data.get('keyspace_id', None)

@@ -11,19 +11,17 @@ from couchbase.common.vector_search import VectorSearch
 
 
 class SearchRequest:
-    """ Represents a search query and/or vector search to execute via the Couchbase Full Text Search (FTS) service.
+    """A search query, a vector search, or both, to run on the Search service.
+
+    A request holding both is a hybrid search, and the request's scoring option sets how their results are combined.
 
     Args:
-        query (:class:`~couchbase.search.SearchQuery` | :class:`~couchbase.vector_search.VectorSearch`): A
-            :class:`~couchbase.search.SearchQuery` or
-            :class:`~couchbase.vector_search.VectorSearch` to initialize the search request.
+        query (:class:`~couchbase.search.SearchQuery` | :class:`~couchbase.vector_search.VectorSearch`): The
+            search query or vector search to start with. Add the other with :meth:`with_search_query` or
+            :meth:`with_vector_search`.
 
     Raises:
-        :class:`~couchbase.exceptions.InvalidArgumentException`: If neither a :class:`~couchbase.search.SearchQuery` or
-            :class:`~couchbase.vector_search.VectorSearch` is provided.
-
-    Returns:
-        :class:`~couchbase.search.SearchRequest`: The created search request.
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If query is neither.
     """
 
     def __init__(self, query: SearchQuery | VectorSearch):
@@ -39,22 +37,16 @@ class SearchRequest:
 
     @property
     def search_query(self) -> SearchQuery | None:
-        """
-        :class:`~couchbase.search.SearchQuery` | None: Returns the search request's
-        :class:`~couchbase.search.SearchQuery`, if it exists.
-        """
+        """The request's search query, or None if it has none."""
         return self._search_query
 
     @property
     def vector_search(self) -> VectorSearch | None:
-        """
-        :class:`~couchbase.vector_search.VectorSearch` | None: Returns the search request's
-        :class:`~couchbase.vector_search.VectorSearch`, if it exists.
-        """
+        """The request's vector search, or None if it has none."""
         return self._vector_search
 
     def with_search_query(self, query: SearchQuery) -> SearchRequest:
-        """ Add a :class:`~couchbase.search.SearchQuery` to the search request.
+        """Add a :class:`~couchbase.search.SearchQuery` to the search request.
 
         Args:
             query (:class:`~couchbase.search.SearchQuery`): The :class:`~couchbase.search.SearchQuery` to add to the
@@ -79,7 +71,7 @@ class SearchRequest:
         return self
 
     def with_vector_search(self, vector_search: VectorSearch) -> SearchRequest:
-        """ Add a :class:`~couchbase.vector_search.VectorSearch` to the search request.
+        """Add a :class:`~couchbase.vector_search.VectorSearch` to the search request.
 
         Args:
             vector_search (:class:`~couchbase.vector_search.VectorSearch`): The
@@ -105,7 +97,7 @@ class SearchRequest:
 
     @classmethod
     def create(cls, query: SearchQuery | VectorSearch) -> SearchRequest:
-        """ Creates a :class:`~couchbase.search.SearchRequest`.
+        """Creates a :class:`~couchbase.search.SearchRequest`.
 
         Args:
             query (:class:`~couchbase.search.SearchQuery` | :class:`~couchbase.vector_search.VectorSearch`): A

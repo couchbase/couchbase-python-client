@@ -17,7 +17,13 @@ from __future__ import annotations
 
 __all__ = ['get_otel_tracer']
 
+import sys
 import typing
+
+if sys.version_info >= (3, 12):
+    from typing import override
+else:
+    from typing_extensions import override
 
 from couchbase._version import __version__
 from couchbase.common.observability.tracing import (RequestSpan,
@@ -53,24 +59,36 @@ if _HAS_OTEL:  # noqa: C901
     }
 
     class OtelWrapperSpan(RequestSpan):
+        """A :class:`~couchbase.observability.tracing.RequestSpan` over an OpenTelemetry span.
+
+        Args:
+            otel_span (opentelemetry.trace.Span): The span it writes to.
+            name (str): The name of the operation it traces.
+        """
+
         def __init__(self, otel_span: otel_trace.Span, name: str):
             self._otel_span = otel_span
             self._name = name
 
         @property
+        @override
         def name(self) -> str:
             return self._name
 
         @property
+        @override
         def is_recording(self) -> bool:
             return self._otel_span.is_recording()
 
+        @override
         def set_attribute(self, key: str, value: SpanAttributeValue) -> None:
             self._otel_span.set_attribute(key, value)
 
+        @override
         def set_attributes(self, attributes: SpanAttributes) -> None:
             self._otel_span.set_attributes(attributes)
 
+        @override
         def add_event(
             self,
             name: str,
@@ -80,17 +98,29 @@ if _HAS_OTEL:  # noqa: C901
 
             self._otel_span.add_event(name, attributes, timestamp)
 
+        @override
         def set_status(self, status: SpanStatusCode) -> None:
             otel_status = OtelStatus(_STATUS_MAP.get(status, OtelStatusCode.UNSET))
             self._otel_span.set_status(otel_status)
 
+        @override
         def end(self, end_time: int | None = None) -> None:
             self._otel_span.end(end_time=end_time)
 
     class OtelWrapperTracer(RequestTracer):
+        """A :class:`~couchbase.observability.tracing.RequestTracer` over an OpenTelemetry tracer.
+
+        Each span it starts is a client span, and a child of the parent span's OpenTelemetry span when the parent is an
+        :class:`OtelWrapperSpan`.
+
+        Args:
+            tracer (opentelemetry.trace.Tracer): The tracer it starts spans with.
+        """
+
         def __init__(self, tracer: otel_trace.Tracer):
             self._tracer = tracer
 
+        @override
         def request_span(
             self,
             name: str,
@@ -116,18 +146,16 @@ if _HAS_OTEL:  # noqa: C901
 
 
 def get_otel_tracer(provider: TracerProvider | None = None) -> RequestTracer:
-    """
-    Creates an OpenTelemetry wrapper tracer.
+    """Create a tracer that sends the SDK's spans to OpenTelemetry.
 
     Args:
-        provider: Optional OpenTelemetry TracerProvider. If not provided,
-                  falls back to the global OTel tracer provider.
+        provider: The tracer provider to get the tracer from. Defaults to None, which uses the global one.
 
     Returns:
-        OtelWrapperTracer instance implementing SDK's RequestTracer interface
+        The tracer, an ``OtelWrapperTracer``.
 
     Raises:
-        ImportError: If OpenTelemetry is not installed
+        ImportError: If OpenTelemetry is not installed.
     """
     if not _HAS_OTEL:
         raise ImportError(

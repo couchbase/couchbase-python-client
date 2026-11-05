@@ -48,6 +48,10 @@ if TYPE_CHECKING:
 
 
 class QueryIndexManager:
+    """Performs management operations on query indexes.
+
+    For managing query indexes at the collection level, :class:`.CollectionQueryIndexManager` should be used.
+    """
 
     def __init__(self, impl: TxQueryIndexMgmtInterface) -> None:
         self._impl = impl

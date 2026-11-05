@@ -108,8 +108,7 @@ def _prefix_length() -> _OptionalField[int]:
 
 
 class SearchQuery:
-    """
-    Base query object. You probably want to use one of the subclasses.
+    """Base query object. You probably want to use one of the subclasses.
 
     .. seealso:: :class:`MatchQuery`, :class:`BooleanQuery`,
         :class:`RegexQuery`, :class:`PrefixQuery`, :class:`NumericRangeQuery`,
@@ -124,8 +123,7 @@ class SearchQuery:
         self.boost = boost
 
     def set_prop(self, key: str, value: JSONType) -> None:
-        """
-        Sets ``key`` in the query's JSON to ``value``, sent as given and without validation.
+        """Sets ``key`` in the query's JSON to ``value``, sent as given and without validation.
 
         The key is written over whatever the query's own fields encode under it, and is not read
         back by any of the query's properties. Use this for a query parameter the class does not
@@ -135,6 +133,7 @@ class SearchQuery:
 
     @property
     def boost(self) -> float | None:
+        """A multiplier on the query's part of a hit's score, or None if not set."""
         return self._boost
 
     @boost.setter
@@ -143,9 +142,9 @@ class SearchQuery:
 
     @property
     def encodable(self) -> JSONType:
-        """
-        Returns the query as the Search service's JSON query language, validated first, in a form
-        suitable for serializing to JSON. Each read builds a new object.
+        """The query as the Search service's JSON query language, validated first.
+
+        The result is ready to serialize to JSON, and each read builds a new one.
 
         .. code-block:: python
 
@@ -154,8 +153,9 @@ class SearchQuery:
         return _encode(self)
 
     def validate(self) -> None:
-        """
-        Optional validation function. Invoked before encoding
+        """Check that the query's required fields are set, before it is encoded.
+
+        The base class checks nothing. A subclass raises if a field it needs is missing or empty.
         """
         pass
 
@@ -170,9 +170,7 @@ class SearchQuery:
 
 
 class TermQuery(SearchQuery):
-
-    """
-    Query that specifies the Search Service should search for an exact match to the specified term.
+    """Query that specifies the Search Service should search for an exact match to the specified term.
 
     Examples:
         Basic search using TermQuery::
@@ -239,6 +237,7 @@ class TermQuery(SearchQuery):
 
     @property
     def term(self) -> str | None:
+        """The term to match exactly, without analysis."""
         return self._term
 
     @term.setter
@@ -247,8 +246,7 @@ class TermQuery(SearchQuery):
 
 
 class QueryStringQuery(SearchQuery):
-    """
-    Query that specifies the Search Service should search for a match to the specified query string.
+    """Query that specifies the Search Service should search for a match to the specified query string.
 
     .. seealso::
 
@@ -306,6 +304,7 @@ class QueryStringQuery(SearchQuery):
 
     @property
     def query(self) -> str | None:
+        """The query, in the query string syntax."""
         return self._query
 
     @query.setter
@@ -314,9 +313,7 @@ class QueryStringQuery(SearchQuery):
 
 
 class WildcardQuery(SearchQuery):
-
-    """
-    Query that specifies the Search Service should search for a match to the specified wildcard string.
+    """Query that specifies the Search Service should search for a match to the specified wildcard string.
 
     Use `?` to allow a match to any single character.
     Use `*` to allow a match to zero or many characters.
@@ -381,6 +378,7 @@ class WildcardQuery(SearchQuery):
 
     @property
     def wildcard(self) -> str | None:
+        """The term to match, where ``?`` matches any one character and ``*`` any run of them."""
         return self._wildcard
 
     @wildcard.setter
@@ -389,10 +387,7 @@ class WildcardQuery(SearchQuery):
 
 
 class DocIdQuery(SearchQuery):
-
-    """
-    Query that specifies the Search Service should search matches to the specified
-    list of document ids.
+    """A query for the documents with the given IDs.
 
     Examples:
         Basic search using DocIdQuery::
@@ -446,6 +441,7 @@ class DocIdQuery(SearchQuery):
 
     @property
     def ids(self) -> Sequence[str] | None:
+        """The IDs of the documents to match."""
         return self._ids
 
     @ids.setter
@@ -453,15 +449,20 @@ class DocIdQuery(SearchQuery):
         self._ids = value
 
     def validate(self) -> None:
+        """Check that the query has at least one ID.
+
+        Raises:
+            :class:`~couchbase.exceptions.NoChildrenException`: If ``ids`` is empty.
+        """
         super().validate()
         if not self.ids:
             raise NoChildrenException('`ids` must contain at least one ID')
 
 
 class MatchQuery(SearchQuery):
-    """
-    Query that specifies the Search Service should search for an exact match to the specified
-    term inside the Search index’s default field.
+    """A query for documents matching a text, which the server analyzes into terms first.
+
+    Without a field it searches the index's default field.
 
     Examples:
         Basic search using MatchQuery::
@@ -534,6 +535,7 @@ class MatchQuery(SearchQuery):
 
     @property
     def match(self) -> str | None:
+        """The text to match, which the server analyzes into terms."""
         return self._match
 
     @match.setter
@@ -542,6 +544,10 @@ class MatchQuery(SearchQuery):
 
     @property
     def match_operator(self) -> MatchOperator | None:
+        """Whether a document must match all the text's terms or any one of them, or None if not set.
+
+        It can be set with the str ``or`` or ``and``.
+        """
         return self._match_operator
 
     @match_operator.setter
@@ -557,9 +563,9 @@ class MatchQuery(SearchQuery):
 
 
 class MatchPhraseQuery(SearchQuery):
-    """
-    Query that specifies the Search Service should search for exact matches to the specified
-    phrase. The phrase is composed of one or more terms.
+    """A query for documents holding a phrase, which the server analyzes into terms first.
+
+    The terms must appear together and in order.
 
     Examples:
         Basic search using MatchPhraseQuery::
@@ -623,6 +629,7 @@ class MatchPhraseQuery(SearchQuery):
 
     @property
     def match_phrase(self) -> str | None:
+        """The phrase to match, which the server analyzes into terms."""
         return self._match_phrase
 
     @match_phrase.setter
@@ -631,9 +638,9 @@ class MatchPhraseQuery(SearchQuery):
 
 
 class PhraseQuery(SearchQuery):
-    """
-    Query that specifies the Search Service should search for terms provided in the specified
-    order. The `field` property must be provided.
+    """A query for documents holding terms together and in order, in one field.
+
+    The ``field`` property must be set.
 
     The terms are matched as given, without analysis, so each must be a term as the index holds
     it. Pass each term as its own argument, or as a list with ``terms=``; a single string is split
@@ -707,6 +714,7 @@ class PhraseQuery(SearchQuery):
 
     @property
     def terms(self) -> list[str] | None:
+        """The terms to match, in order, without analysis."""
         return self._terms
 
     @terms.setter
@@ -716,16 +724,18 @@ class PhraseQuery(SearchQuery):
         self._terms = list(value) if isinstance(value, tuple) else value
 
     def validate(self) -> None:
+        """Check that the query has at least one term.
+
+        Raises:
+            :class:`~couchbase.exceptions.NoChildrenException`: If ``terms`` is empty.
+        """
         super().validate()
         if not self.terms:
             raise NoChildrenException('Missing terms')
 
 
 class PrefixQuery(SearchQuery):
-
-    """
-    Query that specifies the Search Service should search for matches to the specified
-    prefix.
+    """A query for documents holding a term that starts with a prefix.
 
     Examples:
         Basic search using PrefixQuery::
@@ -786,6 +796,7 @@ class PrefixQuery(SearchQuery):
 
     @property
     def prefix(self) -> str | None:
+        """The prefix a matching term starts with."""
         return self._prefix
 
     @prefix.setter
@@ -794,9 +805,7 @@ class PrefixQuery(SearchQuery):
 
 
 class RegexQuery(SearchQuery):
-    """
-    Query that specifies the Search Service should search for matches to the specified
-    regular expression.
+    """A query for documents holding a term that matches a regular expression.
 
     Examples:
         Basic search using RegexQuery::
@@ -860,6 +869,7 @@ class RegexQuery(SearchQuery):
 
     @property
     def regex(self) -> str | None:
+        """The regular expression a matching term matches."""
         return self._regexp
 
     @regex.setter
@@ -868,6 +878,7 @@ class RegexQuery(SearchQuery):
 
     @property
     def regexp(self) -> str | None:
+        """Another name for :attr:`regex`."""
         return self._regexp
 
     @regexp.setter
@@ -879,9 +890,7 @@ RegexpQuery = RegexQuery
 
 
 class BooleanFieldQuery(SearchQuery):
-    """
-    Query that specifies the Search Service should search for to the specified
-    boolean value in the provided field.
+    """A query for documents whose field holds a boolean value.
 
     Examples:
         Basic search using BooleanFieldQuery::
@@ -942,6 +951,7 @@ class BooleanFieldQuery(SearchQuery):
 
     @property
     def bool(self) -> builtins.bool | None:
+        """The boolean value to match."""
         return self._bool
 
     @bool.setter
@@ -953,9 +963,7 @@ class BooleanFieldQuery(SearchQuery):
 
 
 class GeoDistanceQuery(SearchQuery):
-    """
-    Query that specifies the Search Service should search for geo location values
-    in a set radius around a specified latitude and longitude.
+    """A query for documents with a location within a distance of a point.
 
     If you use location as an array, your array must contain a longitude value followed by a latitude value.
 
@@ -1046,6 +1054,7 @@ class GeoDistanceQuery(SearchQuery):
 
     @property
     def location(self) -> list[float] | None:
+        """The point the distance is measured from, as ``[longitude, latitude]``."""
         return self._location
 
     @location.setter
@@ -1054,6 +1063,7 @@ class GeoDistanceQuery(SearchQuery):
 
     @property
     def distance(self) -> str | None:
+        """The distance, with its unit, as in ``10mi``."""
         return self._distance
 
     @distance.setter
@@ -1062,9 +1072,7 @@ class GeoDistanceQuery(SearchQuery):
 
 
 class GeoBoundingBoxQuery(SearchQuery):
-    """
-    Query that specifies the Search Service should search for geo location values
-    in a defined rectangle.
+    """A query for documents with a location inside a rectangle.
 
     If you use location as an array, your array must contain a longitude value followed by a latitude value.
 
@@ -1158,6 +1166,7 @@ class GeoBoundingBoxQuery(SearchQuery):
 
     @property
     def top_left(self) -> list[float] | None:
+        """The rectangle's top left corner, as ``[longitude, latitude]``."""
         return self._top_left
 
     @top_left.setter
@@ -1166,6 +1175,7 @@ class GeoBoundingBoxQuery(SearchQuery):
 
     @property
     def bottom_right(self) -> list[float] | None:
+        """The rectangle's bottom right corner, as ``[longitude, latitude]``."""
         return self._bottom_right
 
     @bottom_right.setter
@@ -1174,9 +1184,7 @@ class GeoBoundingBoxQuery(SearchQuery):
 
 
 class GeoPolygonQuery(SearchQuery):
-    """
-    Query that specifies the Search Service should search for geo location values
-    in a defined polygon.
+    """A query for documents with a location inside a polygon.
 
     The point tuple must contain a longitude value followed by a latitude value.
 
@@ -1258,6 +1266,7 @@ class GeoPolygonQuery(SearchQuery):
 
     @property
     def polygon_points(self) -> list[list[float]] | None:
+        """The polygon's corners, each as ``[longitude, latitude]``."""
         return self._polygon_points
 
     @polygon_points.setter
@@ -1273,9 +1282,7 @@ def _no_bounds(names: tuple[str, str]) -> ValueError:
 
 
 class NumericRangeQuery(SearchQuery):
-    """
-    Query that specifies the Search Service should search for matches to the specified
-    numerical range.
+    """A query for documents whose field holds a number in a range.
 
     .. note::
         At least one of `min` or `max` must be specified.
@@ -1368,6 +1375,7 @@ class NumericRangeQuery(SearchQuery):
 
     @property
     def min(self) -> float | None:
+        """The lower bound, or None for no lower bound."""
         return self._min
 
     @min.setter
@@ -1376,7 +1384,8 @@ class NumericRangeQuery(SearchQuery):
 
     @property
     def min_inclusive(self) -> bool | None:
-        """
+        """**DEPRECATED** The same as :attr:`inclusive_min`.
+
         .. deprecated:: 4.4.0
             Use :attr:`inclusive_min` instead.
         """
@@ -1390,6 +1399,7 @@ class NumericRangeQuery(SearchQuery):
 
     @property
     def inclusive_min(self) -> bool | None:
+        """Whether the lower bound is in the range, or None if not set."""
         return self._inclusive_min
 
     @inclusive_min.setter
@@ -1398,6 +1408,7 @@ class NumericRangeQuery(SearchQuery):
 
     @property
     def max(self) -> float | None:
+        """The upper bound, or None for no upper bound."""
         return self._max
 
     @max.setter
@@ -1406,7 +1417,8 @@ class NumericRangeQuery(SearchQuery):
 
     @property
     def max_inclusive(self) -> bool | None:
-        """
+        """**DEPRECATED** The same as :attr:`inclusive_max`.
+
         .. deprecated:: 4.4.0
             Use :attr:`inclusive_max` instead.
         """
@@ -1420,6 +1432,7 @@ class NumericRangeQuery(SearchQuery):
 
     @property
     def inclusive_max(self) -> bool | None:
+        """Whether the upper bound is in the range, or None if not set."""
         return self._inclusive_max
 
     @inclusive_max.setter
@@ -1428,10 +1441,7 @@ class NumericRangeQuery(SearchQuery):
 
 
 class DateRangeQuery(SearchQuery):
-
-    """
-    Query that specifies the Search Service should search for matches to the specified
-    date range.
+    """A query for documents whose field holds a date in a range.
 
     .. note::
         At least one of `start` or `end` must be specified.
@@ -1531,6 +1541,7 @@ class DateRangeQuery(SearchQuery):
 
     @property
     def start(self) -> str | None:
+        """The earliest date, or None for no lower bound."""
         return self._start
 
     @start.setter
@@ -1539,7 +1550,8 @@ class DateRangeQuery(SearchQuery):
 
     @property
     def start_inclusive(self) -> bool | None:
-        """
+        """**DEPRECATED** The same as :attr:`inclusive_start`.
+
         .. deprecated:: 4.4.0
             Use :attr:`inclusive_start` instead.
         """
@@ -1553,6 +1565,7 @@ class DateRangeQuery(SearchQuery):
 
     @property
     def inclusive_start(self) -> bool | None:
+        """Whether the start date is in the range, or None if not set."""
         return self._inclusive_start
 
     @inclusive_start.setter
@@ -1561,6 +1574,7 @@ class DateRangeQuery(SearchQuery):
 
     @property
     def end(self) -> str | None:
+        """The latest date, or None for no upper bound."""
         return self._end
 
     @end.setter
@@ -1569,7 +1583,8 @@ class DateRangeQuery(SearchQuery):
 
     @property
     def end_inclusive(self) -> bool | None:
-        """
+        """**DEPRECATED** The same as :attr:`inclusive_end`.
+
         .. deprecated:: 4.4.0
             Use :attr:`inclusive_end` instead.
         """
@@ -1583,6 +1598,7 @@ class DateRangeQuery(SearchQuery):
 
     @property
     def inclusive_end(self) -> bool | None:
+        """Whether the end date is in the range, or None if not set."""
         return self._inclusive_end
 
     @inclusive_end.setter
@@ -1591,6 +1607,7 @@ class DateRangeQuery(SearchQuery):
 
     @property
     def datetime_parser(self) -> str | None:
+        """The name of the index's date parser that reads the dates, or None for the index's default."""
         return self._datetime_parser
 
     @datetime_parser.setter
@@ -1599,10 +1616,7 @@ class DateRangeQuery(SearchQuery):
 
 
 class TermRangeQuery(SearchQuery):
-
-    """
-    Query that specifies the Search Service should search for matches to the specified
-    range of terms.
+    """A query for documents holding a term in a range, in lexical order.
 
     .. note::
         At least one of `min` or `max` must be specified.
@@ -1689,7 +1703,8 @@ class TermRangeQuery(SearchQuery):
 
     @property
     def start(self) -> str | None:
-        """
+        """**DEPRECATED** The same as :attr:`min`.
+
         .. deprecated:: 4.4.0
             Use :attr:`min` instead.
         """
@@ -1703,6 +1718,7 @@ class TermRangeQuery(SearchQuery):
 
     @property
     def min(self) -> str | None:
+        """The lower bound, or None for no lower bound."""
         return self._min
 
     @min.setter
@@ -1711,7 +1727,8 @@ class TermRangeQuery(SearchQuery):
 
     @property
     def start_inclusive(self) -> bool | None:
-        """
+        """**DEPRECATED** The same as :attr:`inclusive_min`.
+
         .. deprecated:: 4.4.0
             Use :attr:`inclusive_min` instead.
         """
@@ -1725,6 +1742,7 @@ class TermRangeQuery(SearchQuery):
 
     @property
     def inclusive_min(self) -> bool | None:
+        """Whether the lower bound is in the range, or None if not set."""
         return self._inclusive_min
 
     @inclusive_min.setter
@@ -1733,7 +1751,8 @@ class TermRangeQuery(SearchQuery):
 
     @property
     def end(self) -> str | None:
-        """
+        """**DEPRECATED** The same as :attr:`max`.
+
         .. deprecated:: 4.4.0
             Use :attr:`max` instead.
         """
@@ -1747,6 +1766,7 @@ class TermRangeQuery(SearchQuery):
 
     @property
     def max(self) -> str | None:
+        """The upper bound, or None for no upper bound."""
         return self._max
 
     @max.setter
@@ -1755,7 +1775,8 @@ class TermRangeQuery(SearchQuery):
 
     @property
     def end_inclusive(self) -> bool | None:
-        """
+        """**DEPRECATED** The same as :attr:`inclusive_max`.
+
         .. deprecated:: 4.4.0
             Use :attr:`inclusive_max` instead.
         """
@@ -1769,6 +1790,7 @@ class TermRangeQuery(SearchQuery):
 
     @property
     def inclusive_max(self) -> bool | None:
+        """Whether the upper bound is in the range, or None if not set."""
         return self._inclusive_max
 
     @inclusive_max.setter
@@ -1788,9 +1810,7 @@ def _children(queries: tuple[SearchQuery | list[SearchQuery], ...]) -> list[Sear
 
 
 class ConjunctionQuery(SearchQuery):
-
-    """
-    A compound query that specifies multiple child queries.
+    """A compound query that specifies multiple child queries.
 
     For a ConjunctionQuery, every query object in the array must have a match in a document
     to include the document in search results.
@@ -1844,6 +1864,7 @@ class ConjunctionQuery(SearchQuery):
 
     @property
     def conjuncts(self) -> list[SearchQuery]:
+        """The queries a document must all match."""
         return self._conjuncts
 
     @conjuncts.setter
@@ -1851,15 +1872,18 @@ class ConjunctionQuery(SearchQuery):
         self._conjuncts = value
 
     def validate(self) -> None:
+        """Check that the query has at least one child query.
+
+        Raises:
+            :class:`~couchbase.exceptions.NoChildrenException`: If ``conjuncts`` is empty.
+        """
         super().validate()
         if not self.conjuncts:
             raise NoChildrenException('No sub-queries')
 
 
 class DisjunctionQuery(SearchQuery):
-
-    """
-    A compound query that specifies multiple child queries.
+    """A compound query that specifies multiple child queries.
 
     For a DisjunctionQuery, the :attr:`min` property sets the number of query objects
     from the disjuncts array that must have a match in a document.
@@ -1917,6 +1941,7 @@ class DisjunctionQuery(SearchQuery):
 
     @property
     def disjuncts(self) -> list[SearchQuery]:
+        """The queries a document must match :attr:`min` of."""
         return self._disjuncts
 
     @disjuncts.setter
@@ -1925,6 +1950,7 @@ class DisjunctionQuery(SearchQuery):
 
     @property
     def min(self) -> int:
+        """How many of the queries a document must match. Defaults to 1."""
         return self._min
 
     @min.setter
@@ -1935,6 +1961,13 @@ class DisjunctionQuery(SearchQuery):
         self._min = value
 
     def validate(self) -> None:
+        """Check that the query has child queries, and at least :attr:`min` of them.
+
+        Raises:
+            :class:`~couchbase.exceptions.NoChildrenException`: If ``disjuncts`` is empty.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If :attr:`min` is more than the number of
+                queries.
+        """
         super().validate()
         if not self.disjuncts:
             raise NoChildrenException('No queries specified')
@@ -1947,8 +1980,7 @@ _Compound = TypeVar('_Compound', ConjunctionQuery, DisjunctionQuery)
 
 
 class BooleanQuery(SearchQuery):
-    """
-    A compound query that specifies multiple child queries.
+    """A compound query that specifies multiple child queries.
 
     For a BooleanQuery, a document must match the combination of queries to be included in the search results.
 
@@ -2049,6 +2081,7 @@ class BooleanQuery(SearchQuery):
 
     @property
     def must(self) -> ConjunctionQuery | None:
+        """The queries a document must all match, or None if not set."""
         return self._must
 
     @must.setter
@@ -2057,6 +2090,7 @@ class BooleanQuery(SearchQuery):
 
     @property
     def must_not(self) -> DisjunctionQuery | None:
+        """The queries a document must match none of, or None if not set."""
         return self._must_not
 
     @must_not.setter
@@ -2065,6 +2099,7 @@ class BooleanQuery(SearchQuery):
 
     @property
     def should(self) -> DisjunctionQuery | None:
+        """The queries a document must match the disjunction's ``min`` of, or None if not set."""
         return self._should
 
     @should.setter
@@ -2072,6 +2107,11 @@ class BooleanQuery(SearchQuery):
         self._should = _clause(value, DisjunctionQuery)
 
     def validate(self) -> None:
+        """Check that at least one of :attr:`must`, :attr:`should` and :attr:`must_not` is set.
+
+        Raises:
+            ValueError: If none of them is.
+        """
         super().validate()
         if not self.must and not self.must_not and not self.should:
             raise ValueError('At least one of the following queries should be specified: must, should, must_not.')
@@ -2093,10 +2133,7 @@ def _clause(value: CompoundQueryType | None, reqtype: type[_Compound]) -> _Compo
 # Special Queries
 
 class RawQuery(SearchQuery):
-    """
-    This class is used to wrap a raw query payload. It should be used
-    for custom query parameters, or in cases where any of the other
-    query classes are insufficient.
+    """A query given as its JSON, for parameters or query types the other classes do not cover.
 
     The payload is read when the query is encoded, and never written: :attr:`boost` and
     :meth:`set_prop` are added to a copy.
@@ -2108,9 +2145,7 @@ class RawQuery(SearchQuery):
 
 
 class MatchAllQuery(SearchQuery):
-
-    """
-    Special query which matches all documents
+    """A query that matches every document.
 
     Examples:
         Basic search using MatchAllQuery::
@@ -2130,9 +2165,7 @@ class MatchAllQuery(SearchQuery):
 
 
 class MatchNoneQuery(SearchQuery):
-
-    """
-    Special query which matches no documents
+    """A query that matches no document.
 
     Examples:
         Basic search using MatchNoneQuery::

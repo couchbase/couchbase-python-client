@@ -24,15 +24,33 @@ from typing import Any
 
 
 class Serializer(ABC):
-    """Interface a Custom Serializer must implement
+    """The interface a custom JSON serializer implements.
+
+    :class:`~couchbase.transcoder.JSONTranscoder` uses one to turn values into JSON bytes and back.
     """
 
     @abstractmethod
     def serialize(self, value: Any) -> bytes:
+        """Encode a value as JSON.
+
+        Args:
+            value (Any): The value to encode.
+
+        Returns:
+            bytes: The value as UTF-8 JSON.
+        """
         raise NotImplementedError()
 
     @abstractmethod
     def deserialize(self, value: bytes) -> Any:
+        """Decode JSON into a value.
+
+        Args:
+            value (bytes): UTF-8 JSON.
+
+        Returns:
+            Any: The decoded value.
+        """
         raise NotImplementedError()
 
     @classmethod
@@ -44,10 +62,12 @@ class Serializer(ABC):
 
 
 class DefaultJsonSerializer(Serializer):
-    def serialize(self, value: Any) -> bytes:
+    """The serializer the SDK uses when none is given, built on the standard ``json`` module."""
 
+    def serialize(self, value: Any) -> bytes:
+        """Encode a value as UTF-8 JSON, leaving non-ASCII characters unescaped."""
         return json.dumps(value, ensure_ascii=False).encode('utf-8')
 
     def deserialize(self, value: bytes) -> Any:
-
+        """Decode UTF-8 JSON into a value."""
         return json.loads(value.decode('utf-8'))

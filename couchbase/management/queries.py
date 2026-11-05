@@ -49,8 +49,7 @@ if TYPE_CHECKING:
 
 
 class QueryIndexManager:
-    """
-    Performs management operations on query indexes.
+    """Performs management operations on query indexes.
 
     For managing query indexes at the collection level, :class:`.CollectionQueryIndexManager` should be used.
     """
@@ -206,9 +205,7 @@ class QueryIndexManager:
 
 
 class CollectionQueryIndexManager:
-    """
-    Performs management operations on query indexes at the collection level.
-    """
+    """Performs management operations on query indexes at the collection level."""
 
     def __init__(self, impl: QueryIndexMgmtInterface, bucket_name: str) -> None:
         self._impl = impl

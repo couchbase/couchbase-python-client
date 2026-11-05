@@ -66,7 +66,7 @@ def enum_to_str(value: Enum | str, enum: type[Enum], conversion_fn: Callable[...
 def seconds_to_timedelta(value: float | int) -> timedelta:
     if value and not isinstance(value, (float, int)):
         raise InvalidArgumentException(message=("Expected value to be of type "
-                                                f"Union[float, int] instead of {type(value)}"))
+                                                f"float | int instead of {type(value)}"))
     return timedelta(seconds=value)
 
 
@@ -79,7 +79,7 @@ def timedelta_as_milliseconds(duration: timedelta) -> int:
 def to_seconds(value: timedelta | float | int) -> int:
     if value and not isinstance(value, (timedelta, float, int)):
         raise InvalidArgumentException(message=("Expected value to be of type "
-                                                f"Union[timedelta, float, int] instead of {value}"))
+                                                f"timedelta | float | int instead of {value}"))
     if not value:
         total_secs = 0
     elif isinstance(value, timedelta):
@@ -93,7 +93,7 @@ def to_seconds(value: timedelta | float | int) -> int:
 def to_milliseconds(timeout: timedelta | float | int) -> int:
     if timeout and not isinstance(timeout, (timedelta, float, int)):
         raise InvalidArgumentException(message=("Expected timeout to be of type "
-                                                f"Union[timedelta, float, int] instead of {timeout}"))
+                                                f"timedelta | float | int instead of {timeout}"))
     if not timeout:
         total_us = 0
     elif isinstance(timeout, timedelta):

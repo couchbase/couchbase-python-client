@@ -69,6 +69,7 @@ class EventingFunctionBucketAccess(Enum):
     Unknown = "unknown"
 
     def to_str(self) -> str:
+        """**INTERNAL** The core's name of the member."""
         if self is EventingFunctionBucketAccess.ReadOnly:
             return 'read_only'
         if self is EventingFunctionBucketAccess.Unknown:
@@ -77,6 +78,7 @@ class EventingFunctionBucketAccess(Enum):
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionBucketAccess:
+        """**INTERNAL** The member for a name the eventing service sent."""
         if value in ['r', 'read_only']:
             return cls.ReadOnly
         elif value in ['rw', 'read_write']:
@@ -104,6 +106,7 @@ class EventingFunctionDcpBoundary(Enum):
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionDcpBoundary:
+        """**INTERNAL** The member for a name the eventing service sent."""
         if value == "everything":
             return cls.Everything
         elif value == "from_now":
@@ -130,6 +133,7 @@ class EventingFunctionDeploymentStatus(Enum):
     Unknown = "unknown"
 
     def to_str(self) -> str:
+        """**INTERNAL** The core's name of the member."""
         if self is EventingFunctionDeploymentStatus.Unknown:
             return 'unknown'
         if self.value:
@@ -139,6 +143,7 @@ class EventingFunctionDeploymentStatus(Enum):
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionDeploymentStatus:
+        """**INTERNAL** The member for a name the eventing service sent."""
         if value == 'undeployed':
             return cls.Undeployed
         elif value == 'deployed':
@@ -148,7 +153,7 @@ class EventingFunctionDeploymentStatus(Enum):
 
 
 class EventingFunctionProcessingStatus(Enum):
-    """Indicates if the eventing function is running
+    """Indicates if the eventing function is running.
 
     Allowed values:
 
@@ -165,6 +170,7 @@ class EventingFunctionProcessingStatus(Enum):
     Unknown = "unknown"
 
     def to_str(self) -> str:
+        """**INTERNAL** The core's name of the member."""
         if self is EventingFunctionProcessingStatus.Unknown:
             return 'unknown'
         if self.value:
@@ -174,6 +180,7 @@ class EventingFunctionProcessingStatus(Enum):
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionProcessingStatus:
+        """**INTERNAL** The member for a name the eventing service sent."""
         if value == 'paused':
             return cls.Paused
         elif value == 'running':
@@ -183,17 +190,10 @@ class EventingFunctionProcessingStatus(Enum):
 
 
 class EventingFunctionLogLevel(Enum):
-    """Indicates the system logs level of detail.
+    """The level of detail an eventing function writes to its system log.
 
-    Allowed values:
-
-    Info (default)
-    Error
-    Warning
-    Debug
-    Trace
-    Unknown
-        Couchbase Server returned a level the SDK does not recognize.
+    Info is the default, and Error, Warning, Debug and Trace are the others. Unknown is a level Couchbase Server
+    returned that the SDK does not recognize.
     """
 
     Info = "INFO"
@@ -205,6 +205,7 @@ class EventingFunctionLogLevel(Enum):
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionLogLevel:
+        """**INTERNAL** The member for a name the eventing service sent."""
         if not isinstance(value, str):
             return cls.Unknown
         if value.upper() == "INFO":
@@ -241,12 +242,14 @@ class EventingFunctionLanguageCompatibility(Enum):
     Unknown = "unknown"
 
     def to_str(self) -> str:
+        """**INTERNAL** The core's name of the member."""
         if self is EventingFunctionLanguageCompatibility.Unknown:
             return 'unknown'
         return f"version_{self.value.replace('.', '_')}"
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionLanguageCompatibility:
+        """**INTERNAL** The member for a name the eventing service sent."""
         if value == "version_6_0_0":
             return cls.Version_6_0_0
         elif value == "version_6_5_0":
@@ -293,6 +296,7 @@ class EventingFunctionState(Enum):
 
     @classmethod
     def from_server(cls, value: str) -> EventingFunctionState:
+        """**INTERNAL** The member for a name the eventing service sent."""
         if value == "undeployed":
             return cls.Undeployed
         elif value == "deployed":
@@ -313,7 +317,7 @@ class EventingFunctionState(Enum):
 
 @dataclass
 class EventingFunctionKeyspace:
-    """Object representation for a Couchbase Server eventing keyspace
+    """Object representation for a Couchbase Server eventing keyspace.
 
     A keyspace is a triple consisting of the following
     components: bucket (required), scope (optional) and
@@ -329,6 +333,7 @@ class EventingFunctionKeyspace:
     collection: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
+        """**INTERNAL** The keyspace as the dict the management request is built from."""
         output: dict[str, Any] = {
             'bucket': self.bucket,
         }
@@ -345,17 +350,7 @@ class EventingFunctionKeyspace:
                     bucket: str,
                     scope: str | None = None,
                     collection: str | None = None) -> EventingFunctionKeyspace:
-        """Returns a new `EventingFunctionKeyspace` object based
-        on the JSON response received from Couchbase Server
-
-        Args:
-            bucket (str): bucket name
-            scope (str, optional): scope name
-            collection (str, optional): collection name
-
-        Returns:
-            EventingFunctionKeyspace: new `EventingFunctionKeyspace` object
-        """
+        """**INTERNAL** The keyspace the eventing service described."""
         keyspace = cls(bucket)
         if not is_null_or_empty(scope) and scope != "_default":
             keyspace.scope = scope
@@ -368,7 +363,7 @@ class EventingFunctionKeyspace:
 
 @dataclass
 class EventingFunctionBucketBinding:
-    """Object representation for an eventing function bucket binding
+    """Object representation for an eventing function bucket binding.
 
     Args:
         alias (str): binding's alias
@@ -382,12 +377,7 @@ class EventingFunctionBucketBinding:
     access: EventingFunctionBucketAccess | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        """Returns a representation of the `EventingFunctionBucketBinding` that
-        aligns with what Couchbase Server eventing spec.
-
-        Returns:
-            dict[str, Any]: dict representation of the `EventingFunctionBucketBinding`
-        """
+        """**INTERNAL** The binding as the dict the management request is built from."""
         if self.name is None:
             raise InvalidArgumentException('An EventingFunctionBucketBinding must have a name.')
         output: dict[str, Any] = {'alias': self.alias, 'name': self.name.as_dict()}
@@ -398,6 +388,7 @@ class EventingFunctionBucketBinding:
 
     @classmethod
     def from_server(cls, bucket_binding: dict[str, Any]) -> EventingFunctionBucketBinding:
+        """**INTERNAL** The binding the eventing service described."""
         alias = bucket_binding.get('alias', None)
         name = bucket_binding.get('name', {})
         keyspace = EventingFunctionKeyspace.from_server(**name)
@@ -407,28 +398,27 @@ class EventingFunctionBucketBinding:
 
 @dataclass
 class EventingFunctionUrlAuth:
-    """Base class for all object representation of eventing function URL binding
-    authorization types
+    """How an eventing function authenticates to the endpoint of a URL binding.
+
+    Use one of :class:`.EventingFunctionUrlNoAuth`, :class:`.EventingFunctionUrlAuthBasic`,
+    :class:`.EventingFunctionUrlAuthDigest` or :class:`.EventingFunctionUrlAuthBearer`.
     """
     pass
 
 
 @dataclass
 class EventingFunctionUrlNoAuth(EventingFunctionUrlAuth):
-    """Object representation for an eventing function URL binding
-    with no authorization
-    """
+    """A URL binding that sends no credentials."""
     pass
 
 
 @dataclass
 class EventingFunctionUrlAuthBasic(EventingFunctionUrlAuth):
-    """Object representation for an eventing function URL binding
-    basic authorization
+    """A URL binding that authenticates with HTTP basic authentication.
 
     Args:
-        username (str): auth username
-        password (str): auth password
+        username (str): The username to authenticate with.
+        password (str): The password to authenticate with.
     """
 
     username: str | None = None
@@ -440,12 +430,11 @@ class EventingFunctionUrlAuthBasic(EventingFunctionUrlAuth):
 
 @dataclass
 class EventingFunctionUrlAuthDigest(EventingFunctionUrlAuth):
-    """Object representation for an eventing function URL binding
-    digest authorization
+    """A URL binding that authenticates with HTTP digest authentication.
 
     Args:
-        username (str): auth digest username
-        password (str): auth digest password
+        username (str): The username to authenticate with.
+        password (str): The password to authenticate with.
     """
 
     username: str | None = None
@@ -457,11 +446,10 @@ class EventingFunctionUrlAuthDigest(EventingFunctionUrlAuth):
 
 @dataclass
 class EventingFunctionUrlAuthBearer(EventingFunctionUrlAuth):
-    """Object representation for an eventing function URL binding
-    bearer authorization
+    """A URL binding that authenticates with a bearer token.
 
     Args:
-        key (str): bearer key
+        key (str): The bearer token.
     """
 
     key: str | None = None
@@ -472,7 +460,7 @@ class EventingFunctionUrlAuthBearer(EventingFunctionUrlAuth):
 
 @dataclass
 class EventingFunctionUrlBinding:
-    """Object representation for an eventing function URL binding
+    """Object representation for an eventing function URL binding.
 
     Args:
         hostname (str): binding's hostname
@@ -489,12 +477,7 @@ class EventingFunctionUrlBinding:
     auth: EventingFunctionUrlAuth | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        """Returns a representation of the `EventingFunctionUrlBinding` that
-        aligns with what Couchbase Server eventing spec.
-
-        Returns:
-            dict[str, Any]: dict representation of the `EventingFunctionUrlBinding`
-        """
+        """**INTERNAL** The binding as the dict the management request is built from."""
         output: dict[str, Any] = {
             "hostname": self.hostname,
             "alias": self.alias,
@@ -521,6 +504,7 @@ class EventingFunctionUrlBinding:
 
     @classmethod
     def from_server(cls, url_binding: dict[str, Any]) -> EventingFunctionUrlBinding:
+        """**INTERNAL** The binding the eventing service described."""
         input: dict[str, Any] = {
             'alias': url_binding.get('alias', None),
             'hostname': url_binding.get('hostname', None),
@@ -545,7 +529,7 @@ class EventingFunctionUrlBinding:
 
 @dataclass
 class EventingFunctionConstantBinding:
-    """Object representation for an eventing function constant binding
+    """Object representation for an eventing function constant binding.
 
     Args:
         alias (str): binding's alias
@@ -556,17 +540,12 @@ class EventingFunctionConstantBinding:
     literal: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
-        """Returns a representation of the `EventingFunctionConstantBinding` that
-        aligns with what Couchbase Server eventing spec.
-
-        Returns:
-            dict[str, Any]: dict representation of the `EventingFunctionConstantBinding`
-        """
-
+        """**INTERNAL** The binding as the dict the management request is built from."""
         return {"alias": self.alias, "literal": self.literal}
 
     @classmethod
     def from_server(cls, constant_binding: dict[str, Any]) -> EventingFunctionConstantBinding:
+        """**INTERNAL** The binding the eventing service described."""
         input = {
             'alias': constant_binding.get('alias', None),
             'literal': constant_binding.get('literal', None)
@@ -576,7 +555,7 @@ class EventingFunctionConstantBinding:
 
 @dataclass
 class EventingFunctionSettings:
-    """Object representation for an settings relevant to an eventing function
+    """Object representation for an settings relevant to an eventing function.
 
     Args:
         cpp_worker_thread_count (int): Number of threads each worker utilizes
@@ -647,13 +626,7 @@ class EventingFunctionSettings:
     handler_footers: list[str] | None = None
 
     def as_dict(self) -> dict[str, Any]:  # noqa: C901
-        """Returns a representation of the `EventingFunctionSettings` that
-        aligns with what Couchbase Server eventing spec.
-
-        Returns:
-            dict[str, Any]: dict representation of the `EventingFunctionSettings`
-        """
-
+        """**INTERNAL** The settings as the dict the management request is built from."""
         output: dict[str, Any] = {}
 
         if self.cpp_worker_thread_count:
@@ -762,7 +735,7 @@ class EventingFunctionSettings:
 
     @classmethod
     def new_settings(cls, **kwargs: Any) -> EventingFunctionSettings:
-        """Returns a new `EventingFunctionSettings` object
+        """Returns a new `EventingFunctionSettings` object.
 
         Args:
             kwargs (dict): Keyword arguments to populate `EventingFunctionSettings` object
@@ -794,6 +767,7 @@ class EventingFunctionSettings:
 
     @classmethod
     def from_server(cls, settings: dict[str, Any]) -> EventingFunctionSettings:  # noqa: C901
+        """**INTERNAL** The settings the eventing service described."""
         input: dict[str, Any] = {
             'cpp_worker_thread_count': settings.get('cpp_worker_count', None),
             'description': settings.get('description', None),
@@ -867,7 +841,7 @@ class EventingFunctionSettings:
 
 @dataclass
 class EventingFunction:
-    """Object representation for settings relevant to an eventing function
+    """Object representation for settings relevant to an eventing function.
 
     Args:
         name (str):
@@ -898,13 +872,7 @@ class EventingFunction:
     settings: EventingFunctionSettings | None = None
 
     def as_dict(self) -> dict[str, Any]:  # noqa: C901
-        """Returns a representation of the `EventingFunction` that
-        aligns with what Couchbase Server eventing spec.
-
-        Returns:
-            dict[str, Any]: dict representation of the `EventingFunction`
-        """
-
+        """**INTERNAL** The function as the dict the management request is built from."""
         output: dict[str, Any] = {}
 
         if self.name:
@@ -947,6 +915,7 @@ class EventingFunction:
 
     @classmethod
     def from_server(cls, eventing_function: dict[str, Any]) -> EventingFunction:
+        """**INTERNAL** The function the eventing service described."""
         input: dict[str, Any] = {
             'name': eventing_function['name'],
             'code': eventing_function['code'],
@@ -985,7 +954,7 @@ class EventingFunction:
 
 @dataclass
 class EventingFunctionStatus:
-    """Object representation for the status of an eventing function
+    """Object representation for the status of an eventing function.
 
     Particularly useful when determining an interim state of an evening function (i.e,
     deploying, pausing, undeploying).
@@ -1012,6 +981,7 @@ class EventingFunctionStatus:
 
     @classmethod
     def from_server(cls, function_status: dict[str, Any]) -> EventingFunctionStatus:
+        """**INTERNAL** The status the eventing service described."""
         input: dict[str, Any] = {
             'name': function_status.get('name', None),
             'num_bootstrapping_nodes': function_status.get('num_bootstrapping_nodes', None),
@@ -1037,7 +1007,7 @@ class EventingFunctionStatus:
 
 @dataclass
 class EventingFunctionsStatus:
-    """Object representation for statuses for all eventing functions
+    """Object representation for statuses for all eventing functions.
 
     Args:
         num_eventing_nodes (int):
@@ -1049,15 +1019,7 @@ class EventingFunctionsStatus:
 
     @classmethod
     def from_server(cls, function_status: dict[str, Any]) -> EventingFunctionsStatus:
-        """Returns a new `EventingFunctionsStatus` object based
-        on the dict[str, Any] response received from Couchbase Server
-
-        Args:
-            function_status (dict): dict[str, Any]
-
-        Returns:
-            EventingFunctionsStatus: new `EventingFunctionsStatus` object
-        """
+        """**INTERNAL** The statuses the eventing service described."""
         input: dict[str, Any] = {
             'num_eventing_nodes': function_status.get('num_eventing_nodes', None)
         }

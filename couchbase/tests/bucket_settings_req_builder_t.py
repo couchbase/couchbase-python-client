@@ -260,7 +260,7 @@ class BucketSettingsToServerUnitTests:
 
         # The accepted-types clause, not the verb: the message opens with `Excepted`, and
         # asserting around that typo takes an `or` over two substrings.
-        assert 'Union[timedelta, float, int]' in str(exc_info.value)
+        assert 'timedelta | float | int' in str(exc_info.value)
         assert 'not_a_timedelta' in str(exc_info.value)
 
 
@@ -286,7 +286,7 @@ class LegacyBucketSettingsToServerUnitTests:
         assert result == {'name': 'test', 'max_expiry': 43200}
 
     def test_max_ttl_rejects_timedelta(self, request_builder: BucketMgmtRequestBuilder) -> None:
-        # max_ttl is annotated Optional[Union[timedelta, float, int]] on both settings classes,
+        # max_ttl is annotated timedelta | float | int | None on both settings classes,
         # matching max_expiry, but the builder sends it through an int validator rather than the
         # seconds conversion max_expiry gets, so a timedelta raises.  Pinned: folding max_ttl
         # into max_expiry was declined in PYCBC-1908.

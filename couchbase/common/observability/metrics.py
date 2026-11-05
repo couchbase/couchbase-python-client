@@ -24,41 +24,38 @@ from typing import Any
 
 
 class ValueRecorder(ABC):
-    """
-    This is an abstract base class intended to wrap an external recorder implementation, to use withing the
-    python client.  You will want to create a class deriving from this, which implements the :meth:`record_value`
-    method.
+    """The interface a recorder of one metric implements.
+
+    Implement it to send the SDK's metrics to a metrics library of your own.
     """
 
     @abstractmethod
     def record_value(self, value: int) -> None:
-        """
-        This method will need to be implemented in derived classes.
+        """Record one measurement.
 
         Args:
-            value (int): The value to record.
-
+            value (int): The measurement. A duration is in microseconds.
         """
         pass
 
 
 class Meter(ABC):
-    """
-    This is an abstract base class intended to wrap an external meter implementation, to use withing the
-    python client.  You will want to create a class deriving from this, which implements the :meth:`value_recorder`
-    method.
+    """The interface a source of value recorders implements.
+
+    Implement it, with :class:`ValueRecorder`, to send the SDK's metrics to a metrics library of your own.
+    :func:`~couchbase.observability.get_otel_meter` returns one that sends them to OpenTelemetry.
     """
 
     @abstractmethod
     def value_recorder(self, name: str, tags: Mapping[str, Any]) -> ValueRecorder:
-        """
-        This method will need to be implemented in derived classes.
+        """Get the recorder for a metric and set of tags.
 
         Args:
-            name (int): The name of the recorder.
-            tags (Mapping[str, str]): The tags associated with the recorder.
+            name (str): The metric's name.
+            tags (Mapping[str, Any]): The tags each measurement carries. A ``__unit`` tag names the unit the
+                metric is reported in, and is ``s`` for a duration the SDK records in microseconds.
 
         Returns:
-            :class:`~couchbase.observability.metrics.ValueRecorder`:
+            :class:`~couchbase.observability.metrics.ValueRecorder`: The recorder.
         """
         pass

@@ -31,7 +31,15 @@ from couchbase.common.exceptions import InvalidArgumentException
 
 
 class ScanTerm:
-    """Represents a search term for a RangeScan
+    """One end of a :class:`RangeScan`.
+
+    Args:
+        term (str): The document ID the range starts or ends at.
+        exclusive (bool, optional): True to leave the term itself out of the range. Defaults to None,
+            which includes it.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the term is not a str.
     """
 
     def __init__(self, term: str, exclusive: bool | None = None) -> None:
@@ -45,6 +53,7 @@ class ScanTerm:
         self._exclusive = exclusive
 
     def to_dict(self) -> dict[str, Any]:
+        """**INTERNAL** The term as the scan request takes it."""
         return {
             'term': self._term,
             'exclusive': self._exclusive
@@ -55,13 +64,17 @@ class ScanTerm:
 
 
 class ScanType(ABC):
-    """
-    ** INTERNAL **
-    """
+    """**INTERNAL** The base of the three kinds of scan."""
 
 
 class RangeScan(ScanType):
-    """A RangeScan performs a scan on a range of keys with the range specified through a start and end ScanTerm.
+    """A scan of every document whose ID falls between two terms.
+
+    Args:
+        start (:class:`ScanTerm`, optional): Where the range starts. Defaults to None, which starts at the
+            lowest ID.
+        end (:class:`ScanTerm`, optional): Where the range ends. Defaults to None, which ends at the highest
+            ID.
     """
 
     def __init__(self, start: ScanTerm | None = None, end: ScanTerm | None = None) -> None:
@@ -70,10 +83,12 @@ class RangeScan(ScanType):
 
     @property
     def start(self) -> ScanTerm | None:
+        """Where the range starts, or None to start at the lowest ID."""
         return self._start
 
     @property
     def end(self) -> ScanTerm | None:
+        """Where the range ends, or None to end at the highest ID."""
         return self._end
 
     def __repr__(self) -> str:
@@ -81,7 +96,10 @@ class RangeScan(ScanType):
 
 
 class PrefixScan(ScanType):
-    """A PrefixScan performs a scan on a given prefix
+    """A scan of every document whose ID starts with a prefix.
+
+    Args:
+        prefix (str): The prefix the IDs share.
     """
 
     def __init__(self, prefix: str) -> None:
@@ -89,6 +107,7 @@ class PrefixScan(ScanType):
 
     @property
     def prefix(self) -> str:
+        """The prefix the IDs share."""
         return self._prefix
 
     def __repr__(self) -> str:
@@ -96,7 +115,12 @@ class PrefixScan(ScanType):
 
 
 class SamplingScan(ScanType):
-    """A SamplingScan performs a scan on a random sampling of keys with the sampling bounded by a limit.
+    """A scan of a random sample of the collection's documents.
+
+    Args:
+        limit (int): The most documents the sample holds. Must be greater than 0.
+        seed (int, optional): The seed the sample is drawn with. The same seed draws the same sample from
+            the same data. Defaults to None, which draws a different sample each time.
     """
 
     def __init__(self, limit: int, seed: int | None = None) -> None:
@@ -105,10 +129,12 @@ class SamplingScan(ScanType):
 
     @property
     def limit(self) -> int:
+        """The most documents the sample holds."""
         return self._limit
 
     @property
     def seed(self) -> int | None:
+        """The seed the sample is drawn with, or None to draw a different sample each time."""
         return self._seed
 
     def __repr__(self) -> str:

@@ -47,6 +47,14 @@ if TYPE_CHECKING:
 
 
 class EvictionPolicyType(Enum):
+    """How a bucket removes data from memory when it reaches its RAM quota.
+
+    ``FULL`` and ``VALUE_ONLY`` apply to a Couchbase bucket, which keeps its data on disk: ``FULL`` removes a whole
+    document, while ``VALUE_ONLY`` keeps its key and metadata in memory. ``NOT_RECENTLY_USED`` and ``NO_EVICTION`` apply
+    to an ephemeral bucket, which has nowhere else to keep it: ``NOT_RECENTLY_USED`` removes the documents least
+    recently used, while ``NO_EVICTION`` refuses new writes instead.
+    """
+
     NOT_RECENTLY_USED = "nruEviction"
     NO_EVICTION = "noEviction"
     FULL = "fullEviction"
@@ -55,6 +63,7 @@ class EvictionPolicyType(Enum):
 
     @classmethod
     def from_server_str(cls, value: object) -> EvictionPolicyType:
+        """**INTERNAL** The member for the core's name of a policy, or ``UNKNOWN`` for a name it does not know."""
         if value == 'not_recently_used':
             return cls.NOT_RECENTLY_USED
         elif value == 'no_eviction':
@@ -68,6 +77,7 @@ class EvictionPolicyType(Enum):
 
     @classmethod
     def to_server_str(cls, value: EvictionPolicyType) -> str:
+        """**INTERNAL** The core's name of a policy."""
         if value == cls.NOT_RECENTLY_USED:
             return 'not_recently_used'
         elif value == cls.NO_EVICTION:
@@ -81,11 +91,19 @@ class EvictionPolicyType(Enum):
 
 
 class EjectionMethod(Enum):
+    """How a Couchbase bucket removes data from memory: the whole document, or only its value."""
+
     FULL_EVICTION = "fullEviction"
     VALUE_ONLY = "valueOnly"
 
 
 class BucketType(Enum):
+    """The type of a bucket.
+
+    ``COUCHBASE`` keeps its data in memory and on disk, ``EPHEMERAL`` only in memory, and ``MEMCACHED`` is a memory-only
+    cache.
+    """
+
     COUCHBASE = "membase"
     MEMCACHED = "memcached"
     EPHEMERAL = "ephemeral"
@@ -93,6 +111,7 @@ class BucketType(Enum):
 
     @classmethod
     def from_server_str(cls, value: object) -> BucketType:
+        """**INTERNAL** The member for the core's name of a type, or ``UNKNOWN`` for a name it does not know."""
         if value == 'couchbase':
             return cls.COUCHBASE
         elif value == 'membase':
@@ -106,6 +125,7 @@ class BucketType(Enum):
 
     @classmethod
     def to_server_str(cls, value: BucketType) -> str:
+        """**INTERNAL** The core's name of a type."""
         if value == cls.COUCHBASE:
             return 'couchbase'
         elif value == cls.MEMCACHED:
@@ -117,6 +137,12 @@ class BucketType(Enum):
 
 
 class CompressionMode(Enum):
+    """How a bucket compresses the documents it holds.
+
+    ``OFF`` stores documents as they arrive. ``PASSIVE`` keeps a document compressed when a client sends it compressed,
+    and ``ACTIVE`` also compresses documents itself.
+    """
+
     OFF = "off"
     PASSIVE = "passive"
     ACTIVE = "active"
@@ -124,6 +150,7 @@ class CompressionMode(Enum):
 
     @classmethod
     def from_server_str(cls, value: object) -> CompressionMode:
+        """**INTERNAL** The member for the core's name of a mode, or ``UNKNOWN`` for a name it does not know."""
         try:
             return cls(value)
         except ValueError:
@@ -131,14 +158,10 @@ class CompressionMode(Enum):
 
 
 class ConflictResolutionType(Enum):
-    """
-    Specifies the conflict resolution type to use for the bucket.
+    """How a bucket resolves a conflict between two versions of a document under XDCR.
 
-    Members:
-    TIMESTAMP: specifies to use timestamp conflict resolution
-    SEQUENCE_NUMBER: specifies to use sequence number conflict resolution
-    CUSTOM: specifies to use a custom conflict resolution
-
+    ``TIMESTAMP`` keeps the version written last, ``SEQUENCE_NUMBER`` the version changed most often, and ``CUSTOM``
+    leaves the conflict to the application.
     """
     TIMESTAMP = "lww"
     SEQUENCE_NUMBER = "seqno"
@@ -147,6 +170,7 @@ class ConflictResolutionType(Enum):
 
     @classmethod
     def from_server_str(cls, value: object) -> ConflictResolutionType:
+        """**INTERNAL** The member for the core's name of a type, or ``UNKNOWN`` for a name it does not know."""
         if value == 'timestamp':
             return cls.TIMESTAMP
         elif value == 'sequence_number':
@@ -158,6 +182,7 @@ class ConflictResolutionType(Enum):
 
     @classmethod
     def to_server_str(cls, value: ConflictResolutionType) -> str:
+        """**INTERNAL** The core's name of a type."""
         if value == cls.TIMESTAMP:
             return 'timestamp'
         elif value == cls.SEQUENCE_NUMBER:
@@ -169,15 +194,14 @@ class ConflictResolutionType(Enum):
 
 
 class StorageBackend(Enum):
-    """
-    Specifies the storage type to use for the bucket.
-    """
+    """The storage engine a bucket keeps its data in."""
     UNDEFINED = "undefined"
     COUCHSTORE = "couchstore"
     MAGMA = "magma"
 
     @classmethod
     def from_server_str(cls, value: object) -> StorageBackend:
+        """**INTERNAL** The member for the core's name of an engine, or ``UNDEFINED`` for a name it does not know."""
         try:
             return cls(value)
         except ValueError:
@@ -185,6 +209,8 @@ class StorageBackend(Enum):
 
 
 class BucketSettingsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`.BucketSettings`."""
+
     name: Required[str]
     bucket_type: BucketType | None
     compression_mode: CompressionMode | None
@@ -204,9 +230,17 @@ class BucketSettingsKwargs(TypedDict, total=False):
 
 
 class BucketSettings(dict):
+    """The settings of an existing bucket.
+
+    :meth:`.BucketManager.get_bucket` returns them and :meth:`.BucketManager.update_bucket` takes them. The settings are
+    a dict, and a setting given as ``None`` is left out of it, so each property reads one key, or ``None`` if it is
+    absent.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If ``name`` is missing or empty.
+    """
+
     def __init__(self, **kwargs: Unpack[BucketSettingsKwargs]) -> None:
-        """BucketSettings provides a means of mapping bucket settings into an object.
-        """
         super().__init__()
         self._fill(dict(kwargs))
 
@@ -226,67 +260,56 @@ class BucketSettings(dict):
 
     @property
     def bucket_type(self) -> BucketType | None:
-        """BucketType {couchbase (sent on wire as membase), memcached, ephemeral}
-        The type of the bucket. Default to couchbase."""
+        """The type of the bucket."""
         return self.get('bucket_type', None)
 
     @property
     def compression_mode(self) -> CompressionMode | None:
-        """{off | passive | active} - The compression mode to use."""
+        """How the bucket compresses the documents it holds."""
         return self.get('compression_mode', None)
 
     @property
     def conflict_resolution_type(self) -> ConflictResolutionType | None:
-        """{timestamp | sequence_number | custom} - The bucket's conflict resolution type.
+        """How the bucket resolves a conflict between two versions of a document under XDCR.
 
-        Read-only. A bucket's conflict resolution type is fixed when it is created, so it is
-        only sent to the server when provided to :class:`.CreateBucketSettings`; update_bucket
-        never sends it.
+        It is fixed when the bucket is created, so it is sent to the server only from a :class:`.CreateBucketSettings`;
+        :meth:`.BucketManager.update_bucket` never sends it.
         """
         return self.get('conflict_resolution_type', None)
 
     @property
     def eviction_policy(self) -> EvictionPolicyType | None:
-        """{fullEviction | valueOnly}. The eviction policy to use."""
+        """How the bucket removes data from memory when it reaches its RAM quota."""
         return self.get('eviction_policy', None)
 
     @property
     def flush_enabled(self) -> bool | None:
-        """True if flush enabled on bucket, False otherwise"""
+        """Whether the bucket can be flushed."""
         return self.get('flush_enabled', None)
 
     @property
     def history_retention_collection_default(self) -> bool | None:
-        """
-        Whether history retention on collections is enabled by default
-        """
+        """Whether the bucket's collections keep a change history unless a collection is set otherwise."""
         return self.get('history_retention_collection_default', None)
 
     @property
     def history_retention_bytes(self) -> int | None:
-        """
-        The maximum size, in bytes, of the change history that is written to disk for all collections in this bucket
-        """
+        """The largest the change history on disk can grow, in bytes, across all the bucket's collections."""
         return self.get('history_retention_bytes', None)
 
     @property
     def history_retention_duration(self) -> timedelta | None:
-        """
-        The maximum duration to be covered by the change history that is written to disk for all collections in this
-        bucket
-        """
+        """The longest span of time the change history on disk covers, across all the bucket's collections."""
         return self.get('history_retention_duration', None)
 
     @property
     def max_expiry(self) -> timedelta | float | int | None:
-        """
-           Value for the max expiry of new documents created without an expiry.
-        """
+        """The longest expiry a document in the bucket can have, which a document written without one is given."""
         return self.get('max_expiry', None)
 
     @property
     def max_ttl(self) -> timedelta | float | int | None:
-        """Value for the maxTTL of new documents created without a ttl.
+        """The longest expiry a document in the bucket can have, which a document written without one is given.
 
         .. deprecated:: 4.0.0
             Use :attr:`max_expiry` instead.
@@ -296,45 +319,43 @@ class BucketSettings(dict):
 
     @property
     def minimum_durability_level(self) -> DurabilityLevel | None:
-        """The durability level to use for the bucket."""
+        """The durability level the bucket applies to a mutation that asks for a lower one."""
         return self.get('minimum_durability_level', None)
 
     @property
     def name(self) -> str:
-        """ Bucket name"""
+        """The name of the bucket."""
         name: str = self['name']
         return name
 
     @property
     def num_replicas(self) -> int | None:
-        """NumReplicas (int) - The number of replicas for documents."""
+        """The number of replicas the bucket keeps of each document."""
         return self.get('num_replicas', None)
 
     @property
     def num_vbuckets(self) -> int | None:
-        """num_vbuckets (int) - The number of vbuckets for the bucket."""
+        """The number of vBuckets the bucket is split into."""
         return self.get('num_vbuckets', None)
 
     @property
     def ram_quota_mb(self) -> int | None:
-        """ram_quota_mb (int) - The RAM quota for the bucket."""
+        """The bucket's RAM quota on each node, in megabytes."""
         return self.get('ram_quota_mb', None)
 
     @property
     def replica_index(self) -> bool | None:
-        """ Whether replica indexes should be enabled for the bucket."""
+        """Whether the bucket's view indexes are replicated."""
         return self.get('replica_index', None)
 
     @property
     def storage_backend(self) -> StorageBackend | None:
-        """
-        {couchstore | magma | undefined} - The storage backend to use.
-        """
+        """The storage engine the bucket keeps its data in."""
         return self.get('storage_backend', None)
 
     @classmethod
     def bucket_settings_from_server(cls, settings: dict[str, Any]) -> BucketSettings:  # noqa: C901
-        """**INTERNAL**"""
+        """**INTERNAL**."""
         output: dict[str, Any] = {}
         bucket_type = settings.get('bucket_type', None)
         if bucket_type:
@@ -387,6 +408,8 @@ class BucketSettings(dict):
 
 
 class CreateBucketSettingsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`.CreateBucketSettings`."""
+
     name: Required[str]
     bucket_type: BucketType | None
     compression_mode: CompressionMode | None
@@ -407,12 +430,30 @@ class CreateBucketSettingsKwargs(TypedDict, total=False):
 
 
 class CreateBucketSettings(BucketSettings):
+    """The settings of a bucket for :meth:`.BucketManager.create_bucket` to create.
+
+    They are :class:`.BucketSettings` that can also set ``conflict_resolution_type``, which is fixed once the bucket
+    exists.
+    """
+
     def __init__(self, **kwargs: Unpack[CreateBucketSettingsKwargs]) -> None:
         self._fill(dict(kwargs))
 
 
 @dataclass
 class BucketDescribeResult:
+    """A description of a bucket and where its data is, from :meth:`.BucketManager.bucket_describe`.
+
+    Attributes:
+        name (str | None): The name of the bucket.
+        uuid (str | None): The bucket's UUID, which changes when a bucket is dropped and created again.
+        number_of_nodes (int | None): The number of nodes the bucket's data is on.
+        number_of_replicas (int | None): The number of replicas the bucket keeps of each document.
+        bucket_capabilities (list[str] | None): The capabilities the bucket supports.
+        storage_backend (str | None): The storage engine the bucket keeps its data in.
+        server_groups (dict[str, Any] | None): The server groups the bucket's nodes are in.
+    """
+
     name: str | None = None
     uuid: str | None = None
     number_of_nodes: int | None = None

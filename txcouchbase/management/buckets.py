@@ -63,6 +63,8 @@ if TYPE_CHECKING:
 
 
 class BucketManager:
+    """Performs management operations on a cluster's buckets."""
+
     def __init__(self, impl: TxBucketMgmtInterface) -> None:
         self._impl = impl
 
