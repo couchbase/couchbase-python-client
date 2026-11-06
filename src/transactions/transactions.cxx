@@ -1,4 +1,3 @@
-
 /*
  *   Copyright 2016-2026. Couchbase, Inc.
  *   All Rights Reserved.

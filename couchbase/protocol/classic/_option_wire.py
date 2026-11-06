@@ -12,6 +12,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
 """What each option is sent to the classic binding as: the key it reads, and what converts the value.
 
 A record is one option's wire wherever the option is carried, and a class that sends it

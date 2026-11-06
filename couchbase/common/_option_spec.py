@@ -12,6 +12,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
+
 """What holds of an option key for every protocol: one record per option, one entry per class.
 
 A record answers for its key wherever the key is carried, and a class that carries it differently
