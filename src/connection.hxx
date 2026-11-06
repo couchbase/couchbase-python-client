@@ -56,6 +56,11 @@ public:
     return cluster_;
   }
 
+  std::shared_ptr<asio::io_context> io_context() const
+  {
+    return io_;
+  }
+
   bool is_connected() const
   {
     return connected_;

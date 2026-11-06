@@ -394,7 +394,8 @@ pycbc::txns::create_transactions([[maybe_unused]] PyObject* self, PyObject* args
     return pycbc::build_exception(res.first, __FILE__, __LINE__, res.first.message().c_str());
   }
 
-  pycbc::txns::transactions* txns = new pycbc::txns::transactions(res.second);
+  pycbc::txns::transactions* txns =
+    new pycbc::txns::transactions(conn->conn->io_context(), res.second);
   PyObject* pyObj_txns = PyCapsule_New(txns, "txns_", dealloc_transactions);
   if (pyObj_txns == nullptr) {
     // No capsule means dealloc_transactions() never runs, so release the wrapper (and the core
@@ -1384,7 +1385,7 @@ pycbc::txns::create_transaction_context([[maybe_unused]] PyObject* self,
   pycbc::txns::transaction_context* py_ctx = nullptr;
   try {
     py_ctx = new pycbc::txns::transaction_context(
-      cbcoretxns::transaction_context::create(*txns->txns, tx_options));
+      txns->io, cbcoretxns::transaction_context::create(*txns->txns, tx_options));
   } catch (const std::exception& e) {
     return raise_invalid_argument(e.what());
   }

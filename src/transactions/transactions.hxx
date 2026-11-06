@@ -106,20 +106,30 @@ enum TxnExceptionType {
   COUCHBASE_ERROR
 };
 
+// A core transaction context owns an asio timer bound to the connection's io context, and
+// destroying that timer reaches into the context.  Python frees these capsules in no fixed
+// order relative to the connection, at interpreter exit in particular, so each holds its own
+// reference to the io context.  It is declared first so that it is destroyed last.
 struct transactions {
+  std::shared_ptr<asio::io_context> io;
   std::shared_ptr<cbcoretxns::transactions> txns;
 
-  explicit transactions(std::shared_ptr<cbcoretxns::transactions> transactions)
-    : txns(std::move(transactions))
+  transactions(std::shared_ptr<asio::io_context> io,
+               std::shared_ptr<cbcoretxns::transactions> transactions)
+    : io(std::move(io))
+    , txns(std::move(transactions))
   {
   }
 };
 
 struct transaction_context {
+  std::shared_ptr<asio::io_context> io;
   std::shared_ptr<cbcoretxns::transaction_context> ctx;
 
-  explicit transaction_context(std::shared_ptr<cbcoretxns::transaction_context> ctx)
-    : ctx(std::move(ctx))
+  transaction_context(std::shared_ptr<asio::io_context> io,
+                      std::shared_ptr<cbcoretxns::transaction_context> ctx)
+    : io(std::move(io))
+    , ctx(std::move(ctx))
   {
   }
 };

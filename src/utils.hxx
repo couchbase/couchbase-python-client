@@ -632,8 +632,6 @@ get_default_timeouts()
   add_field<std::chrono::milliseconds>(
     result, "bootstrap_timeout", couchbase::core::timeout_defaults::bootstrap_timeout);
   add_field<std::chrono::milliseconds>(
-    result, "dispatch_timeout", couchbase::core::timeout_defaults::dispatch_timeout);
-  add_field<std::chrono::milliseconds>(
     result, "resolve_timeout", couchbase::core::timeout_defaults::resolve_timeout);
   add_field<std::chrono::milliseconds>(
     result, "connect_timeout", couchbase::core::timeout_defaults::connect_timeout);

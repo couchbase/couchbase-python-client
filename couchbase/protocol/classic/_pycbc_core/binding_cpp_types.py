@@ -68,7 +68,6 @@ class CppQueryContext(TypedDict, total=False):
 
 class CppTimeoutDefaults(TypedDict):
     bootstrap_timeout: int
-    dispatch_timeout: int
     resolve_timeout: int
     connect_timeout: int
     key_value_timeout: int
