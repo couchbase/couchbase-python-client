@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import logging
+from typing import TYPE_CHECKING, Any
 
 from google.protobuf import timestamp_pb2 as timestamp
 
@@ -12,16 +15,29 @@ from .search_commands import SearchCommandBuilder
 from .search_index_manager_commands import SearchIndexManagerCommandBuilder
 from .update_authenticator_command import UpdateAuthenticatorCommand
 
+if TYPE_CHECKING:
+    from couchbase.cluster import Cluster
+
+    from sdk import workload_pb2 as sdk_pb
+
+    from ..telemetry.span_owner import SpanOwner
+    from ..workloads import Counters
+    from .sdk_commands import SdkCommand
+
 logger = logging.getLogger(__name__)
 
 
 class SdkCommandBuilder:
     @staticmethod
-    def build_command(cluster, command, counters, span_owner=None):  # noqa: C901
+    def build_command(cluster: Cluster,  # noqa: C901
+                      command: sdk_pb.Command,
+                      counters: Counters,
+                      span_owner: SpanOwner | None = None,
+                      ) -> SdkCommand:
         cmd_type = command.WhichOneof("command")
         kv_cmd_types = ['insert', 'get', 'remove', 'replace', 'upsert', 'range_scan']
 
-        cmd_kwargs = {
+        cmd_kwargs: dict[str, Any] = {
             'initiated': timestamp.Timestamp(),
             'return_result': command.return_result,
             'span_owner': span_owner

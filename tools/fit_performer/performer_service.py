@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Iterator
 from copy import deepcopy
 from datetime import timedelta
 from uuid import uuid4
@@ -9,17 +12,19 @@ from couchbase import __version__ as PYCBC_VERSION
 from couchbase import get_transactions_protocol
 from couchbase.cluster import Cluster
 
+import performer_pb2_grpc as performer_pb_grpc
+from observability import top_pb2 as observability_pb
+from performer import caps_pb2 as performer_caps_pb
+from run import top_level_pb2 as run_pb
+from shared import basic_pb2 as basic_pb
+from shared import bounds_pb2 as bounds_pb
+from shared import cluster_pb2 as cluster_pb
+from shared import echo_pb2 as echo_pb
+from streams import top_level_pb2 as streams_pb
+from transactions import extensions_pb2 as extensions_pb
+
 from .caps import PERFORMER_CAPS, SDK_CAPS
 from .executors import RequestExecutor, WorkloadExecutorBuilder
-from .generated import performer_pb2_grpc as performer_pb_grpc
-from .generated.observability import top_pb2 as observability_pb
-from .generated.performer import caps_pb2 as performer_caps_pb
-from .generated.shared import basic_pb2 as basic_pb
-from .generated.shared import bounds_pb2 as bounds_pb
-from .generated.shared import cluster_pb2 as cluster_pb
-from .generated.shared import echo_pb2 as echo_pb
-from .generated.streams import top_level_pb2 as streams_pb
-from .generated.transactions import extensions_pb2 as extensions_pb
 from .streaming import StreamOwner
 from .telemetry.span_owner import SpanOwner
 from .utils import ClusterConnectOptions, ConnectionCache
@@ -60,7 +65,7 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
         "RPP1": extensions_pb.EXT_REPLICA_FROM_PREFERRED_GROUP_PATCH1,
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._logger: logging.Logger = logging.getLogger()
         self._conns: dict[str, ConnectionCache] = {}
         self._stream_owner: StreamOwner = StreamOwner()
@@ -72,7 +77,10 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
         # persist across runs and are mutated by setCounter / clearAllCounters.
         self._counters: Counters = Counters()
 
-    def performerCapsFetch(self, request, context):
+    def performerCapsFetch(self,
+                           request: performer_caps_pb.PerformerCapsFetchRequest,
+                           context: grpc.ServicerContext,
+                           ) -> performer_caps_pb.PerformerCapsFetchResponse:
         self._logger.info("performerCapsFetch called")
 
         response = performer_caps_pb.PerformerCapsFetchResponse(
@@ -84,20 +92,26 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
             supported_apis=[basic_pb.API.DEFAULT]
         )
 
-        transactions_protocol_version, supported_extensions = get_transactions_protocol()
-        response.transactions_protocol_version = str(transactions_protocol_version)
+        # None when the core's metadata carries no transactions protocol.
+        transactions_protocol = get_transactions_protocol()
+        if transactions_protocol is not None:
+            transactions_protocol_version, supported_extensions = transactions_protocol
+            response.transactions_protocol_version = str(transactions_protocol_version)
 
-        for ext in supported_extensions:
-            try:
-                response.transaction_implementations_caps.append(self._VALID_EXTENSIONS[ext])
-            except KeyError:
-                # This is a warning only as the performer doesn't have transactions support yet.
-                # We can consider making this an error once we add transactions support.
-                self._logger.warning(f"Library reported unexpected transactions extension '{ext}'")
+            for ext in supported_extensions or []:
+                try:
+                    response.transaction_implementations_caps.append(self._VALID_EXTENSIONS[ext])
+                except KeyError:
+                    # This is a warning only as the performer doesn't have transactions support yet.
+                    # We can consider making this an error once we add transactions support.
+                    self._logger.warning(f"Library reported unexpected transactions extension '{ext}'")
 
         return response
 
-    def clusterConnectionCreate(self, request, context):
+    def clusterConnectionCreate(self,
+                                request: cluster_pb.ClusterConnectionCreateRequest,
+                                context: grpc.ServicerContext,
+                                ) -> cluster_pb.ClusterConnectionCreateResponse:
         self._logger.info("clusterConnectionCreate called ")
 
         hostname = request.cluster_hostname
@@ -156,7 +170,10 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
         response = cluster_pb.ClusterConnectionCreateResponse(cluster_connection_count=len(self._conns))
         return response
 
-    def clusterConnectionClose(self, request, context):
+    def clusterConnectionClose(self,
+                               request: cluster_pb.ClusterConnectionCloseRequest,
+                               context: grpc.ServicerContext,
+                               ) -> cluster_pb.ClusterConnectionCloseResponse:
         self._logger.info("clusterConnectionClose called")
 
         conn_id = request.cluster_connection_id
@@ -172,7 +189,10 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
 
         return cluster_pb.ClusterConnectionCloseResponse(cluster_connection_count=len(self._conns))
 
-    def disconnectConnections(self, request, context):
+    def disconnectConnections(self,
+                              request: cluster_pb.DisconnectConnectionsRequest,
+                              context: grpc.ServicerContext,
+                              ) -> cluster_pb.DisconnectConnectionsResponse:
         self._logger.info("disconnectConnections called")
 
         for conn in self._conns.values():
@@ -186,16 +206,18 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
 
         return cluster_pb.DisconnectConnectionsResponse()
 
-    def spanCreate(self, request, context):
+    def spanCreate(self,
+                   request: observability_pb.SpanCreateRequest,
+                   context: grpc.ServicerContext,
+                   ) -> observability_pb.SpanCreateResponse:
         self._logger.info(f"spanCreate called: id={request.id} name={request.name}")
 
         conn = self._conns.get(request.cluster_connection_id)
         if conn is None:
-            return grpc.Status(grpc.StatusCode.NOT_FOUND,
-                               f"No connection with id '{request.cluster_connection_id}'")
+            context.abort(grpc.StatusCode.NOT_FOUND, f"No connection with id '{request.cluster_connection_id}'")
         if conn.tracer is None:
-            return grpc.Status(grpc.StatusCode.FAILED_PRECONDITION,
-                               f"Tracer has not been set up for connection '{request.cluster_connection_id}'")
+            context.abort(grpc.StatusCode.FAILED_PRECONDITION,
+                          f"Tracer has not been set up for connection '{request.cluster_connection_id}'")
 
         try:
             self._span_owner.create_span(conn.tracer, request)
@@ -205,7 +227,10 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
 
         return observability_pb.SpanCreateResponse()
 
-    def spanFinish(self, request, context):
+    def spanFinish(self,
+                   request: observability_pb.SpanFinishRequest,
+                   context: grpc.ServicerContext,
+                   ) -> observability_pb.SpanFinishResponse:
         self._logger.info(f"spanFinish called: id={request.id}")
 
         try:
@@ -216,11 +241,14 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
 
         return observability_pb.SpanFinishResponse()
 
-    def echo(self, request, context):
+    def echo(self, request: echo_pb.EchoRequest, context: grpc.ServicerContext) -> echo_pb.EchoResponse:
         self._logger.info("================ " + request.testName + " : " + request.message + " ================ ")
         return echo_pb.EchoResponse()
 
-    def run(self, request, context):  # noqa: C901
+    def run(self,  # noqa: C901
+            request: run_pb.Request,
+            context: grpc.ServicerContext,
+            ) -> Iterator[run_pb.Result]:
         self._logger.info("Run called")
 
         run_id = str(uuid4())
@@ -271,17 +299,23 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
             context.abort(grpc.StatusCode.UNIMPLEMENTED, f"Request type {request_type} not supported")
             return None
 
-    def streamCancel(self, request, context):
+    def streamCancel(self,
+                     request: streams_pb.CancelRequest,
+                     context: grpc.ServicerContext,
+                     ) -> streams_pb.CancelResponse:
         self._logger.info('streamCancel called')
         self._stream_owner.cancel(request)
         return streams_pb.CancelResponse()
 
-    def streamRequestItems(self, request, context):
+    def streamRequestItems(self,
+                           request: streams_pb.RequestItemsRequest,
+                           context: grpc.ServicerContext,
+                           ) -> streams_pb.RequestItemsResponse:
         self._logger.info('streamRequestItems called')
         self._stream_owner.request_items(request)
         return streams_pb.RequestItemsResponse()
 
-    def setCounter(self, request, context):
+    def setCounter(self, request: bounds_pb.Counter, context: grpc.ServicerContext) -> bounds_pb.SetCounterResponse:
         self._logger.info(f"setCounter called (counter_id: {request.counter_id})")
         try:
             self._counters.set(request)
@@ -290,7 +324,10 @@ class PerformerServiceServicer(performer_pb_grpc.PerformerServiceServicer):
             return
         return bounds_pb.SetCounterResponse()
 
-    def clearAllCounters(self, request, context):
+    def clearAllCounters(self,
+                         request: bounds_pb.ClearAllCountersRequest,
+                         context: grpc.ServicerContext,
+                         ) -> bounds_pb.ClearAllCountersResponse:
         self._logger.info("clearAllCounters called")
         self._counters.clear()
         return bounds_pb.ClearAllCountersResponse()

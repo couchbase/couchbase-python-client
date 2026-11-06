@@ -7,7 +7,14 @@ from collections.abc import Callable, Iterator
 from datetime import timedelta
 from functools import wraps
 from time import perf_counter_ns
-from typing import Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Concatenate,
+                    ParamSpec,
+                    TypeVar,
+                    cast)
+
+from google.protobuf import timestamp_pb2 as timestamp_pb
 
 from couchbase.durability import DurabilityLevel
 from couchbase.exceptions import (AmbiguousTimeoutException,
@@ -67,15 +74,30 @@ from couchbase.transcoder import (JSONTranscoder,
                                   LegacyTranscoder,
                                   RawBinaryTranscoder,
                                   RawJSONTranscoder,
-                                  RawStringTranscoder)
+                                  RawStringTranscoder,
+                                  Transcoder)
 
-from ..generated.run import top_level_pb2 as run_pb
-from ..generated.sdk import workload_pb2 as sdk_pb
-from ..generated.shared import basic_pb2 as basic_pb
-from ..generated.shared import content_pb2 as content_pb
-from ..generated.shared import exceptions_pb2 as exceptions_pb
+from run import top_level_pb2 as run_pb
+from sdk import workload_pb2 as sdk_pb
+from shared import basic_pb2 as basic_pb
+from shared import content_pb2 as content_pb
+from shared import exceptions_pb2 as exceptions_pb
+from streams import top_level_pb2 as streams_pb
+
+if TYPE_CHECKING:
+    from couchbase.observability.tracing import RequestSpan
+
+    from ..telemetry.span_owner import SpanOwner
+
+P = ParamSpec('P')
+C = TypeVar('C', bound='SdkCommand')
 
 logger = logging.getLogger(__name__)
+
+
+def _identity(value: Any) -> Any:
+    return value
+
 
 DURABILITY_LEVEL_MAP = {
     basic_pb.Durability.NONE: DurabilityLevel.NONE,
@@ -84,7 +106,7 @@ DURABILITY_LEVEL_MAP = {
     basic_pb.Durability.PERSIST_TO_MAJORITY: DurabilityLevel.PERSIST_TO_MAJORITY
 }
 
-TRANSCODER_MAP = {
+TRANSCODER_MAP: dict[str, Transcoder] = {
     'legacy': LegacyTranscoder(),
     'json': JSONTranscoder(),
     'raw_json': RawJSONTranscoder(),
@@ -95,9 +117,11 @@ TRANSCODER_MAP = {
 
 class SdkCommand(ABC):
 
+    _initiated: timestamp_pb.Timestamp
+
     @staticmethod
     @abstractmethod
-    def create_command(**kwargs) -> SdkCommand:
+    def create_command(**kwargs: Any) -> SdkCommand:
         """ Create, build and return SdkCommand instance.
 
         Forcing kwargs with the create command.  This format helps the factory more easily pass in options.
@@ -122,30 +146,33 @@ class SdkCommand(ABC):
         raise NotImplementedError('execute_command method must be implemented by concrete class.')
 
     @abstractmethod
-    def set_options(self):
+    def set_options(self) -> None:
         """ Sets SdkCommand options.
         """
         raise NotImplementedError('set_options method must be implemented by concrete class.')
 
     @property
-    def stream_type(self):
+    def stream_type(self) -> streams_pb.Type.ValueType | None:
         return None
 
     @property
-    def stream_config(self):
+    def stream_config(self) -> streams_pb.Config | None:
         return None
 
 
 class SdkCommandOptions:
+    # Each helper reads a field that several unrelated option messages share, so each takes the
+    # message as `Any`.
+
     @staticmethod
-    def get_simple_option(options, option_name):
+    def get_simple_option(options: Any, option_name: str) -> Any:
         if not options.HasField(option_name):
             return None
 
         return getattr(options, option_name)
 
     @staticmethod
-    def resolve_parent_span(options, span_owner):
+    def resolve_parent_span(options: Any, span_owner: SpanOwner | None) -> RequestSpan | None:
         if options is None or span_owner is None:
             return None
         if not options.HasField('parent_span_id'):
@@ -156,7 +183,7 @@ class SdkCommandOptions:
         return span
 
     @staticmethod
-    def get_timeout(options):
+    def get_timeout(options: Any) -> timedelta | None:
         try:
             if not options.HasField("timeout_msecs"):
                 return None
@@ -169,14 +196,14 @@ class SdkCommandOptions:
             return timedelta(milliseconds=options.timeout_millis)
 
     @staticmethod
-    def get_transcoder(options):
+    def get_transcoder(options: Any) -> Transcoder | None:
         if not options.HasField("transcoder"):
             return None
 
         return TRANSCODER_MAP.get(options.transcoder.WhichOneof("transcoder"), None)
 
     @staticmethod
-    def get_consistent_with(options):
+    def get_consistent_with(options: Any) -> MutationState | None:
         if not options.HasField('consistent_with'):
             return None
 
@@ -192,12 +219,12 @@ class SdkCommandOptions:
         return state
 
     @staticmethod
-    def get_preserve_expiry(options):
+    def get_preserve_expiry(options: Any) -> bool | None:
         return SdkCommandOptions.get_simple_option(options, "preserve_expiry")
 
 
 class SdkErrorContextEncoder(json.JSONEncoder):
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         if isinstance(obj, ErrorContext):
             return obj._base or dict()
         elif isinstance(obj, set):
@@ -207,7 +234,7 @@ class SdkErrorContextEncoder(json.JSONEncoder):
 
 
 class SdkCommandResult:
-    ERROR_MAP = {
+    ERROR_MAP: dict[type[Exception], exceptions_pb.CouchbaseExceptionType.ValueType] = {
         CouchbaseException: exceptions_pb.SDK_COUCHBASE_EXCEPTION,
         TimeoutException: exceptions_pb.SDK_TIMEOUT_EXCEPTION,
         RequestCanceledException: exceptions_pb.SDK_REQUEST_CANCELLED_EXCEPTION,
@@ -261,9 +288,9 @@ class SdkCommandResult:
     }
 
     @classmethod
-    def as_success(cls, fn):
+    def as_success(cls, fn: Callable[Concatenate[C, P], object]) -> Callable[Concatenate[C, P], run_pb.Result]:
         @wraps(fn)
-        def wrapped_fn(self, *args, **kwargs):
+        def wrapped_fn(self: C, *args: P.args, **kwargs: P.kwargs) -> run_pb.Result:
             try:
                 start = perf_counter_ns()
                 fn(self, *args, **kwargs)
@@ -277,7 +304,7 @@ class SdkCommandResult:
         return wrapped_fn
 
     @staticmethod
-    def exception_as_result(cb_exception):
+    def exception_as_result(cb_exception: Exception) -> run_pb.Result:
         """ Returns a run.top_level.result w/ the sdk field set to a sdk.workload.result w/ an exception.
             Uses `SdkCommandResult.to_exception` in order to convert the exception to a PB exception.
         """
@@ -285,20 +312,19 @@ class SdkCommandResult:
         return run_pb.Result(sdk=sdk_result)
 
     @staticmethod
-    def to_exception(cb_exception):
+    def to_exception(cb_exception: Exception) -> exceptions_pb.Exception:
         """ Converts an exception to the equivalent Protobuf exception object
         """
-        try:
-            cb_exception_type = SdkCommandResult.ERROR_MAP[type(cb_exception)]
-        except KeyError:
-            cb_exception_type = None
+        cb_exception_type = SdkCommandResult.ERROR_MAP.get(type(cb_exception))
 
         if cb_exception_type is not None:
+            # Every key of the map is a Couchbase exception type.
+            couchbase_exception = cast(CouchbaseException, cb_exception)
             return exceptions_pb.Exception(
                 couchbase=exceptions_pb.CouchbaseExceptionEx(
                     name=type(cb_exception).__name__,
                     type=cb_exception_type,
-                    serialized=SdkCommandResult._serialize_couchbase_exception(cb_exception)
+                    serialized=SdkCommandResult._serialize_couchbase_exception(couchbase_exception)
                 )
             )
         else:
@@ -310,7 +336,10 @@ class SdkCommandResult:
             )
 
     @staticmethod
-    def to_content(cb_result, content_as: content_pb.ContentAs, index=None) -> content_pb.ContentTypes:  # noqa: C901
+    def to_content(cb_result: Any,  # noqa: C901
+                   content_as: content_pb.ContentAs,
+                   index: int | None = None,
+                   ) -> content_pb.ContentTypes:
         res = content_pb.ContentTypes()
         as_type = content_as.WhichOneof('as')
 
@@ -320,9 +349,9 @@ class SdkCommandResult:
             return SdkCommandResult._row_to_content(cb_result, content_as)
 
         if index is None:
-            orig_content = cb_result.content_as._content
+            orig_content = cb_result.content_as[_identity]
         else:
-            orig_content = cb_result.content_as._content[index].get('value')
+            orig_content = cb_result.content_as[_identity](index)
 
         if as_type == 'as_string':
             if isinstance(orig_content, list):
@@ -394,7 +423,7 @@ class SdkCommandResult:
         return res
 
     @staticmethod
-    def _row_to_content(row, content_as: content_pb.ContentAs):  # noqa: C901
+    def _row_to_content(row: Any, content_as: content_pb.ContentAs) -> content_pb.ContentTypes:  # noqa: C901
         """
         Returns the ContentType message when the result has no content_as method - e.g. in a scan or query row
         """
@@ -433,8 +462,8 @@ class SdkCommandResult:
         return f"{exc.message} {json.dumps(exc.error_context, cls=SdkErrorContextEncoder)}"
 
 
-def validate_command(validation_dict,  # type: dict[str, Callable[[Any], bool]]
-                     **kwargs,  # type: dict[str, Any]
+def validate_command(validation_dict: dict[str, Callable[[Any], bool]],
+                     **kwargs: Any,
                      ) -> bool:
     """Validate SDK Command options.
 

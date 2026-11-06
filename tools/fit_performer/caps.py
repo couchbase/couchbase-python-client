@@ -1,5 +1,5 @@
-from .generated.performer import caps_pb2 as performer_caps_pb
-from .generated.sdk import caps_pb2 as sdk_caps_pb
+from performer import caps_pb2 as performer_caps_pb
+from sdk import caps_pb2 as sdk_caps_pb
 
 PERFORMER_CAPS = [
     performer_caps_pb.KV_SUPPORT_1,

@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from .bounds import build_bounds_executor
 
 if TYPE_CHECKING:
-    import multiprocessing as mp
-    import queue
-
-    from acouchbase.cluster import AsyncCluster
     from couchbase.cluster import Cluster
 
+    from sdk import workload_pb2 as sdk_pb
+
+    from ..executors.workload_executor import ResultQueue
     from ..streaming import StreamOwner
     from .bounds import BoundsExecutor, Counters
 
@@ -20,16 +19,16 @@ if TYPE_CHECKING:
 class Workload(ABC):
 
     def __init__(self,
-                 workload: Any,
+                 workload: sdk_pb.Workload,
                  run_id: str,
-                 conn: Cluster | AsyncCluster = None
-                 ):
+                 conn: Cluster | None = None
+                 ) -> None:
         """ Initialize a workload instance.
 
         Args:
             workload (protobuf Workload): The gRPC workload object.
             run_id (str): The ID of the run request that created this workload.
-            conn (Union[Cluster, AsyncCluster], optional): The cluster instance.
+            conn (Cluster, optional): The cluster instance.
         """
         self._workload = workload
         self._run_id = run_id
@@ -51,7 +50,7 @@ class Workload(ABC):
 
     @abstractmethod
     def set_connection(self,
-                       connection  # type: Cluster | AsyncCluster
+                       connection: Cluster
                        ) -> None:
         """ Set a workload's connection.
 
@@ -61,14 +60,14 @@ class Workload(ABC):
         to pass in the it's own connection to the workload.
 
         Args:
-            connection (Union[Cluster, AsyncCluster]): The cluster instance.
+            connection (Cluster): The cluster instance.
         """
         raise NotImplementedError('set_connection method must be implemented by concrete class.')
 
     @abstractmethod
     def execute(self,
-                results,  # type:  mp.Queue | queue.Queue
-                stream_owner=None,  # type: StreamOwner | None
+                results: ResultQueue,
+                stream_owner: StreamOwner | None = None,
                 ) -> None:
         """ Execute a workload.
 
@@ -81,8 +80,8 @@ class Workload(ABC):
                 be executed.
 
         Args:
-            results (Union[mp.Queue, queue.Queue]): Queue that stores results from the workload commands.
-                If the workload is using multi-processing, the queue should be a multiprocessing.Queue,
+            results (ResultQueue): Queue that stores results from the workload commands.
+                If the workload is using multi-processing, the queue should be a multiprocessing.SimpleQueue,
                 otherwise a queue.Queue.
             stream_owner (StreamOwner, optional): The stream owner object to submit any streams created by this
                 workload.
@@ -92,19 +91,21 @@ class Workload(ABC):
 
     @abstractmethod
     def execute_command(self,
-                        command,  # type: Any
-                        command_count,  # type: int
-                        results) -> None:
+                        command: sdk_pb.Command,
+                        results: ResultQueue,
+                        stream_owner: StreamOwner | None = None,
+                        ) -> None:
         """ Execute one command from a workload.
 
         Build the SdkCommand, execute it and place the result in the results queue.
 
         Args:
-            command (Union[protobuf Command object, SdkCommand]): The protobuf command object.
-            command_count (int): The number of commands in the workload that have been executed.
-            results (Union[mp.Queue, queue.Queue]): Queue that stores results from the workload commands.
-                If the workload is using multi-processing, the queue should be a multiprocessing.Queue,
+            command (protobuf Command): The protobuf command object.
+            results (ResultQueue): Queue that stores results from the workload commands.
+                If the workload is using multi-processing, the queue should be a multiprocessing.SimpleQueue,
                 otherwise a queue.Queue.
+            stream_owner (StreamOwner, optional): The stream owner object to submit any streams created by this
+                command.
         """
         raise NotImplementedError('execute_command method must be implemented by concrete class.')
 
@@ -130,4 +131,6 @@ class Workload(ABC):
         Returns:
             bool: True if the workload is still within its bounds.  False otherwise.
         """
+        if self._bounds is None:
+            raise RuntimeError('Bounds have not been set, call set_counters_and_bounds first.')
         return self._bounds.can_execute()

@@ -4,20 +4,33 @@ import logging
 import multiprocessing as mp
 import threading
 import weakref
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import timedelta
+from multiprocessing.context import BaseContext, ForkServerProcess
+from multiprocessing.pool import Pool
+from multiprocessing.queues import SimpleQueue
 from time import sleep
-from typing import TYPE_CHECKING
+from typing import (TYPE_CHECKING,
+                    Any,
+                    cast)
 
-from acouchbase.cluster import AsyncCluster
 from couchbase.cluster import Cluster
 
 from ..workloads import WorkloadBuilder
 from .workload_executor import WorkloadExecutor
 
 if TYPE_CHECKING:
+    from opentelemetry.sdk.metrics import MeterProvider
+    from opentelemetry.sdk.trace import TracerProvider
+
+    from couchbase.observability.metrics import Meter
+    from couchbase.observability.tracing import RequestTracer
     from couchbase.options import ClusterOptions
 
+    from observability import config_pb2 as observability_config_pb
+    from run import top_level_pb2 as run_pb
+
+    from ..telemetry.span_owner import SpanOwner
     from ..workloads import Counters, Workload
 
 # forkserver avoids inheriting the performer's active gRPC threads/fds into workers.
@@ -27,69 +40,77 @@ if TYPE_CHECKING:
 _CTX = mp.get_context('forkserver')
 
 
-class PerformerProcess(_CTX.Process):
-    def __init__(self, *args, **kwargs):
+# `_CTX.Process` is this class, named directly so a type checker can follow the subclass.
+class PerformerProcess(ForkServerProcess):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._results_queue = None
-        self._tracer = None
-        self._meter = None
-        self._tracer_provider = None
-        self._meter_provider = None
-        self._span_contexts = {}
+        self._results_queue: SimpleQueue[run_pb.Result | None] | None = None
+        self._tracer: RequestTracer | None = None
+        self._meter: Meter | None = None
+        self._tracer_provider: TracerProvider | None = None
+        self._meter_provider: MeterProvider | None = None
+        self._span_contexts: dict[str, str] = {}
 
     @property
-    def results(self):
+    def results(self) -> SimpleQueue[run_pb.Result | None] | None:
         return self._results_queue
 
     @property
-    def meter(self):
+    def meter(self) -> Meter | None:
         return self._meter
 
     @property
-    def meter_provider(self):
+    def meter_provider(self) -> MeterProvider | None:
         return self._meter_provider
 
     @property
-    def span_contexts(self):
+    def span_contexts(self) -> dict[str, str]:
         return self._span_contexts
 
     @property
-    def tracer(self):
+    def tracer(self) -> RequestTracer | None:
         return self._tracer
 
     @property
-    def tracer_provider(self):
+    def tracer_provider(self) -> TracerProvider | None:
         return self._tracer_provider
 
-    def set_otel(self, tracer, tracer_provider, meter, meter_provider, span_contexts):
+    def set_otel(self,
+                 tracer: RequestTracer | None,
+                 tracer_provider: TracerProvider | None,
+                 meter: Meter | None,
+                 meter_provider: MeterProvider | None,
+                 span_contexts: dict[str, str],
+                 ) -> None:
         self._tracer = tracer
         self._tracer_provider = tracer_provider
         self._meter = meter
         self._meter_provider = meter_provider
         self._span_contexts = span_contexts
 
-    def set_parent_items(self, queue):
+    def set_parent_items(self, queue: SimpleQueue[run_pb.Result | None]) -> None:
         self._results_queue = queue
 
     @classmethod
-    def register_with_context(cls, context):
-        context.Process = cls
+    def register_with_context(cls, context: BaseContext) -> None:
+        # The stubs declare `Process` on each context class, not on an instance, which is what this replaces.
+        setattr(context, 'Process', cls)
 
 
 # Make sure the process pool uses our custom process
 PerformerProcess.register_with_context(_CTX)
 
 
-def init_process(queue,  # type: mp.Queue
-                 obs_config=None,
-                 span_contexts=None
+def init_process(queue: SimpleQueue[run_pb.Result | None],
+                 obs_config: observability_config_pb.Config | None = None,
+                 span_contexts: dict[str, str] | None = None
                  ) -> None:
     """ Initialize the performer process
 
     Sets the items shared with the parent process
 
     Args:
-        queue (mp.Queue): The results queue shared with the parent process
+        queue (mp.SimpleQueue): The results queue shared with the parent process
         obs_config: The observability config used to create OTel tracer/meter in this process
         span_contexts: Dict mapping span ID to W3C traceparent string, for ambient context injection
     """
@@ -100,10 +121,14 @@ def init_process(queue,  # type: mp.Queue
         root.addHandler(handler)
         root.setLevel(logging.INFO)
 
-    current_p = mp.current_process()
+    # The pool is created from `_CTX`, whose Process is this class, so every worker is one.
+    current_p = cast(PerformerProcess, mp.current_process())
     current_p.set_parent_items(queue)
 
-    tracer = tracer_provider = meter = meter_provider = None
+    tracer: RequestTracer | None = None
+    tracer_provider: TracerProvider | None = None
+    meter: Meter | None = None
+    meter_provider: MeterProvider | None = None
     if obs_config is not None:
         _logger = logging.getLogger(__name__)
         pid = current_p.pid
@@ -126,11 +151,11 @@ def init_process(queue,  # type: mp.Queue
     current_p.set_otel(tracer, tracer_provider, meter, meter_provider, span_contexts or {})
 
 
-def execute_workload(workloads,  # type: list[Workload]
-                     counters,  # type: Counters
-                     hostname,  # type: str
-                     options,  # type: ClusterOptions
-                     retries=5  # type: int | None
+def execute_workload(workloads: list[Workload],
+                     counters: Counters,
+                     hostname: str,
+                     options: ClusterOptions,
+                     retries: int = 5
                      ) -> None:
     """ Execute the given workloads in the current process
 
@@ -146,15 +171,17 @@ def execute_workload(workloads,  # type: list[Workload]
         RuntimeError: If no connection can be established with the cluster after the given number of retries.
     """
     logger = logging.getLogger(__name__)
-    current_p = mp.current_process()
+    current_p = cast(PerformerProcess, mp.current_process())
     results = current_p.results
+    if results is None:
+        raise RuntimeError('The worker process has no results queue, init_process has not run.')
 
     from ..telemetry.otel import worker_otel_setup, worker_otel_teardown
     otel_tokens, worker_span_owner = worker_otel_setup(
         current_p.tracer, current_p.meter, current_p.span_contexts, options
     )
 
-    connection = None
+    connection: Cluster | None = None
     for _ in range(retries):
         try:
             connection = Cluster(hostname, options)
@@ -183,24 +210,31 @@ class MultiProcessExecutor(WorkloadExecutor):
 
     _SUPPORTS_STREAMING = False
 
-    def __init__(self, run_id, counters, hostname=None, options=None, obs_config=None, span_contexts=None):
+    def __init__(self,
+                 run_id: str,
+                 counters: Counters,
+                 hostname: str | None = None,
+                 options: ClusterOptions | None = None,
+                 obs_config: observability_config_pb.Config | None = None,
+                 span_contexts: dict[str, str] | None = None,
+                 ) -> None:
         self._run_id = run_id
         self._span_contexts = span_contexts or {}
         self._complete_lock = threading.Lock()
-        self._results = _CTX.SimpleQueue()
+        self._results: SimpleQueue[run_pb.Result | None] = _CTX.SimpleQueue()
         self._counters = counters
-        self._pool = None
+        self._pool: Pool | None = None
         self._workload_complete = False
         self._thread_executor = ThreadPoolExecutor(max_workers=1)
-        self._num_workers = None
-        self._workloads = None
+        self._num_workers: int | None = None
+        self._workloads: list[list[Workload]] = []
         self._hostname = hostname
         self._options = options
         self._obs_config = obs_config
         self._logger = logging.getLogger(__name__)
 
     @property
-    def pool(self):
+    def pool(self) -> Pool | None:
         return self._pool
 
     @property
@@ -209,14 +243,14 @@ class MultiProcessExecutor(WorkloadExecutor):
             return self._workload_complete
 
     @property
-    def results(self) -> mp.SimpleQueue:
+    def results(self) -> SimpleQueue[run_pb.Result | None]:
         return self._results
 
     @property
     def supports_streaming(self) -> bool:
         return self._SUPPORTS_STREAMING
 
-    def create_pool(self):
+    def create_pool(self) -> None:
         if self._pool:
             raise RuntimeError('Pool has already been created.')
 
@@ -225,14 +259,14 @@ class MultiProcessExecutor(WorkloadExecutor):
         self._pool = _CTX.Pool(self._num_workers, initializer=init_process, initargs=args)
 
     def set_connection(self,
-                       conn=None,  # type: AsyncCluster | Cluster | None
-                       hostname=None,  # type: str | None
-                       options=None,  # type: ClusterOptions | None
-                       retries=5,  # type: int | None
+                       conn: Cluster | None = None,
+                       hostname: str | None = None,
+                       options: ClusterOptions | None = None,
+                       retries: int = 5,
                        ) -> None:
         pass
 
-    def build_workloads(self, request):
+    def build_workloads(self, request: run_pb.Request) -> None:
         # The number of workloads equals # of gRPC HorizontalScaling
         # which also equals # of processes to use to execute workloads
 
@@ -242,11 +276,13 @@ class MultiProcessExecutor(WorkloadExecutor):
         self._num_workers = len(self._workloads)
         self._logger.info(f"There are {self._num_workers} workloads")
 
-    def _execute_workloads(self, workloads):
+    def _execute_workloads(self, workloads: list[list[Workload]]) -> None:
+        if self._pool is None:
+            raise RuntimeError('No pool has been created, cannot execute workloads.')
         args = list(map(lambda wl: (wl, self._counters, self._hostname, self._options), workloads))
         self._pool.starmap(execute_workload, args)
 
-    def _workloads_complete(self, future):
+    def _workloads_complete(self, future: Future[None]) -> None:
         exc = future.exception()
         if exc:
             raise exc
@@ -255,17 +291,26 @@ class MultiProcessExecutor(WorkloadExecutor):
         self._logger.info('Workloads complete')
         self._results.put(None)  # Executor done sentinel
 
-    def execute_workloads(self):
+    def execute_workloads(self) -> None:
         self._workload_complete = False
         ft = self._thread_executor.submit(self._execute_workloads, self._workloads)
         ft.add_done_callback(self._workloads_complete)
 
-    def shutdown(self):
+    def shutdown(self) -> None:
+        if self._pool is None:
+            return
         self._pool.close()
         self._pool.join()
 
     @classmethod
-    def build_executor(cls, run_id, request, hostname, options, counters, obs_config=None, span_owner=None
+    def build_executor(cls,
+                       run_id: str,
+                       request: run_pb.Request,
+                       hostname: str,
+                       options: ClusterOptions,
+                       counters: Counters,
+                       obs_config: observability_config_pb.Config | None = None,
+                       span_owner: SpanOwner | None = None,
                        ) -> MultiProcessExecutor:
         # Worker processes can't see this process's in-process dict, so upgrade the registry to a
         # Manager backing (shared via picklable proxies) before the pool is created.

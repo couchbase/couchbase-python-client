@@ -1,15 +1,22 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from datetime import timedelta
 from functools import wraps
 from time import perf_counter_ns
-from typing import Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Concatenate,
+                    ParamSpec,
+                    Protocol,
+                    TypeVar)
 
 import google.protobuf.timestamp_pb2 as timestamp_pb
 
 from couchbase.cluster import Cluster
-from couchbase.management.buckets import (BucketSettings,
+from couchbase.management.buckets import (BucketManager,
+                                          BucketSettings,
                                           BucketType,
                                           CompressionMode,
                                           ConflictResolutionType,
@@ -23,14 +30,18 @@ from couchbase.management.options import (CreateBucketOptions,
                                           GetBucketOptions,
                                           UpdateBucketOptions)
 
-from ..generated.run import top_level_pb2 as run_pb
-from ..generated.sdk import workload_pb2 as sdk_pb
-from ..generated.sdk.cluster import bucket_manager_pb2 as bucket_manager_pb
+from run import top_level_pb2 as run_pb
+from sdk import workload_pb2 as sdk_pb
+from sdk.cluster import bucket_manager_pb2 as bucket_manager_pb
+
 from .sdk_commands import (DURABILITY_LEVEL_MAP,
                            SdkCommand,
                            SdkCommandOptions,
                            SdkCommandResult,
                            validate_command)
+
+if TYPE_CHECKING:
+    from ..telemetry.span_owner import SpanOwner
 
 VALID_BUCKET_MANAGER_COMMAND_ARGS = {
     'return_result': lambda r: isinstance(r, bool),
@@ -82,15 +93,26 @@ INV_DURABILITY_LEVEL_MAP = {v: k for k, v in DURABILITY_LEVEL_MAP.items()}
 logger = logging.getLogger(__name__)
 
 
+class _ResultCommand(Protocol):
+    _initiated: timestamp_pb.Timestamp
+    _return_result: bool
+
+
+C = TypeVar('C', bound=_ResultCommand)
+P = ParamSpec('P')
+
+
 class BucketManagerCommandOptions(SdkCommandOptions):
     pass
 
 
 class BucketManagerCommandResult(SdkCommandResult):
     @classmethod
-    def as_bucket_settings(cls, fn):
+    def as_bucket_settings(cls,
+                           fn: Callable[Concatenate[C, P], BucketSettings]
+                           ) -> Callable[Concatenate[C, P], run_pb.Result]:
         @wraps(fn)
-        def wrapped_fn(self, *args, **kwargs):
+        def wrapped_fn(self: C, *args: P.args, **kwargs: P.kwargs) -> run_pb.Result:
             try:
                 start = perf_counter_ns()
                 res = fn(self, *args, **kwargs)
@@ -111,9 +133,11 @@ class BucketManagerCommandResult(SdkCommandResult):
         return wrapped_fn
 
     @classmethod
-    def as_get_all_buckets_result(cls, fn):
+    def as_get_all_buckets_result(cls,
+                                  fn: Callable[Concatenate[C, P], list[BucketSettings]]
+                                  ) -> Callable[Concatenate[C, P], run_pb.Result]:
         @wraps(fn)
-        def wrapped_fn(self, *args, **kwargs):
+        def wrapped_fn(self: C, *args: P.args, **kwargs: P.kwargs) -> run_pb.Result:
             try:
                 start = perf_counter_ns()
                 res = fn(self, *args, **kwargs)
@@ -135,7 +159,7 @@ class BucketManagerCommandResult(SdkCommandResult):
 
     @classmethod
     def to_bucket_settings(cls, sdk_settings: BucketSettings) -> bucket_manager_pb.BucketSettings:  # noqa: C901
-        kwargs = {
+        kwargs: dict[str, Any] = {
             'name': sdk_settings.name,
             'ram_quota_MB': sdk_settings['ram_quota_mb']
         }
@@ -149,8 +173,11 @@ class BucketManagerCommandResult(SdkCommandResult):
             kwargs['bucket_type'] = INV_BUCKET_TYPE_MAP[sdk_settings.bucket_type]
         if sdk_settings.eviction_policy is not None:
             kwargs['eviction_policy'] = INV_EVICTION_POLICY_TYPE_MAP[sdk_settings.eviction_policy]
-        if sdk_settings.max_expiry is not None:
-            kwargs['max_expiry_seconds'] = round(sdk_settings.max_expiry.total_seconds())
+        max_expiry = sdk_settings.max_expiry
+        if max_expiry is not None:
+            # Settings read from the server carry a timedelta; settings built by hand may carry seconds.
+            max_expiry_seconds = max_expiry.total_seconds() if isinstance(max_expiry, timedelta) else max_expiry
+            kwargs['max_expiry_seconds'] = round(max_expiry_seconds)
         if sdk_settings.compression_mode is not None:
             kwargs['compression_mode'] = INV_COMPRESSION_MODE_MAP[sdk_settings.compression_mode]
         if 'minimum_durability_level' in sdk_settings:
@@ -168,7 +195,7 @@ class BucketManagerCommandResult(SdkCommandResult):
         return bucket_manager_pb.BucketSettings(**kwargs)
 
     @classmethod
-    def to_get_all_buckets_result(cls, sdk_res: list[BucketSettings]):
+    def to_get_all_buckets_result(cls, sdk_res: list[BucketSettings]) -> bucket_manager_pb.GetAllBucketsResult:
         res = bucket_manager_pb.GetAllBucketsResult()
         for settings in sdk_res:
             res.result[settings.name] = cls.to_bucket_settings(settings)
@@ -177,18 +204,18 @@ class BucketManagerCommandResult(SdkCommandResult):
 
 
 class GetBucketCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_BUCKET_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._bucket_manager = self._cluster.buckets()
-        self._return_result = kwargs.get('return_result')
-        self._bucket_name = kwargs.get('bucket_name')
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster = kwargs['cluster']
+        self._bucket_manager: BucketManager = self._cluster.buckets()
+        self._return_result: bool = kwargs['return_result']
+        self._bucket_name: str = kwargs['bucket_name']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: GetBucketOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -198,28 +225,28 @@ class GetBucketCommand(SdkCommand):
         )
 
     @BucketManagerCommandResult.as_bucket_settings
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> BucketSettings:
         return self._bucket_manager.get_bucket(self._bucket_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> GetBucketCommand:
+    def create_command(**kwargs: Any) -> GetBucketCommand:
         command = GetBucketCommand(**kwargs)
         command.set_options()
         return command
 
 
 class GetAllBucketsCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_BUCKET_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._bucket_manager = self._cluster.buckets()
-        self._return_result = kwargs.get('return_result')
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster = kwargs['cluster']
+        self._bucket_manager: BucketManager = self._cluster.buckets()
+        self._return_result: bool = kwargs['return_result']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: GetAllBucketOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -229,29 +256,29 @@ class GetAllBucketsCommand(SdkCommand):
         )
 
     @BucketManagerCommandResult.as_get_all_buckets_result
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> list[BucketSettings]:
         return self._bucket_manager.get_all_buckets(self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> GetAllBucketsCommand:
+    def create_command(**kwargs: Any) -> GetAllBucketsCommand:
         command = GetAllBucketsCommand(**kwargs)
         command.set_options()
         return command
 
 
 class CreateBucketCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_BUCKET_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._bucket_manager = self._cluster.buckets()
-        self._settings = kwargs.get('settings')
-        self._return_result = kwargs.get('return_result')
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster = kwargs['cluster']
+        self._bucket_manager: BucketManager = self._cluster.buckets()
+        self._settings: CreateBucketSettings = kwargs['settings']
+        self._return_result: bool = kwargs['return_result']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: CreateBucketOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -261,29 +288,29 @@ class CreateBucketCommand(SdkCommand):
         )
 
     @BucketManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._bucket_manager.create_bucket(self._settings, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> CreateBucketCommand:
+    def create_command(**kwargs: Any) -> CreateBucketCommand:
         command = CreateBucketCommand(**kwargs)
         command.set_options()
         return command
 
 
 class DropBucketCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_BUCKET_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._bucket_manager = self._cluster.buckets()
-        self._bucket_name = kwargs.get('bucket_name')
-        self._return_result = kwargs.get('return_result')
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster = kwargs['cluster']
+        self._bucket_manager: BucketManager = self._cluster.buckets()
+        self._bucket_name: str = kwargs['bucket_name']
+        self._return_result: bool = kwargs['return_result']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: DropBucketOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -293,29 +320,29 @@ class DropBucketCommand(SdkCommand):
         )
 
     @BucketManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._bucket_manager.drop_bucket(self._bucket_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> DropBucketCommand:
+    def create_command(**kwargs: Any) -> DropBucketCommand:
         command = DropBucketCommand(**kwargs)
         command.set_options()
         return command
 
 
 class FlushBucketCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_BUCKET_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._bucket_manager = self._cluster.buckets()
-        self._bucket_name = kwargs.get('bucket_name')
-        self._return_result = kwargs.get('return_result')
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster = kwargs['cluster']
+        self._bucket_manager: BucketManager = self._cluster.buckets()
+        self._bucket_name: str = kwargs['bucket_name']
+        self._return_result: bool = kwargs['return_result']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: FlushBucketOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -325,29 +352,29 @@ class FlushBucketCommand(SdkCommand):
         )
 
     @BucketManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._bucket_manager.flush_bucket(self._bucket_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> FlushBucketCommand:
+    def create_command(**kwargs: Any) -> FlushBucketCommand:
         command = FlushBucketCommand(**kwargs)
         command.set_options()
         return command
 
 
 class UpdateBucketCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_BUCKET_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._bucket_manager = self._cluster.buckets()
-        self._settings = kwargs.get('settings')
-        self._return_result = kwargs.get('return_result')
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster = kwargs['cluster']
+        self._bucket_manager: BucketManager = self._cluster.buckets()
+        self._settings: BucketSettings = kwargs['settings']
+        self._return_result: bool = kwargs['return_result']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: UpdateBucketOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -357,11 +384,11 @@ class UpdateBucketCommand(SdkCommand):
         )
 
     @BucketManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._bucket_manager.update_bucket(self._settings, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> UpdateBucketCommand:
+    def create_command(**kwargs: Any) -> UpdateBucketCommand:
         command = UpdateBucketCommand(**kwargs)
         command.set_options()
         return command
@@ -370,7 +397,7 @@ class UpdateBucketCommand(SdkCommand):
 class BucketManagerCommandBuilder:
     @staticmethod
     def _get_bucket_settings_kwargs(proto_settings: bucket_manager_pb.BucketSettings) -> dict[str, Any]:  # noqa: C901
-        kwargs = {
+        kwargs: dict[str, Any] = {
             'name': proto_settings.name,
             'ram_quota_mb': proto_settings.ram_quota_MB,
         }
@@ -420,9 +447,11 @@ class BucketManagerCommandBuilder:
     @classmethod
     def build_command(cls,
                       bucket_mgr_cmd: bucket_manager_pb.Command,
-                      **cmd_kwargs: dict[str, Any]
+                      **cmd_kwargs: Any
                       ) -> SdkCommand:
         cmd_type = bucket_mgr_cmd.WhichOneof('command')
+        if cmd_type is None:
+            raise NotImplementedError('Bucket management command with no command set not supported by performer')
         cmd = getattr(bucket_mgr_cmd, cmd_type)
 
         if cmd.HasField('options'):

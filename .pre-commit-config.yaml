@@ -71,6 +71,35 @@ repos:
           - pytest-asyncio~=1.1
           - Twisted~=24.7
           - opentelemetry-api~=1.22
+  - repo: local
+    hooks:
+      - id: mypy-fit-performer
+        name: mypy on the FIT performer, against its generated protobuf code
+        # A separate run from the gate above because the performer's protobuf code is generated,
+        # not committed: the script generates it from proto/ into a temporary directory and puts
+        # that on the search path, so the performer's own generated/ is never touched.  The mypy
+        # pin follows the hook above.  The generators and stubs are pinned exactly, apart from the
+        # performer's requirements.txt, because they decide what mypy sees; the venv that runs the
+        # performer may differ.  mypy-protobuf stays on 3.6: 3.7.0 writes each service stub with a
+        # type variable per RPC, and mypy's overload checks grow with their product (mypy-protobuf
+        # issue 707), while 4.x needs a newer protobuf than the performer runs with.  The rest is
+        # what the performer imports for types.
+        entry: tools/fit_performer/bin/typecheck.sh
+        language: python
+        additional_dependencies:
+          - mypy==2.3.1
+          - grpcio-tools==1.84.1
+          - mypy-protobuf==3.6.0
+          - types-protobuf==7.35.1.20260906
+          - types-grpcio==1.84.0.20261021
+          - types-psutil~=5.9.5
+          - 'typing-extensions>=4.14'
+          - Twisted~=24.7
+          - opentelemetry-api~=1.22
+          - opentelemetry-sdk~=1.22
+          - opentelemetry-exporter-otlp-proto-grpc~=1.22
+        pass_filenames: false
+        files: ^(tools/fit_performer/|pyproject\.toml$|(a|tx)?couchbase/.*\.py$)
 
   - repo: local
     hooks:

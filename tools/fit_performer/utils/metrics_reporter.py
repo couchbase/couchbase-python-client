@@ -1,49 +1,50 @@
+from __future__ import annotations
+
 import json
 import logging
-import sys
-from collections import namedtuple
 from queue import (Empty,
                    Full,
                    Queue)
 from threading import Timer
 from time import perf_counter_ns
-from typing import TypedDict
+from typing import (Any,
+                    Protocol,
+                    TypeAlias,
+                    TypedDict)
 
 import psutil
 from google.protobuf import timestamp_pb2 as timestamp
 
-from ..generated.metrics.top_level_pb2 import Result as MetricsResult
-from ..generated.run.top_level_pb2 import Result
-
-if sys.version_info < (3, 10):
-    from typing import TypeAlias
-else:
-    from typing import TypeAlias
+from metrics.top_level_pb2 import Result as MetricsResult
+from run.top_level_pb2 import Result
 
 logger = logging.getLogger(__name__)
 
-# copy of psutil.Process.cpu_times()
-proc_cpu = namedtuple(
-    'proc_cpu', ['user', 'system', 'children_user', 'children_system']
-)
+
+class ProcCPU(Protocol):
+    """The fields read from `psutil.Process.cpu_times()`, whose tuple type is private and per platform."""
+    @property
+    def user(self) -> float: ...
+    @property
+    def system(self) -> float: ...
 
 
 class ThreadCPU(TypedDict):
-    user_time: int
-    system_time: int
+    user_time: float
+    system_time: float
 
 
 threads_cpu: TypeAlias = dict[int, ThreadCPU]
 
 
-class ReportQueue(Queue):
-    def __init__(self):
+class ReportQueue(Queue[Result]):
+    def __init__(self) -> None:
         super().__init__()
 
-    def __iter__(self):
+    def __iter__(self) -> ReportQueue:
         return self
 
-    def __next__(self):
+    def __next__(self) -> Result:
         try:
             return self.get_nowait()
         except Empty:
@@ -55,23 +56,22 @@ class MetricsReporter(Timer):
                  run_id: str,
                  interval: float,
                  proc: psutil.Process | None = None,
-                 args=None,
-                 kwargs=None):
+                 args: list[Any] | None = None,
+                 kwargs: dict[str, Any] | None = None,
+                 ) -> None:
         super().__init__(interval, self._compute_metrics, args, kwargs)
         self._run_id = run_id
         self._proc = proc or psutil.Process()
-        # base class has an _initialized attribute
-        self._reporter_initialized = False
-        self._last_report = None
-        self._last_proc_cpu = None
-        self._last_proc_threads = None
+        self._last_report = 0
+        self._last_proc_cpu: ProcCPU | None = None
+        self._last_proc_threads: threads_cpu = {}
         self._report_queue = ReportQueue()
 
     @property
     def report_queue(self) -> ReportQueue:
         return self._report_queue
 
-    def _calc_proc_cpu_percent(self, t1: proc_cpu, t2: proc_cpu, time_delta: float) -> float:
+    def _calc_proc_cpu_percent(self, t1: ProcCPU, t2: ProcCPU, time_delta: float) -> float:
         if time_delta == 0:
             return 0.0
 
@@ -81,7 +81,7 @@ class MetricsReporter(Timer):
         return cpu_percent
 
     def _calc_proc_threads_cpu_percent(self, t1: threads_cpu, t2: threads_cpu, time_delta: float) -> dict[str, float]:
-        delta_threads = {}
+        delta_threads: dict[int, float] = {}
         for tid, cpu in t2.items():
             t1_match = t1.get(tid, None)
             if t1_match is None:
@@ -90,33 +90,32 @@ class MetricsReporter(Timer):
             # convert delta to milliseconds
             delta_threads[tid] = delta_cpu * 1000
 
-        thread_cpu_percent = {}
-        total_thread_cpu = 0
+        thread_cpu_percent: dict[str, float] = {}
+        total_thread_cpu = 0.0
         for tid, dcpu in delta_threads.items():
             if time_delta == 0:
-                thread_cpu_percent[tid] = 0.0
+                thread_cpu_percent[str(tid)] = 0.0
                 continue
             cpu_percent = (dcpu / time_delta) * 100
-            thread_cpu_percent[tid] = cpu_percent
+            thread_cpu_percent[str(tid)] = cpu_percent
             total_thread_cpu += cpu_percent
 
         thread_cpu_percent['total_thread_cpu'] = total_thread_cpu
         return thread_cpu_percent
 
-    def _compute_metrics(self):
+    def _compute_metrics(self) -> None:
         now = perf_counter_ns()
         # for linux/macOS, returns CPU ticks / ticks per second which yields seconds
         proc_cpu = self._proc.cpu_times()
         threads = self._proc.threads()
-        tdict = {}
+        tdict: threads_cpu = {}
         for t in threads:
             if t.id not in tdict:
                 tdict[t.id] = {'user_time': t.user_time, 'system_time': t.system_time}
-        if not self._reporter_initialized:
+        if self._last_proc_cpu is None:
             self._last_report = now
             self._last_proc_cpu = proc_cpu
             self._last_proc_threads = tdict
-            self._reporter_initialized = True
             return
 
         time_delta = (now - self._last_report) / 1e6  # to milliseconds
@@ -142,8 +141,9 @@ class MetricsReporter(Timer):
                              })
         logger.info(f'Metrics (run: {self._run_id}): {report}')
         try:
-            metrics_result = Result(metrics=MetricsResult(metrics=report,
-                                                          initiated=timestamp.Timestamp().GetCurrentTime()))
+            initiated = timestamp.Timestamp()
+            initiated.GetCurrentTime()
+            metrics_result = Result(metrics=MetricsResult(metrics=report, initiated=initiated))
             self._report_queue.put_nowait(metrics_result)
         except Full:
             logger.debug(f'Queue is full, dropping report (run: {self._run_id}): {report}')
@@ -152,11 +152,11 @@ class MetricsReporter(Timer):
     # Override the run method to keep the timer running
     # Python3.10:
     # https://github.com/python/cpython/blob/10a2a9b3bcf237fd6183f84941632cda59395319/Lib/threading.py#L1375-L1379
-    def run(self):
+    def run(self) -> None:
         while not self.finished.is_set():
             self.function(*self.args, **self.kwargs)
             self.finished.wait(self.interval)
 
-    def stop(self):
+    def stop(self) -> None:
         logger.info(f'Stopping metrics reporter (run: {self._run_id}).')
         self.cancel()

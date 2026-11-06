@@ -1,17 +1,19 @@
 #!/bin/sh
-# generate.sh
+# generate.sh [out_dir]
 #
-# Generates the Python protobuf/gRPC code from proto/ into generated/.
+# Generates the Python protobuf/gRPC code from proto/ into out_dir, generated/ by default.
 
 set -e
 
 cd "$(dirname "$0")/.."
 
-rm -rf generated
-mkdir -p generated
+out=${1:-generated}
+rm -rf "$out"
+mkdir -p "$out"
 python -m grpc_tools.protoc \
     --proto_path=./proto \
-    --python_out=./generated \
-    --grpc_python_out=./generated \
-    --mypy_out=./generated \
+    --python_out="$out" \
+    --grpc_python_out="$out" \
+    --mypy_out=quiet:"$out" \
+    --mypy_grpc_out=quiet:"$out" \
     ./proto/*.proto

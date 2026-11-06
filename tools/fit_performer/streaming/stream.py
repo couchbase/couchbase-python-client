@@ -7,26 +7,24 @@ from threading import (Event,
                        Thread)
 from typing import TYPE_CHECKING
 
-from ..generated.run import top_level_pb2 as run
-from ..generated.shared import exceptions_pb2 as exceptions
-from ..generated.streams import top_level_pb2 as streams
+from run import top_level_pb2 as run
+from shared import exceptions_pb2 as exceptions
+from streams import top_level_pb2 as streams
 
 if TYPE_CHECKING:
-    import multiprocessing as mp
-    import queue
-
     from ..commands import SdkCommand
+    from ..executors.workload_executor import ResultQueue
 
 
 class Stream:
     def __init__(self,
-                 run_id,  # type: str
-                 results,  # type: mp.SimpleQueue | queue.Queue
-                 stream_type,  # type: streams.Type
-                 stream_id,  # type: str
-                 on_demand,  # type: bool
-                 iterator,  # type: Iterator
-                 ):
+                 run_id: str,
+                 results: ResultQueue,
+                 stream_type: streams.Type.ValueType,
+                 stream_id: str,
+                 on_demand: bool,
+                 iterator: Iterator[run.Result | exceptions.Exception],
+                 ) -> None:
 
         self._run_id = run_id
         self._stream_id = stream_id
@@ -34,7 +32,7 @@ class Stream:
         self._results = results
         self._on_demand = on_demand
         self._iterator = iterator
-        self._thread = None
+        self._thread: Thread | None = None
         self._stop = Event()
         self._requested_item_count = 0
         self._requested_item_count_lock = Lock()
@@ -54,6 +52,8 @@ class Stream:
 
     def start(self) -> None:
         self._logger.info(f'Starting stream {self._stream_id}')
+        if self._thread is None:
+            raise RuntimeError(f'Stream {self._stream_id} has not been created, cannot start it.')
         self._thread.start()
 
     def _run(self) -> None:
@@ -99,7 +99,7 @@ class Stream:
         self._results.put(run.Result(stream=signal))
 
     def _send_error_signal(self,
-                           exception,  # type: exceptions.Exception
+                           exception: exceptions.Exception,
                            ) -> None:
         self._logger.info('Sending stream error signal')
         signal = streams.Signal(error=streams.Error(stream_id=self._stream_id, exception=exception))
@@ -109,22 +109,27 @@ class Stream:
         self._stop.set()
 
     def wait(self) -> None:
-        self._thread.join()
+        if self._thread is not None:
+            self._thread.join()
 
-    def request_items(self, num_items) -> None:
+    def request_items(self, num_items: int) -> None:
         with self._requested_item_count_lock:
             self._requested_item_count += num_items
             self._logger.info(f'{num_items} requested from stream - {self._requested_item_count} total')
 
     @classmethod
     def build_stream(cls,
-                     run_id,  # type: str
-                     results,  # type: mp.SimpleQueue | queue.Queue
-                     sdk_command,  # type: SdkCommand
-                     iterator,  # type: Iterator
+                     run_id: str,
+                     results: ResultQueue,
+                     sdk_command: SdkCommand,
+                     iterator: Iterator[run.Result | exceptions.Exception],
                      ) -> Stream:
 
-        stream_strategy = sdk_command.stream_config.WhichOneof('stream_when')
+        stream_config = sdk_command.stream_config
+        stream_type = sdk_command.stream_type
+        if stream_config is None or stream_type is None:
+            raise NotImplementedError(f'{type(sdk_command).__name__} does not stream its results')
+        stream_strategy = stream_config.WhichOneof('stream_when')
         if stream_strategy == 'automatically':
             on_demand = False
         elif stream_strategy == 'on_demand':
@@ -132,4 +137,4 @@ class Stream:
         else:
             raise NotImplementedError(f"Stream strategy '{stream_strategy}' not supported")
 
-        return cls(run_id, results, sdk_command.stream_type, sdk_command.stream_config.stream_id, on_demand, iterator)
+        return cls(run_id, results, stream_type, stream_config.stream_id, on_demand, iterator)

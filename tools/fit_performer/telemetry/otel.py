@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 import logging
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -14,11 +18,25 @@ from opentelemetry.sdk.trace.sampling import (ALWAYS_OFF,
 from couchbase.observability.otel_metrics import get_otel_meter
 from couchbase.observability.otel_tracing import get_otel_tracer
 
+if TYPE_CHECKING:
+    from opentelemetry.context import Token
+    from opentelemetry.context.context import Context
+    from opentelemetry.sdk.trace.sampling import Sampler
+
+    from couchbase.observability.metrics import Meter
+    from couchbase.observability.tracing import RequestTracer
+    from couchbase.options import ClusterOptions
+
+    from observability import config_pb2 as observability_config_pb
+    from observability import top_pb2 as observability_pb
+
+    from .span_owner import SpanOwner
+
 logger = logging.getLogger(__name__)
 
 
-def _parse_resources(resources_map):
-    resources = {}
+def _parse_resources(resources_map: Mapping[str, observability_pb.Attribute]) -> dict[str, str | int | bool]:
+    resources: dict[str, str | int | bool] = {}
     for key, attr in resources_map.items():
         which = attr.WhichOneof('value')
         if which == 'value_string':
@@ -30,13 +48,15 @@ def _parse_resources(resources_map):
     return resources
 
 
-def create_tracer_provider(tracing_config):
+def create_tracer_provider(tracing_config: observability_config_pb.TracingConfig
+                           ) -> tuple[RequestTracer, TracerProvider]:
     # TODO:  We should probably put this "behind" an ENV variable
     logging.getLogger('opentelemetry').setLevel(logging.DEBUG)
 
     resources = _parse_resources(tracing_config.resources)
 
     epsilon = 0.00001
+    sampler: Sampler
     if tracing_config.sampling_percentage < epsilon:
         sampler = ALWAYS_OFF
     elif tracing_config.sampling_percentage > 1.0 - epsilon:
@@ -54,8 +74,9 @@ def create_tracer_provider(tracing_config):
         insecure=True
     )
 
+    processor: BatchSpanProcessor | SimpleSpanProcessor
     if tracing_config.batching:
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         if tracing_config.export_every_millis > 0:
             kwargs['schedule_delay_millis'] = tracing_config.export_every_millis
         processor = BatchSpanProcessor(exporter, **kwargs)
@@ -67,7 +88,8 @@ def create_tracer_provider(tracing_config):
     return get_otel_tracer(provider), provider
 
 
-def create_meter_provider(metrics_config):
+def create_meter_provider(metrics_config: observability_config_pb.MetricsConfig
+                          ) -> tuple[Meter, OtelMeterProvider]:
     # TODO:  We should probably put this "behind" an ENV variable
     logging.getLogger('opentelemetry').setLevel(logging.DEBUG)
 
@@ -78,7 +100,7 @@ def create_meter_provider(metrics_config):
         insecure=True
     )
 
-    reader_kwargs = {}
+    reader_kwargs: dict[str, Any] = {}
     if metrics_config.export_every_millis > 0:
         reader_kwargs['export_interval_millis'] = metrics_config.export_every_millis
     reader = PeriodicExportingMetricReader(exporter, **reader_kwargs)
@@ -91,7 +113,11 @@ def create_meter_provider(metrics_config):
     return get_otel_meter(meter_provider), meter_provider
 
 
-def worker_otel_setup(tracer, meter, span_contexts, options):
+def worker_otel_setup(tracer: RequestTracer | None,
+                      meter: Meter | None,
+                      span_contexts: dict[str, str],
+                      options: ClusterOptions,
+                      ) -> tuple[list[Token[Context]], SpanOwner | None]:
     """Set up OTel context for a worker process.
 
     Injects tracer/meter into cluster options, attaches ambient W3C context tokens,
@@ -104,8 +130,8 @@ def worker_otel_setup(tracer, meter, span_contexts, options):
     if meter is not None:
         options['meter'] = meter
 
-    otel_tokens = []
-    worker_span_owner = None
+    otel_tokens: list[Token[Context]] = []
+    worker_span_owner: SpanOwner | None = None
     if span_contexts:
         from opentelemetry import context as otel_context
         from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
@@ -120,7 +146,10 @@ def worker_otel_setup(tracer, meter, span_contexts, options):
     return otel_tokens, worker_span_owner
 
 
-def worker_otel_teardown(otel_tokens, tracer_provider, meter_provider):
+def worker_otel_teardown(otel_tokens: list[Token[Context]],
+                         tracer_provider: TracerProvider | None,
+                         meter_provider: OtelMeterProvider | None,
+                         ) -> None:
     """Detach ambient OTel context tokens and flush/shut down providers after worker exits."""
     if otel_tokens:
         from opentelemetry import context as otel_context

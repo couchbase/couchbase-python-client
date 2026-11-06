@@ -1,9 +1,18 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import (Callable,
+                             Iterable,
+                             Mapping)
 from datetime import timedelta
 from functools import wraps
 from time import perf_counter_ns
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Concatenate,
+                    ParamSpec,
+                    TypeVar)
+
+from google.protobuf.message import Message
 
 from couchbase.management.eventing import (EventingFunction,
                                            EventingFunctionBucketAccess,
@@ -35,14 +44,28 @@ from couchbase.management.options import (DeployFunctionOptions,
                                           UpsertFunctionOptions)
 from couchbase.n1ql import QueryScanConsistency
 
-from ..generated.run import top_level_pb2 as run_pb
-from ..generated.sdk import workload_pb2 as sdk_pb
-from ..generated.sdk.cluster import eventing_function_manager_pb2 as eventing_pb
-from ..generated.sdk.scope import eventing_function_manager_pb2 as scope_eventing_pb
-from ..generated.shared import basic_pb2 as basic_pb
+from run import top_level_pb2 as run_pb
+from sdk import workload_pb2 as sdk_pb
+from sdk.cluster import eventing_function_manager_pb2 as eventing_pb
+from sdk.scope import eventing_function_manager_pb2 as scope_eventing_pb
+from shared import basic_pb2 as basic_pb
+
 from .sdk_commands import (SdkCommand,
                            SdkCommandOptions,
                            SdkCommandResult)
+
+if TYPE_CHECKING:
+    from couchbase.cluster import Cluster
+    from couchbase.management.eventing import EventingFunctionManager, ScopeEventingFunctionManager
+    from couchbase.scope import Scope
+
+    from ..telemetry.span_owner import SpanOwner
+
+P = ParamSpec('P')
+C = TypeVar('C', bound=SdkCommand)
+K = TypeVar('K')
+V = TypeVar('V')
+R = TypeVar('R')
 
 BUCKET_ACCESS_MAP = {
     eventing_pb.READ_ONLY: EventingFunctionBucketAccess.ReadOnly,
@@ -96,14 +119,24 @@ FUNCTION_STATE_MAP = {
 }
 
 
-def _reverse(mapping):
+def _reverse(mapping: Mapping[K, V]) -> dict[V, K]:
     return {v: k for k, v in mapping.items()}
+
+
+def _function_manager(cluster: Cluster | None,
+                      scope: Scope | None,
+                      ) -> EventingFunctionManager | ScopeEventingFunctionManager:
+    if scope is not None:
+        return scope.eventing_functions()
+    if cluster is None:
+        raise ValueError('An eventing function command needs a cluster or a scope.')
+    return cluster.eventing_functions()
 
 
 class EventingFunctionManagerCommandOptions(SdkCommandOptions):
 
     @staticmethod
-    def get_timeout(options) -> timedelta | None:
+    def get_timeout(options: Any) -> timedelta | None:
         # The eventing protocol uses a google.protobuf.Duration rather than the timeout_msecs used elsewhere
         if not options.HasField('timeout'):
             return None
@@ -130,6 +163,8 @@ class EventingFunctionManagerCommandOptions(SdkCommandOptions):
     @staticmethod
     def to_url_binding(proto_binding: eventing_pb.EventingFunctionUrlBinding) -> EventingFunctionUrlBinding:
         auth_type = proto_binding.auth.WhichOneof('auth')
+        auth: (EventingFunctionUrlAuthBasic | EventingFunctionUrlAuthDigest | EventingFunctionUrlAuthBearer
+               | EventingFunctionUrlNoAuth)
         if auth_type == 'basic_auth':
             auth = EventingFunctionUrlAuthBasic(username=proto_binding.auth.basic_auth.username,
                                                 password=proto_binding.auth.basic_auth.password)
@@ -151,7 +186,9 @@ class EventingFunctionManagerCommandOptions(SdkCommandOptions):
 
     @staticmethod
     def to_settings(proto_settings: eventing_pb.EventingFunctionSettings) -> EventingFunctionSettings:  # noqa: C901
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
+        # The field names below are only known at runtime, so presence is checked through the base type.
+        settings_message: Message = proto_settings
 
         simple_fields = {
             # proto field name -> SDK field name
@@ -173,7 +210,7 @@ class EventingFunctionManagerCommandOptions(SdkCommandOptions):
             'worker_count': 'worker_count',
         }
         for proto_name, sdk_name in simple_fields.items():
-            if proto_settings.HasField(proto_name):
+            if settings_message.HasField(proto_name):
                 kwargs[sdk_name] = getattr(proto_settings, proto_name)
 
         if proto_settings.HasField('checkpoint_interval'):
@@ -236,7 +273,7 @@ class EventingFunctionManagerCommandResult(SdkCommandResult):
 
     @staticmethod
     def to_keyspace(sdk_keyspace: EventingFunctionKeyspace) -> eventing_pb.EventingFunctionKeyspace:
-        proto_keyspace = eventing_pb.EventingFunctionKeyspace(bucket=sdk_keyspace.bucket)
+        proto_keyspace = eventing_pb.EventingFunctionKeyspace(bucket=sdk_keyspace.bucket or '')
         if sdk_keyspace.scope is not None:
             proto_keyspace.scope = sdk_keyspace.scope
         if sdk_keyspace.collection is not None:
@@ -247,9 +284,11 @@ class EventingFunctionManagerCommandResult(SdkCommandResult):
     def to_bucket_binding(cls,
                           sdk_binding: EventingFunctionBucketBinding
                           ) -> eventing_pb.EventingFunctionBucketBinding:
+        if sdk_binding.name is None or sdk_binding.access is None:
+            raise ValueError(f"Bucket binding '{sdk_binding.alias}' has no keyspace or no access.")
         return eventing_pb.EventingFunctionBucketBinding(
             access=_reverse(BUCKET_ACCESS_MAP)[sdk_binding.access],
-            alias=sdk_binding.alias,
+            alias=sdk_binding.alias or '',
             name=cls.to_keyspace(sdk_binding.name),
         )
 
@@ -268,10 +307,10 @@ class EventingFunctionManagerCommandResult(SdkCommandResult):
             auth.no_auth.SetInParent()
 
         return eventing_pb.EventingFunctionUrlBinding(
-            alias=sdk_binding.alias,
+            alias=sdk_binding.alias or '',
             allow_cookies=bool(sdk_binding.allow_cookies),
             auth=auth,
-            hostname=sdk_binding.hostname,
+            hostname=sdk_binding.hostname or '',
             validate_ssl_certificate=bool(sdk_binding.validate_ssl_certificate),
         )
 
@@ -311,7 +350,8 @@ class EventingFunctionManagerCommandResult(SdkCommandResult):
         if sdk_settings.bucket_cache_age is not None:
             proto_settings.bucket_cache_age = int(sdk_settings.bucket_cache_age.total_seconds() * 1000)
 
-        enum_fields = {
+        # Each value maps a different pair of enums.
+        enum_fields: dict[str, Mapping[Any, Any]] = {
             'dcp_stream_boundary': DCP_BOUNDARY_MAP,
             'deployment_status': DEPLOYMENT_STATUS_MAP,
             'processing_status': PROCESSING_STATUS_MAP,
@@ -334,10 +374,10 @@ class EventingFunctionManagerCommandResult(SdkCommandResult):
     @classmethod
     def to_eventing_function(cls, sdk_function: EventingFunction) -> eventing_pb.EventingFunction:
         proto_function = eventing_pb.EventingFunction(
-            name=sdk_function.name,
-            code=sdk_function.code,
+            name=sdk_function.name or '',
+            code=sdk_function.code or '',
             bucket_bindings=[cls.to_bucket_binding(b) for b in sdk_function.bucket_bindings or []],
-            constant_bindings=[eventing_pb.EventingFunctionConstantBinding(alias=b.alias, literal=b.literal)
+            constant_bindings=[eventing_pb.EventingFunctionConstantBinding(alias=b.alias or '', literal=b.literal or '')
                                for b in sdk_function.constant_bindings or []],
             url_bindings=[cls.to_url_binding(b) for b in sdk_function.url_bindings or []],
             settings=cls.to_settings(sdk_function.settings or EventingFunctionSettings()),
@@ -365,10 +405,11 @@ class EventingFunctionManagerCommandResult(SdkCommandResult):
     @staticmethod
     def to_function_state(sdk_status: EventingFunctionStatus) -> eventing_pb.EventingFunctionState:
         proto_state = eventing_pb.EventingFunctionState(
-            name=sdk_status.name,
+            name=sdk_status.name or '',
             num_bootstrapping_nodes=sdk_status.num_bootstrapping_nodes or 0,
             num_deployed_nodes=sdk_status.num_deployed_nodes or 0,
-            status=FUNCTION_STATE_MAP.get(sdk_status.state, eventing_pb.UNKNOWN),
+            status=(FUNCTION_STATE_MAP.get(sdk_status.state, eventing_pb.UNKNOWN)
+                    if sdk_status.state is not None else eventing_pb.UNKNOWN),
         )
         if sdk_status.deployment_status is not None:
             proto_state.deployment_status = _reverse(DEPLOYMENT_STATUS_MAP)[sdk_status.deployment_status]
@@ -384,9 +425,12 @@ class EventingFunctionManagerCommandResult(SdkCommandResult):
         )
 
     @classmethod
-    def _as_result(cls, fn, to_proto_result):
+    def _as_result(cls,
+                   fn: Callable[Concatenate[C, P], R],
+                   to_proto_result: Callable[[R], eventing_pb.Result],
+                   ) -> Callable[Concatenate[C, P], run_pb.Result]:
         @wraps(fn)
-        def wrapped_fn(self, *args, **kwargs):
+        def wrapped_fn(self: C, *args: P.args, **kwargs: P.kwargs) -> run_pb.Result:
             try:
                 start = perf_counter_ns()
                 res = fn(self, *args, **kwargs)
@@ -400,36 +444,39 @@ class EventingFunctionManagerCommandResult(SdkCommandResult):
         return wrapped_fn
 
     @classmethod
-    def as_eventing_function(cls, fn):
+    def as_eventing_function(cls,
+                             fn: Callable[Concatenate[C, P], EventingFunction],
+                             ) -> Callable[Concatenate[C, P], run_pb.Result]:
         return cls._as_result(
             fn, lambda res: eventing_pb.Result(eventing_function=cls.to_eventing_function(res)))
 
     @classmethod
-    def as_eventing_function_list(cls, fn):
+    def as_eventing_function_list(cls,
+                                  fn: Callable[Concatenate[C, P], Iterable[EventingFunction]],
+                                  ) -> Callable[Concatenate[C, P], run_pb.Result]:
         return cls._as_result(
             fn, lambda res: eventing_pb.Result(eventing_function_list=cls.to_eventing_function_list(res)))
 
     @classmethod
-    def as_eventing_status(cls, fn):
+    def as_eventing_status(cls,
+                           fn: Callable[Concatenate[C, P], EventingFunctionsStatus],
+                           ) -> Callable[Concatenate[C, P], run_pb.Result]:
         return cls._as_result(
             fn, lambda res: eventing_pb.Result(eventing_status=cls.to_eventing_status(res)))
 
 
 class GetFunctionCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._eventing_function_manager = self._scope.eventing_functions()
-        else:
-            self._eventing_function_manager = self._cluster.eventing_functions()
-        self._name = kwargs.get('name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster | None = kwargs.get('cluster')
+        self._scope: Scope | None = kwargs.get('scope')
+        self._eventing_function_manager = _function_manager(self._cluster, self._scope)
+        self._name: str = kwargs['name']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: GetFunctionOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -440,30 +487,27 @@ class GetFunctionCommand(SdkCommand):
         )
 
     @EventingFunctionManagerCommandResult.as_eventing_function
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> EventingFunction:
         return self._eventing_function_manager.get_function(self._name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> GetFunctionCommand:
+    def create_command(**kwargs: Any) -> GetFunctionCommand:
         command = GetFunctionCommand(**kwargs)
         command.set_options()
         return command
 
 
 class GetAllFunctionsCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._eventing_function_manager = self._scope.eventing_functions()
-        else:
-            self._eventing_function_manager = self._cluster.eventing_functions()
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster | None = kwargs.get('cluster')
+        self._scope: Scope | None = kwargs.get('scope')
+        self._eventing_function_manager = _function_manager(self._cluster, self._scope)
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: GetAllFunctionOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -474,31 +518,28 @@ class GetAllFunctionsCommand(SdkCommand):
         )
 
     @EventingFunctionManagerCommandResult.as_eventing_function_list
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> list[EventingFunction]:
         return self._eventing_function_manager.get_all_functions(self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> GetAllFunctionsCommand:
+    def create_command(**kwargs: Any) -> GetAllFunctionsCommand:
         command = GetAllFunctionsCommand(**kwargs)
         command.set_options()
         return command
 
 
 class DeployFunctionCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._eventing_function_manager = self._scope.eventing_functions()
-        else:
-            self._eventing_function_manager = self._cluster.eventing_functions()
-        self._name = kwargs.get('name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster | None = kwargs.get('cluster')
+        self._scope: Scope | None = kwargs.get('scope')
+        self._eventing_function_manager = _function_manager(self._cluster, self._scope)
+        self._name: str = kwargs['name']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: DeployFunctionOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -509,31 +550,28 @@ class DeployFunctionCommand(SdkCommand):
         )
 
     @EventingFunctionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._eventing_function_manager.deploy_function(self._name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> DeployFunctionCommand:
+    def create_command(**kwargs: Any) -> DeployFunctionCommand:
         command = DeployFunctionCommand(**kwargs)
         command.set_options()
         return command
 
 
 class DropFunctionCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._eventing_function_manager = self._scope.eventing_functions()
-        else:
-            self._eventing_function_manager = self._cluster.eventing_functions()
-        self._name = kwargs.get('name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster | None = kwargs.get('cluster')
+        self._scope: Scope | None = kwargs.get('scope')
+        self._eventing_function_manager = _function_manager(self._cluster, self._scope)
+        self._name: str = kwargs['name']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: DropFunctionOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -544,30 +582,27 @@ class DropFunctionCommand(SdkCommand):
         )
 
     @EventingFunctionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._eventing_function_manager.drop_function(self._name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> DropFunctionCommand:
+    def create_command(**kwargs: Any) -> DropFunctionCommand:
         command = DropFunctionCommand(**kwargs)
         command.set_options()
         return command
 
 
 class FunctionsStatusCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._eventing_function_manager = self._scope.eventing_functions()
-        else:
-            self._eventing_function_manager = self._cluster.eventing_functions()
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster | None = kwargs.get('cluster')
+        self._scope: Scope | None = kwargs.get('scope')
+        self._eventing_function_manager = _function_manager(self._cluster, self._scope)
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: FunctionsStatusOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -578,31 +613,28 @@ class FunctionsStatusCommand(SdkCommand):
         )
 
     @EventingFunctionManagerCommandResult.as_eventing_status
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> EventingFunctionsStatus:
         return self._eventing_function_manager.functions_status(self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> FunctionsStatusCommand:
+    def create_command(**kwargs: Any) -> FunctionsStatusCommand:
         command = FunctionsStatusCommand(**kwargs)
         command.set_options()
         return command
 
 
 class PauseFunctionCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._eventing_function_manager = self._scope.eventing_functions()
-        else:
-            self._eventing_function_manager = self._cluster.eventing_functions()
-        self._name = kwargs.get('name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster | None = kwargs.get('cluster')
+        self._scope: Scope | None = kwargs.get('scope')
+        self._eventing_function_manager = _function_manager(self._cluster, self._scope)
+        self._name: str = kwargs['name']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: PauseFunctionOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -613,31 +645,28 @@ class PauseFunctionCommand(SdkCommand):
         )
 
     @EventingFunctionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._eventing_function_manager.pause_function(self._name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> PauseFunctionCommand:
+    def create_command(**kwargs: Any) -> PauseFunctionCommand:
         command = PauseFunctionCommand(**kwargs)
         command.set_options()
         return command
 
 
 class ResumeFunctionCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._eventing_function_manager = self._scope.eventing_functions()
-        else:
-            self._eventing_function_manager = self._cluster.eventing_functions()
-        self._name = kwargs.get('name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster | None = kwargs.get('cluster')
+        self._scope: Scope | None = kwargs.get('scope')
+        self._eventing_function_manager = _function_manager(self._cluster, self._scope)
+        self._name: str = kwargs['name']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: ResumeFunctionOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -648,31 +677,28 @@ class ResumeFunctionCommand(SdkCommand):
         )
 
     @EventingFunctionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._eventing_function_manager.resume_function(self._name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> ResumeFunctionCommand:
+    def create_command(**kwargs: Any) -> ResumeFunctionCommand:
         command = ResumeFunctionCommand(**kwargs)
         command.set_options()
         return command
 
 
 class UndeployFunctionCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._eventing_function_manager = self._scope.eventing_functions()
-        else:
-            self._eventing_function_manager = self._cluster.eventing_functions()
-        self._name = kwargs.get('name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster | None = kwargs.get('cluster')
+        self._scope: Scope | None = kwargs.get('scope')
+        self._eventing_function_manager = _function_manager(self._cluster, self._scope)
+        self._name: str = kwargs['name']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: UndeployFunctionOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -683,31 +709,28 @@ class UndeployFunctionCommand(SdkCommand):
         )
 
     @EventingFunctionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._eventing_function_manager.undeploy_function(self._name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> UndeployFunctionCommand:
+    def create_command(**kwargs: Any) -> UndeployFunctionCommand:
         command = UndeployFunctionCommand(**kwargs)
         command.set_options()
         return command
 
 
 class UpsertFunctionCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._eventing_function_manager = self._scope.eventing_functions()
-        else:
-            self._eventing_function_manager = self._cluster.eventing_functions()
-        self._function = kwargs.get('function')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._cluster: Cluster | None = kwargs.get('cluster')
+        self._scope: Scope | None = kwargs.get('scope')
+        self._eventing_function_manager = _function_manager(self._cluster, self._scope)
+        self._function: EventingFunction = kwargs['function']
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: UpsertFunctionOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -718,11 +741,11 @@ class UpsertFunctionCommand(SdkCommand):
         )
 
     @EventingFunctionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._eventing_function_manager.upsert_function(self._function, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> UpsertFunctionCommand:
+    def create_command(**kwargs: Any) -> UpsertFunctionCommand:
         command = UpsertFunctionCommand(**kwargs)
         command.set_options()
         return command
@@ -731,9 +754,11 @@ class UpsertFunctionCommand(SdkCommand):
 class EventingFunctionManagerCommandBuilder:
     @staticmethod
     def build_command(  # noqa: C901
-            eventing_cmd,  # type: eventing_pb.Command | scope_eventing_pb.Command
-            **cmd_kwargs):
+            eventing_cmd: eventing_pb.Command | scope_eventing_pb.Command,
+            **cmd_kwargs: Any) -> SdkCommand:
         cmd_type = eventing_cmd.WhichOneof('command')
+        if cmd_type is None:
+            raise NotImplementedError('Eventing function management command has no command set')
         if getattr(eventing_cmd, cmd_type).HasField('options'):
             cmd_kwargs['options'] = getattr(eventing_cmd, cmd_type).options
 

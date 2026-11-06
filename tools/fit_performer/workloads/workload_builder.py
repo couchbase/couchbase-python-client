@@ -1,11 +1,14 @@
-from typing import TYPE_CHECKING, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
 
 from .sdk_workload import SdkWorkload
 from .workload import Workload
 
 if TYPE_CHECKING:
-    from acouchbase.cluster import AsyncCluster
     from couchbase.cluster import Cluster
+
+    from run import workloads_pb2 as run_workloads_pb
 
     from ..telemetry.span_owner import SpanOwner
 
@@ -13,17 +16,17 @@ if TYPE_CHECKING:
 class WorkloadBuilder:
 
     @staticmethod
-    def build_workload(workload,  # type: Any
-                       run_id,    # type: str
-                       conn=None,  # type: Cluster | AsyncCluster | None
-                       span_owner=None  # type: SpanOwner | None
+    def build_workload(workload: run_workloads_pb.Workload,
+                       run_id: str,
+                       conn: Cluster | None = None,
+                       span_owner: SpanOwner | None = None
                        ) -> Workload:
         """Factory function, builds and returns the appropriate workload instance.
 
         Args:
             workload (protobuf Workload): The Protocol Buffers workload object.
             run_id (str): The ID of the run request that is creating this workload.
-            conn (Union[Cluster, AsyncCluster], optional): The cluster instance.
+            conn (Cluster, optional): The cluster instance.
 
         Returns:
             Workload: The workload object.

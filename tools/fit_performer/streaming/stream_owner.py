@@ -1,32 +1,35 @@
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..generated.streams.top_level_pb2 import CancelRequest, RequestItemsRequest
+    from streams.top_level_pb2 import CancelRequest, RequestItemsRequest
+
     from .stream import Stream
 
 
 class StreamOwner:
-    def __init__(self):
+    def __init__(self) -> None:
         self._logger = logging.getLogger(__name__)
         self._streams: dict[str, Stream] = {}
 
     def cancel(self,
-               request,  # type: CancelRequest
+               request: CancelRequest,
                ) -> None:
         self._logger.info('Cancelling stream')
         self._streams[request.stream_id].cancel()
         del self._streams[request.stream_id]
 
     def request_items(self,
-                      request,  # type: RequestItemsRequest
+                      request: RequestItemsRequest,
                       ) -> None:
         self._logger.info('Requesting items')
         stream_id = request.stream_id
         self._streams[stream_id].request_items(request.num_items)
 
     def wait_for_all_streams_from_run(self,
-                                      run_id,  # type: str
+                                      run_id: str,
                                       ) -> None:
         self._logger.info(f'Waiting for streams from run {run_id}')
 
@@ -38,7 +41,7 @@ class StreamOwner:
         self._logger.info(f'All streams from run {run_id} have finished')
 
     def register_stream(self,
-                        stream,  # type: Stream
+                        stream: Stream,
                         ) -> None:
         stream_id = stream.stream_id
         if stream_id in self._streams:

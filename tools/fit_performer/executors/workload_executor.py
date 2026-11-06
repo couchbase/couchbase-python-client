@@ -1,15 +1,19 @@
 from __future__ import annotations
 
-import multiprocessing as mp
 import queue
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from multiprocessing.queues import SimpleQueue
+from typing import TYPE_CHECKING, TypeAlias
 
 if TYPE_CHECKING:
-
-    from acouchbase.cluster import AsyncCluster
     from couchbase.cluster import Cluster
     from couchbase.options import ClusterOptions
+
+    from run import top_level_pb2 as run_pb
+
+    # Where workloads put their results, and `None` once every workload has finished.  A thread
+    # executor uses an in-process queue and a process executor one its workers can reach.
+    ResultQueue: TypeAlias = queue.Queue[run_pb.Result | None] | SimpleQueue[run_pb.Result | None]
 
 
 class WorkloadExecutor(ABC):
@@ -21,7 +25,7 @@ class WorkloadExecutor(ABC):
 
     @property
     @abstractmethod
-    def results(self) -> mp.Queue | queue.Queue:
+    def results(self) -> ResultQueue:
         raise NotImplementedError('results property must be implemented by concrete class.')
 
     @property
@@ -32,14 +36,14 @@ class WorkloadExecutor(ABC):
     # @TODO:  Would this sort of method be useful?  Ponder...
     @abstractmethod
     def set_connection(self,
-                       conn=None,  # type: AsyncCluster | Cluster | None
-                       hostname=None,  # type: str | None
-                       options=None,  # type: ClusterOptions | None
+                       conn: Cluster | None = None,
+                       hostname: str | None = None,
+                       options: ClusterOptions | None = None,
                        ) -> None:
         raise NotImplementedError('set_connection method must be implemented by concrete class.')
 
     @abstractmethod
-    def build_workloads(self, request) -> None:
+    def build_workloads(self, request: run_pb.Request) -> None:
         raise NotImplementedError('build_workloads method must be implemented by concrete class.')
 
     @abstractmethod

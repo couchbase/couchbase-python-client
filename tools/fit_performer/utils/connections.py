@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import os
 import tempfile
 from dataclasses import dataclass
 from datetime import timedelta
+from typing import TYPE_CHECKING, Any
 
-from acouchbase.cluster import AsyncCluster
+from google.protobuf.message import Message
+
 from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
                             PasswordAuthenticator)
@@ -17,20 +21,27 @@ from couchbase.options import (ClusterOptions,
 
 from ..commands.sdk_commands import SdkCommandOptions
 
+if TYPE_CHECKING:
+    from opentelemetry.sdk.metrics import MeterProvider
+    from opentelemetry.sdk.trace import TracerProvider
+
+    from observability import config_pb2 as observability_config_pb
+    from shared import cluster_pb2 as cluster_pb
+
 
 @dataclass
 class ConnectionCache:
-    hostname: str = None
-    options: ClusterOptions = None
-    mp_cluster_options: ClusterOptions = None
-    obs_config: object = None
-    cluster: AsyncCluster | Cluster = None
+    hostname: str
+    options: ClusterOptions
+    mp_cluster_options: ClusterOptions
+    obs_config: observability_config_pb.Config | None = None
+    cluster: Cluster | None = None
     tracer: RequestTracer | None = None
-    tracer_provider: object = None
+    tracer_provider: TracerProvider | None = None
     meter: Meter | None = None
-    meter_provider: object = None
+    meter_provider: MeterProvider | None = None
 
-    def close(self):
+    def close(self) -> None:
         if self.cluster:
             self.cluster.close()
         if self.tracer_provider:
@@ -43,8 +54,8 @@ class ClusterConnectOptions:
     # TODO Should these functions be moved to different file?
 
     @staticmethod
-    def get_cluster_options(request):
-        config = None
+    def get_cluster_options(request: cluster_pb.ClusterConnectionCreateRequest) -> ClusterOptions:
+        config: cluster_pb.ClusterConfig | None = None
         if request.HasField('cluster_config'):
             config = request.cluster_config
 
@@ -56,7 +67,7 @@ class ClusterConnectOptions:
             return ClusterOptions(authenticator=authenticator)
 
         # TODO Add custom serializer
-        kwargs = {
+        kwargs: dict[str, Any] = {
             'authenticator': authenticator,
             'timeout_options': ClusterConnectOptions.get_cluster_timeout_options(config),
             'enable_mutation_tokens': (config.enable_mutation_tokens
@@ -95,7 +106,7 @@ class ClusterConnectOptions:
         return ClusterOptions(**kwargs)
 
     @staticmethod
-    def _get_trust_store_path(config) -> str | None:
+    def _get_trust_store_path(config: cluster_pb.ClusterConfig | None) -> str | None:
         if config is None:
             return None
 
@@ -116,7 +127,9 @@ class ClusterConnectOptions:
         return path
 
     @staticmethod
-    def create_authenticator(auth_message, trust_store_path: str | None = None):
+    def create_authenticator(auth_message: cluster_pb.Authenticator,
+                             trust_store_path: str | None = None,
+                             ) -> PasswordAuthenticator | JwtAuthenticator | CertificateAuthenticator:
         """Create an authenticator from a proto authenticator message.
 
         This method can be used both during cluster connection and for
@@ -153,14 +166,16 @@ class ClusterConnectOptions:
         raise NotImplementedError(f"Authenticator type '{which_auth}' is not supported.")
 
     @staticmethod
-    def _get_authenticator(request, trust_store_path: str | None):
+    def _get_authenticator(request: cluster_pb.ClusterConnectionCreateRequest,
+                           trust_store_path: str | None,
+                           ) -> PasswordAuthenticator | JwtAuthenticator | CertificateAuthenticator:
         if request.HasField('authenticator'):
             return ClusterConnectOptions.create_authenticator(request.authenticator, trust_store_path)
 
         return PasswordAuthenticator(request.cluster_username, request.cluster_password, cert_path=trust_store_path)
 
     @staticmethod
-    def get_cluster_timeout_options(config):
+    def get_cluster_timeout_options(config: cluster_pb.ClusterConfig) -> ClusterTimeoutOptions:
         return ClusterTimeoutOptions(
             connect_timeout=ClusterConnectOptions.get_timeout_secs(config, 'kv_connect_timeout_secs'),
             kv_timeout=ClusterConnectOptions.get_timeout_millis(config, 'kv_timeout_millis'),
@@ -176,19 +191,19 @@ class ClusterConnectOptions:
         )
 
     @staticmethod
-    def get_timeout_secs(config, field):
+    def get_timeout_secs(config: Message, field: str) -> timedelta | None:
         if not config.HasField(field):
             return None
         return timedelta(seconds=getattr(config, field))
 
     @staticmethod
-    def get_timeout_millis(config, field):
+    def get_timeout_millis(config: Message, field: str) -> timedelta | None:
         if not config.HasField(field):
             return None
         return timedelta(milliseconds=getattr(config, field))
 
     @staticmethod
-    def get_tls_verify_mode(config):
+    def get_tls_verify_mode(config: cluster_pb.ClusterConfig) -> TLSVerifyMode | None:
         if not config.HasField('insecure') or not config.insecure:
             return None
         return TLSVerifyMode.NO_VERIFY

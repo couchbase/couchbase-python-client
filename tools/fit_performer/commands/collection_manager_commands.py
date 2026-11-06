@@ -1,16 +1,22 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import timedelta
 from functools import wraps
 from time import perf_counter_ns
-from typing import Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    Concatenate,
+                    ParamSpec,
+                    Protocol,
+                    TypeVar)
 
 import google.protobuf.timestamp_pb2 as timestamp_pb
 
 from couchbase.bucket import Bucket
-from couchbase.management.collections import (CreateCollectionSettings,
+from couchbase.management.collections import (CollectionManager,
+                                              CreateCollectionSettings,
                                               ScopeSpec,
                                               UpdateCollectionSettings)
 from couchbase.management.options import (CreateCollectionOptions,
@@ -20,13 +26,17 @@ from couchbase.management.options import (CreateCollectionOptions,
                                           GetAllScopesOptions,
                                           UpdateCollectionOptions)
 
-from ..generated.run import top_level_pb2 as run_pb
-from ..generated.sdk import workload_pb2 as sdk_pb
-from ..generated.sdk.bucket import collection_manager_pb2 as collection_manager_pb
+from run import top_level_pb2 as run_pb
+from sdk import workload_pb2 as sdk_pb
+from sdk.bucket import collection_manager_pb2 as collection_manager_pb
+
 from .sdk_commands import (SdkCommand,
                            SdkCommandOptions,
                            SdkCommandResult,
                            validate_command)
+
+if TYPE_CHECKING:
+    from ..telemetry.span_owner import SpanOwner
 
 VALID_COLLECTION_MANAGER_COMMAND_ARGS = {
     'return_result': lambda r: isinstance(r, bool),
@@ -44,15 +54,26 @@ VALID_COLLECTION_MANAGER_COMMAND_ARGS = {
 logger = logging.getLogger(__name__)
 
 
+class _ResultCommand(Protocol):
+    _initiated: timestamp_pb.Timestamp
+    _return_result: bool
+
+
+C = TypeVar('C', bound=_ResultCommand)
+P = ParamSpec('P')
+
+
 class CollectionManagerCommandOptions(SdkCommandOptions):
     pass
 
 
 class CollectionManagerCommandResult(SdkCommandResult):
     @classmethod
-    def as_get_all_scopes_result(cls, fn):
+    def as_get_all_scopes_result(cls,
+                                 fn: Callable[Concatenate[C, P], Iterable[ScopeSpec]]
+                                 ) -> Callable[Concatenate[C, P], run_pb.Result]:
         @wraps(fn)
-        def wrapped_fn(self, *args, **kwargs):
+        def wrapped_fn(self: C, *args: P.args, **kwargs: P.kwargs) -> run_pb.Result:
             try:
                 start = perf_counter_ns()
                 res = fn(self, *args, **kwargs)
@@ -78,7 +99,7 @@ class CollectionManagerCommandResult(SdkCommandResult):
         for scope_spec in sdk_res:
             proto_scope_spec = collection_manager_pb.ScopeSpec(name=scope_spec.name)
             for coll_spec in scope_spec.collections:
-                kwargs = {
+                kwargs: dict[str, Any] = {
                     'name': coll_spec.name,
                     'scope_name': coll_spec.scope_name,
                 }
@@ -92,17 +113,17 @@ class CollectionManagerCommandResult(SdkCommandResult):
 
 
 class GetAllScopesCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_COLLECTION_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._return_result = kwargs.get('return_result')
-        self._bucket = kwargs.get('bucket')
-        self._collection_manager = self._bucket.collections()
+        self._initiated = kwargs['initiated']
+        self._return_result: bool = kwargs['return_result']
+        self._bucket: Bucket = kwargs['bucket']
+        self._collection_manager: CollectionManager = self._bucket.collections()
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._span_owner = kwargs.get('span_owner')
+        self._options: GetAllScopesOptions | None = None
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -112,29 +133,29 @@ class GetAllScopesCommand(SdkCommand):
         )
 
     @CollectionManagerCommandResult.as_get_all_scopes_result
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> Iterable[ScopeSpec]:
         return self._collection_manager.get_all_scopes(self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> GetAllScopesCommand:
+    def create_command(**kwargs: Any) -> GetAllScopesCommand:
         command = GetAllScopesCommand(**kwargs)
         command.set_options()
         return command
 
 
 class CreateScopeCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_COLLECTION_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._return_result = kwargs.get('return_result')
-        self._bucket = kwargs.get('bucket')
-        self._collection_manager = self._bucket.collections()
+        self._initiated = kwargs['initiated']
+        self._return_result: bool = kwargs['return_result']
+        self._bucket: Bucket = kwargs['bucket']
+        self._collection_manager: CollectionManager = self._bucket.collections()
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._scope_name = kwargs.get('scope_name')
-        self._span_owner = kwargs.get('span_owner')
+        self._options: CreateScopeOptions | None = None
+        self._scope_name: str = kwargs['scope_name']
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -144,29 +165,29 @@ class CreateScopeCommand(SdkCommand):
         )
 
     @CollectionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._collection_manager.create_scope(self._scope_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> CreateScopeCommand:
+    def create_command(**kwargs: Any) -> CreateScopeCommand:
         command = CreateScopeCommand(**kwargs)
         command.set_options()
         return command
 
 
 class DropScopeCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_COLLECTION_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._return_result = kwargs.get('return_result')
-        self._bucket = kwargs.get('bucket')
-        self._collection_manager = self._bucket.collections()
+        self._initiated = kwargs['initiated']
+        self._return_result: bool = kwargs['return_result']
+        self._bucket: Bucket = kwargs['bucket']
+        self._collection_manager: CollectionManager = self._bucket.collections()
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._scope_name = kwargs.get('scope_name')
-        self._span_owner = kwargs.get('span_owner')
+        self._options: DropScopeOptions | None = None
+        self._scope_name: str = kwargs['scope_name']
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -176,31 +197,31 @@ class DropScopeCommand(SdkCommand):
         )
 
     @CollectionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._collection_manager.drop_scope(self._scope_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> DropScopeCommand:
+    def create_command(**kwargs: Any) -> DropScopeCommand:
         command = DropScopeCommand(**kwargs)
         command.set_options()
         return command
 
 
 class CreateCollectionCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_COLLECTION_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._return_result = kwargs.get('return_result')
-        self._bucket = kwargs.get('bucket')
-        self._collection_manager = self._bucket.collections()
+        self._initiated = kwargs['initiated']
+        self._return_result: bool = kwargs['return_result']
+        self._bucket: Bucket = kwargs['bucket']
+        self._collection_manager: CollectionManager = self._bucket.collections()
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._scope_name = kwargs.get('scope_name')
-        self._collection_name = kwargs.get('collection_name')
-        self._settings = kwargs.get('settings')
-        self._span_owner = kwargs.get('span_owner')
+        self._options: CreateCollectionOptions | None = None
+        self._scope_name: str = kwargs['scope_name']
+        self._collection_name: str = kwargs['collection_name']
+        self._settings: CreateCollectionSettings | None = kwargs.get('settings')
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -210,32 +231,32 @@ class CreateCollectionCommand(SdkCommand):
         )
 
     @CollectionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._collection_manager.create_collection(
             self._scope_name, self._collection_name, self._settings, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> CreateCollectionCommand:
+    def create_command(**kwargs: Any) -> CreateCollectionCommand:
         command = CreateCollectionCommand(**kwargs)
         command.set_options()
         return command
 
 
 class UpdateCollectionCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_COLLECTION_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._return_result = kwargs.get('return_result')
-        self._bucket = kwargs.get('bucket')
-        self._collection_manager = self._bucket.collections()
+        self._initiated = kwargs['initiated']
+        self._return_result: bool = kwargs['return_result']
+        self._bucket: Bucket = kwargs['bucket']
+        self._collection_manager: CollectionManager = self._bucket.collections()
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._scope_name = kwargs.get('scope_name')
-        self._collection_name = kwargs.get('collection_name')
-        self._settings = kwargs.get('settings')
-        self._span_owner = kwargs.get('span_owner')
+        self._options: UpdateCollectionOptions | None = None
+        self._scope_name: str = kwargs['scope_name']
+        self._collection_name: str = kwargs['collection_name']
+        self._settings: UpdateCollectionSettings = kwargs['settings']
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -245,31 +266,31 @@ class UpdateCollectionCommand(SdkCommand):
         )
 
     @CollectionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._collection_manager.update_collection(
             self._scope_name, self._collection_name, self._settings, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> UpdateCollectionCommand:
+    def create_command(**kwargs: Any) -> UpdateCollectionCommand:
         command = UpdateCollectionCommand(**kwargs)
         command.set_options()
         return command
 
 
 class DropCollectionCommand(SdkCommand):
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         validate_command(VALID_COLLECTION_MANAGER_COMMAND_ARGS, **kwargs)
-        self._initiated = kwargs.get('initiated')
-        self._return_result = kwargs.get('return_result')
-        self._bucket = kwargs.get('bucket')
-        self._collection_manager = self._bucket.collections()
+        self._initiated = kwargs['initiated']
+        self._return_result: bool = kwargs['return_result']
+        self._bucket: Bucket = kwargs['bucket']
+        self._collection_manager: CollectionManager = self._bucket.collections()
         self._raw_options = kwargs.get('options')
-        self._options = None
-        self._scope_name = kwargs.get('scope_name')
-        self._collection_name = kwargs.get('collection_name')
-        self._span_owner = kwargs.get('span_owner')
+        self._options: DropCollectionOptions | None = None
+        self._scope_name: str = kwargs['scope_name']
+        self._collection_name: str = kwargs['collection_name']
+        self._span_owner: SpanOwner | None = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -279,12 +300,12 @@ class DropCollectionCommand(SdkCommand):
         )
 
     @CollectionManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._collection_manager.drop_collection(
             self._scope_name, self._collection_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> DropCollectionCommand:
+    def create_command(**kwargs: Any) -> DropCollectionCommand:
         command = DropCollectionCommand(**kwargs)
         command.set_options()
         return command
@@ -296,11 +317,12 @@ class CollectionManagerCommandBuilder:
                                  proto_settings: (collection_manager_pb.CreateCollectionSettings |
                                                   collection_manager_pb.UpdateCollectionSettings)
                                  ) -> CreateCollectionSettings | UpdateCollectionSettings:
+        settings_cls: type[CreateCollectionSettings] | type[UpdateCollectionSettings]
         if isinstance(proto_settings, collection_manager_pb.CreateCollectionSettings):
             settings_cls = CreateCollectionSettings
         else:
             settings_cls = UpdateCollectionSettings
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         if proto_settings.HasField('expiry_secs'):
             kwargs['max_expiry'] = timedelta(seconds=proto_settings.expiry_secs)
         if proto_settings.HasField('history'):
@@ -310,9 +332,11 @@ class CollectionManagerCommandBuilder:
     @classmethod
     def build_command(cls,
                       coll_mgr_cmd: collection_manager_pb.Command,
-                      **cmd_kwargs: dict[str, Any]
+                      **cmd_kwargs: Any
                       ) -> SdkCommand:
         cmd_type = coll_mgr_cmd.WhichOneof('command')
+        if cmd_type is None:
+            raise NotImplementedError('Collection management command with no command not supported by the performer')
         cmd = getattr(coll_mgr_cmd, cmd_type)
 
         if cmd.HasField('options'):

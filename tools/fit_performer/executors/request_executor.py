@@ -2,48 +2,49 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
+from typing import TYPE_CHECKING
 
-from ..generated.run.top_level_pb2 import BatchedResult, Result
+from run.top_level_pb2 import (BatchedResult,
+                               Request,
+                               Result)
+
+if TYPE_CHECKING:
+    from .workload_executor import WorkloadExecutor
 
 
 class RequestExecutor:
-    def __init__(self, request, executor):
-        self._batch_size = None
+    def __init__(self, request: Request, executor: WorkloadExecutor) -> None:
+        self._batch_size: int | None = None
         self._executor = executor
         self._request = request
-        self._request_workloads = None
         self._conn_id = self._request.workloads.cluster_connection_id
         self._logger = logging.getLogger(__name__)
 
-    @property
-    def num_workloads(self) -> int:
-        return len(self._request_workloads)
-
-    def set_batch_size(self):
+    def set_batch_size(self) -> None:
         self._batch_size = 1
         if self._request.HasField("config") and self._request.config.HasField("streaming_config"):
             if self._request.config.streaming_config.HasField("batch_size"):
                 self._batch_size = self._request.config.streaming_config.batch_size
         self._logger.info(f"Batch size is {self._batch_size}")
 
-    def execute_request(self):
+    def execute_request(self) -> None:
         if self._executor is None:
             raise RuntimeError('No horizontal scale executor has been set, cannot execute request.')
 
         self._executor.execute_workloads()
 
-    def results(self):
+    def results(self) -> RequestExecutor:
         return self
 
-    def __iter__(self):
+    def __iter__(self) -> RequestExecutor:
         return self
 
-    def __next__(self):
+    def __next__(self) -> Result:
         if self._executor.workload_complete and self._executor.results.empty():
             self._logger.info("All results have been sent")
             raise StopIteration
 
-        batch = []
+        batch: list[Result] = []
         start_time = datetime.now()
         while True:
             if len(batch) == self._batch_size:
@@ -68,7 +69,7 @@ class RequestExecutor:
         return batch[0]
 
     @classmethod
-    def build_request(cls, request, executor) -> RequestExecutor:
+    def build_request(cls, request: Request, executor: WorkloadExecutor) -> RequestExecutor:
         req = cls(request, executor)
         req.set_batch_size()
         return req

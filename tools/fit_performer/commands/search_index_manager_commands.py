@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from functools import wraps
 from time import perf_counter_ns
+from typing import (Any,
+                    Concatenate,
+                    ParamSpec,
+                    TypeVar)
 
 from google.protobuf import timestamp_pb2 as timestamp_pb
 
@@ -20,19 +24,25 @@ from couchbase.management.options import (AllowQueryingSearchIndexOptions,
                                           ResumeIngestSearchIndexOptions,
                                           UnfreezePlanSearchIndexOptions,
                                           UpsertSearchIndexOptions)
-from couchbase.management.search import SearchIndex
+from couchbase.management.search import (ScopeSearchIndexManager,
+                                         SearchIndex,
+                                         SearchIndexManager)
 from couchbase.scope import Scope
 
-from ..generated.run import top_level_pb2 as run_pb
-from ..generated.sdk import workload_pb2 as sdk_pb
-from ..generated.sdk.cluster.search import index_manager_pb2 as cluster_search_index_pb
-from ..generated.sdk.scope.search import index_manager_pb2 as scope_search_index_pb
-from ..generated.sdk.search import index_manager_pb2 as search_index_pb
+from run import top_level_pb2 as run_pb
+from sdk import workload_pb2 as sdk_pb
+from sdk.cluster.search import index_manager_pb2 as cluster_search_index_pb
+from sdk.scope.search import index_manager_pb2 as scope_search_index_pb
+from sdk.search import index_manager_pb2 as search_index_pb
+
 from .sdk_commands import (SdkCommand,
                            SdkCommandOptions,
                            SdkCommandResult)
 
-_VALID_SEARCH_MGMT_CMD_ARGS = {
+P = ParamSpec('P')
+C = TypeVar('C', bound=SdkCommand)
+
+_VALID_SEARCH_MGMT_CMD_ARGS: dict[str, Callable[[Any], bool]] = {
     'scope': lambda s: s is None or isinstance(s, Scope),
     'cluster': lambda c: c is None or isinstance(c, Cluster),
     'return_result': lambda r: isinstance(r, bool),
@@ -42,6 +52,16 @@ _VALID_SEARCH_MGMT_CMD_ARGS = {
     'options': lambda o: True,
     'span_owner': lambda s: True
 }
+
+
+def _search_index_manager(kwargs: dict[str, Any]) -> SearchIndexManager | ScopeSearchIndexManager:
+    scope: Scope | None = kwargs.get('scope')
+    if scope is not None:
+        return scope.search_indexes()
+    cluster: Cluster | None = kwargs.get('cluster')
+    if cluster is None:
+        raise ValueError('A search index management command needs a cluster or a scope.')
+    return cluster.search_indexes()
 
 
 class SearchIndexManagerCommandOptions(SdkCommandOptions):
@@ -54,10 +74,10 @@ class SearchIndexManagerCommandResult(SdkCommandResult):
     @classmethod
     def to_search_index(cls, sdk_index: SearchIndex) -> search_index_pb.SearchIndex:
         return search_index_pb.SearchIndex(
-            uuid=sdk_index.uuid,
+            uuid=sdk_index.uuid or '',
             name=sdk_index.name,
             type=sdk_index.idx_type,
-            source_uuid=sdk_index.source_uuid,
+            source_uuid=sdk_index.source_uuid or '',
             source_type=sdk_index.source_type,
             params=json.dumps(sdk_index.params).encode('utf-8'),
             source_params=json.dumps(sdk_index.source_params).encode('utf-8'),
@@ -71,9 +91,11 @@ class SearchIndexManagerCommandResult(SdkCommandResult):
         )
 
     @classmethod
-    def as_search_index(cls, fn):
+    def as_search_index(cls,
+                        fn: Callable[Concatenate[C, P], SearchIndex],
+                        ) -> Callable[Concatenate[C, P], run_pb.Result]:
         @wraps(fn)
-        def wrapped_fn(self, *args, **kwargs):
+        def wrapped_fn(self: C, *args: P.args, **kwargs: P.kwargs) -> run_pb.Result:
             try:
                 start = perf_counter_ns()
                 res = fn(self, *args, **kwargs)
@@ -89,9 +111,11 @@ class SearchIndexManagerCommandResult(SdkCommandResult):
         return wrapped_fn
 
     @classmethod
-    def as_search_indexes(cls, fn):
+    def as_search_indexes(cls,
+                          fn: Callable[Concatenate[C, P], Iterable[SearchIndex]],
+                          ) -> Callable[Concatenate[C, P], run_pb.Result]:
         @wraps(fn)
-        def wrapped_fn(self, *args, **kwargs):
+        def wrapped_fn(self: C, *args: P.args, **kwargs: P.kwargs) -> run_pb.Result:
             try:
                 start = perf_counter_ns()
                 res = fn(self, *args, **kwargs)
@@ -107,9 +131,11 @@ class SearchIndexManagerCommandResult(SdkCommandResult):
         return wrapped_fn
 
     @classmethod
-    def as_indexed_document_counts(cls, fn):
+    def as_indexed_document_counts(cls,
+                                   fn: Callable[Concatenate[C, P], int],
+                                   ) -> Callable[Concatenate[C, P], run_pb.Result]:
         @wraps(fn)
-        def wrapped_fn(self, *args, **kwargs):
+        def wrapped_fn(self: C, *args: P.args, **kwargs: P.kwargs) -> run_pb.Result:
             try:
                 start = perf_counter_ns()
                 res = fn(self, *args, **kwargs)
@@ -125,16 +151,18 @@ class SearchIndexManagerCommandResult(SdkCommandResult):
         return wrapped_fn
 
     @classmethod
-    def as_analyze_document_result(cls, fn):
+    def as_analyze_document_result(cls,
+                                   fn: Callable[Concatenate[C, P], dict[str, Any]],
+                                   ) -> Callable[Concatenate[C, P], run_pb.Result]:
         @wraps(fn)
-        def wrapped_fn(self, *args, **kwargs):
+        def wrapped_fn(self: C, *args: P.args, **kwargs: P.kwargs) -> run_pb.Result:
             try:
                 start = perf_counter_ns()
                 res = fn(self, *args, **kwargs)
                 end = perf_counter_ns()
                 sdk_result = sdk_pb.Result(search_index_manager_result=search_index_pb.Result(
                     analyze_document=search_index_pb.AnalyzeDocumentResult(
-                        results=json.dumps(res).encode('utf-8')
+                        results=[json.dumps(res).encode('utf-8')]
                     )
                 ))
                 return run_pb.Result(sdk=sdk_result, elapsedNanos=(end - start), initiated=self._initiated)
@@ -146,20 +174,15 @@ class SearchIndexManagerCommandResult(SdkCommandResult):
 
 
 class GetIndexCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_name = kwargs.get('index_name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_name: str = kwargs['index_name']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: GetSearchIndexOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -169,30 +192,25 @@ class GetIndexCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_search_index
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> SearchIndex:
         return self._search_index_manager.get_index(self._index_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> GetIndexCommand:
+    def create_command(**kwargs: Any) -> GetIndexCommand:
         command = GetIndexCommand(**kwargs)
         command.set_options()
         return command
 
 
 class GetAllIndexesCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: GetAllSearchIndexesOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -202,31 +220,26 @@ class GetAllIndexesCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_search_indexes
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> Iterable[SearchIndex]:
         return self._search_index_manager.get_all_indexes(self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> GetAllIndexesCommand:
+    def create_command(**kwargs: Any) -> GetAllIndexesCommand:
         command = GetAllIndexesCommand(**kwargs)
         command.set_options()
         return command
 
 
 class UpsertIndexCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_definition = kwargs.get('index_definition')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_definition: SearchIndex = kwargs['index_definition']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: UpsertSearchIndexOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -236,31 +249,26 @@ class UpsertIndexCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._search_index_manager.upsert_index(self._index_definition, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> UpsertIndexCommand:
+    def create_command(**kwargs: Any) -> UpsertIndexCommand:
         command = UpsertIndexCommand(**kwargs)
         command.set_options()
         return command
 
 
 class DropIndexCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_name = kwargs.get('index_name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_name: str = kwargs['index_name']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: DropSearchIndexOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -270,31 +278,26 @@ class DropIndexCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._search_index_manager.drop_index(self._index_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> DropIndexCommand:
+    def create_command(**kwargs: Any) -> DropIndexCommand:
         command = DropIndexCommand(**kwargs)
         command.set_options()
         return command
 
 
 class GetIndexedDocumentsCountCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_name = kwargs.get('index_name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_name: str = kwargs['index_name']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: GetSearchIndexedDocumentsCountOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -304,31 +307,26 @@ class GetIndexedDocumentsCountCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_indexed_document_counts
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> int:
         return self._search_index_manager.get_indexed_documents_count(self._index_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> GetIndexedDocumentsCountCommand:
+    def create_command(**kwargs: Any) -> GetIndexedDocumentsCountCommand:
         command = GetIndexedDocumentsCountCommand(**kwargs)
         command.set_options()
         return command
 
 
 class PauseIngestCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_name = kwargs.get('index_name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_name: str = kwargs['index_name']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: PauseIngestSearchIndexOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -338,31 +336,26 @@ class PauseIngestCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._search_index_manager.pause_ingest(self._index_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> PauseIngestCommand:
+    def create_command(**kwargs: Any) -> PauseIngestCommand:
         command = PauseIngestCommand(**kwargs)
         command.set_options()
         return command
 
 
 class ResumeIngestCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_name = kwargs.get('index_name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_name: str = kwargs['index_name']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: ResumeIngestSearchIndexOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -372,31 +365,26 @@ class ResumeIngestCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._search_index_manager.resume_ingest(self._index_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> ResumeIngestCommand:
+    def create_command(**kwargs: Any) -> ResumeIngestCommand:
         command = ResumeIngestCommand(**kwargs)
         command.set_options()
         return command
 
 
 class AllowQueryingCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_name = kwargs.get('index_name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_name: str = kwargs['index_name']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: AllowQueryingSearchIndexOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -406,31 +394,26 @@ class AllowQueryingCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._search_index_manager.allow_querying(self._index_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> AllowQueryingCommand:
+    def create_command(**kwargs: Any) -> AllowQueryingCommand:
         command = AllowQueryingCommand(**kwargs)
         command.set_options()
         return command
 
 
 class DisallowQueryingCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_name = kwargs.get('index_name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_name: str = kwargs['index_name']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: DisallowQueryingSearchIndexOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -440,31 +423,26 @@ class DisallowQueryingCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._search_index_manager.disallow_querying(self._index_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> DisallowQueryingCommand:
+    def create_command(**kwargs: Any) -> DisallowQueryingCommand:
         command = DisallowQueryingCommand(**kwargs)
         command.set_options()
         return command
 
 
 class FreezePlanCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_name = kwargs.get('index_name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_name: str = kwargs['index_name']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: FreezePlanSearchIndexOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -474,31 +452,26 @@ class FreezePlanCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._search_index_manager.freeze_plan(self._index_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> FreezePlanCommand:
+    def create_command(**kwargs: Any) -> FreezePlanCommand:
         command = FreezePlanCommand(**kwargs)
         command.set_options()
         return command
 
 
 class UnfreezePlanCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_name = kwargs.get('index_name')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_name: str = kwargs['index_name']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: UnfreezePlanSearchIndexOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -508,32 +481,27 @@ class UnfreezePlanCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_success
-    def execute_command(self) -> run_pb.Result:
+    def execute_command(self) -> None:
         return self._search_index_manager.unfreeze_plan(self._index_name, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> UnfreezePlanCommand:
+    def create_command(**kwargs: Any) -> UnfreezePlanCommand:
         command = UnfreezePlanCommand(**kwargs)
         command.set_options()
         return command
 
 
 class AnalyzeDocumentCommand(SdkCommand):
-    def __init__(self, **kwargs):
-        self._initiated = kwargs.get('initiated')
-        self._cluster = kwargs.get('cluster')
-        self._scope = kwargs.get('scope')
-        if self._scope is not None:
-            self._search_index_manager = self._scope.search_indexes()
-        else:
-            self._search_index_manager = self._cluster.search_indexes()
-        self._index_name = kwargs.get('index_name')
-        self._document = kwargs.get('document')
+    def __init__(self, **kwargs: Any) -> None:
+        self._initiated = kwargs['initiated']
+        self._search_index_manager = _search_index_manager(kwargs)
+        self._index_name: str = kwargs['index_name']
+        self._document = kwargs['document']
         self._raw_options = kwargs.get('options')
-        self._options = None
+        self._options: AnalyzeDocumentSearchIndexOptions | None = None
         self._span_owner = kwargs.get('span_owner')
 
-    def set_options(self):
+    def set_options(self) -> None:
         if self._raw_options is None:
             return
 
@@ -543,11 +511,11 @@ class AnalyzeDocumentCommand(SdkCommand):
         )
 
     @SearchIndexManagerCommandResult.as_analyze_document_result
-    def execute_command(self) -> run_pb.Result:
-        return self._search_index_manager.analyze_document(self._index_name, self._options)
+    def execute_command(self) -> dict[str, Any]:
+        return self._search_index_manager.analyze_document(self._index_name, self._document, self._options)
 
     @staticmethod
-    def create_command(**kwargs) -> AnalyzeDocumentCommand:
+    def create_command(**kwargs: Any) -> AnalyzeDocumentCommand:
         command = AnalyzeDocumentCommand(**kwargs)
         command.set_options()
         return command
@@ -556,7 +524,7 @@ class AnalyzeDocumentCommand(SdkCommand):
 class SearchIndexManagerCommandBuilder:
     @classmethod
     def parse_index_definition(cls, raw_defn: bytes) -> SearchIndex:
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         for camel_key, val in json.loads(raw_defn).items():
             # The keys of the JSON definiton are given in lowerCamelCase from the driver
             # Convert them to snake_case so they match the arguments of the constructor
@@ -576,23 +544,25 @@ class SearchIndexManagerCommandBuilder:
 
     @classmethod
     def build_cluster_level_command(cls,
-                                    cluster_search_idx_cmd,  # type: cluster_search_index_pb.Command
-                                    **cmd_kwargs
-                                    ):
+                                    cluster_search_idx_cmd: cluster_search_index_pb.Command,
+                                    **cmd_kwargs: Any
+                                    ) -> SdkCommand:
         return cls.build_shared_command(cluster_search_idx_cmd.shared, **cmd_kwargs)
 
     @classmethod
     def build_scope_level_command(cls,
-                                  scope_search_idx_cmd,  # type: scope_search_index_pb.Command
-                                  **cmd_kwargs
-                                  ):
+                                  scope_search_idx_cmd: scope_search_index_pb.Command,
+                                  **cmd_kwargs: Any
+                                  ) -> SdkCommand:
         return cls.build_shared_command(scope_search_idx_cmd.shared, **cmd_kwargs)
 
     @classmethod
     def build_shared_command(cls,  # noqa: C901
-                             search_idx_cmd,  # type: search_index_pb.Command
-                             **cmd_kwargs):
+                             search_idx_cmd: search_index_pb.Command,
+                             **cmd_kwargs: Any) -> SdkCommand:
         cmd_type = search_idx_cmd.WhichOneof('command')
+        if cmd_type is None:
+            raise NotImplementedError('Search index management command has no command type set')
         if getattr(search_idx_cmd, cmd_type).HasField('options'):
             cmd_kwargs['options'] = getattr(search_idx_cmd, cmd_type).options
 

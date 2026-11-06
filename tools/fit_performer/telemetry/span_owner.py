@@ -2,25 +2,31 @@ from __future__ import annotations
 
 import logging
 import threading
+from typing import TYPE_CHECKING
 
 from opentelemetry import trace as otel_trace
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 from couchbase.observability.otel_tracing import OtelWrapperSpan
 
+if TYPE_CHECKING:
+    from couchbase.observability.tracing import RequestSpan, RequestTracer
+
+    from observability import top_pb2 as observability_pb
+
 
 class SpanOwner:
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._lock = threading.Lock()
-        self._spans: dict[str, object] = {}
+        self._spans: dict[str, RequestSpan] = {}
         self._logger = logging.getLogger(__name__)
 
-    def get_span(self, span_id: str) -> object | None:
+    def get_span(self, span_id: str) -> RequestSpan | None:
         with self._lock:
             return self._spans.get(span_id)
 
-    def create_span(self, tracer, request):
+    def create_span(self, tracer: RequestTracer, request: observability_pb.SpanCreateRequest) -> None:
         parent_span = None
         if request.HasField('parent_span_id'):
             parent_span = self.get_span(request.parent_span_id)
@@ -41,16 +47,16 @@ class SpanOwner:
         with self._lock:
             self._spans[request.id] = span
 
-    def finish_span(self, request):
+    def finish_span(self, request: observability_pb.SpanFinishRequest) -> None:
         with self._lock:
             span = self._spans.pop(request.id, None)
 
         if span is None:
             raise KeyError(f"Span '{request.id}' not found")
 
-        span.end()
+        span.end(None)
 
-    def clear(self):
+    def clear(self) -> None:
         with self._lock:
             self._spans.clear()
 
@@ -59,8 +65,8 @@ class SpanOwner:
         result = {}
         with self._lock:
             for span_id, span in self._spans.items():
-                if hasattr(span, '_otel_span'):
-                    carrier = {}
+                if isinstance(span, OtelWrapperSpan):
+                    carrier: dict[str, str] = {}
                     prop.inject(carrier, context=otel_trace.set_span_in_context(span._otel_span))
                     if 'traceparent' in carrier:
                         result[span_id] = carrier['traceparent']

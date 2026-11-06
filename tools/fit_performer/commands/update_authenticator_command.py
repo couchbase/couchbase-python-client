@@ -9,10 +9,17 @@ from __future__ import annotations
 
 import logging
 from time import perf_counter_ns
+from typing import TYPE_CHECKING, Any
 
-from ..generated.run import top_level_pb2 as run_pb
-from ..generated.sdk import workload_pb2 as sdk_pb
+from run import top_level_pb2 as run_pb
+from sdk import workload_pb2 as sdk_pb
+
 from .sdk_commands import SdkCommand, SdkCommandResult
+
+if TYPE_CHECKING:
+    from couchbase.cluster import Cluster
+
+    from shared import cluster_pb2 as cluster_pb
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +27,7 @@ logger = logging.getLogger(__name__)
 class UpdateAuthenticatorCommand(SdkCommand):
     """Command to update cluster authentication credentials at runtime."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         """Initialize the UpdateAuthenticatorCommand.
 
         Args:
@@ -29,13 +36,13 @@ class UpdateAuthenticatorCommand(SdkCommand):
             initiated: Timestamp when the command was initiated.
             return_result: Whether to return the result.
         """
-        self._cluster = kwargs.get('cluster')
-        self._auth_message = kwargs.get('auth_message')
-        self._initiated = kwargs.get('initiated')
+        self._cluster: Cluster = kwargs['cluster']
+        self._auth_message: cluster_pb.Authenticator = kwargs['auth_message']
+        self._initiated = kwargs['initiated']
         self._return_result = kwargs.get('return_result')
 
     @staticmethod
-    def create_command(**cmd_kwargs) -> UpdateAuthenticatorCommand:
+    def create_command(**cmd_kwargs: Any) -> UpdateAuthenticatorCommand:
         """Create and return an UpdateAuthenticatorCommand instance.
 
         Args:
@@ -48,7 +55,7 @@ class UpdateAuthenticatorCommand(SdkCommand):
         """
         return UpdateAuthenticatorCommand(**cmd_kwargs)
 
-    def set_options(self):
+    def set_options(self) -> None:
         """Set command options. No additional options for this command."""
         pass
 

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -5,7 +7,8 @@ from .multi_process_executor import MultiProcessExecutor
 from .multi_thread_executor import MultiThreadExecutor
 
 if TYPE_CHECKING:
-    from ..generated.run import top_level_pb2 as run
+    from run import top_level_pb2 as run
+
     from ..streaming import StreamOwner
     from ..telemetry.span_owner import SpanOwner
     from ..utils import ConnectionCache
@@ -15,12 +18,12 @@ if TYPE_CHECKING:
 class WorkloadExecutorBuilder:
 
     @staticmethod
-    def build_executor(run_request,  # type: run.Request
-                       run_id,       # type: str
-                       cached_conn,  # type: ConnectionCache
-                       stream_owner,  # type: StreamOwner
-                       counters,     # type: Counters
-                       span_owner=None,  # type: SpanOwner | None
+    def build_executor(run_request: run.Request,
+                       run_id: str,
+                       cached_conn: ConnectionCache,
+                       stream_owner: StreamOwner,
+                       counters: Counters,
+                       span_owner: SpanOwner | None = None,
                        ) -> MultiProcessExecutor | MultiThreadExecutor:
         """ Factory function, builds and returns the appropriate workload executor instance.
 
@@ -41,6 +44,8 @@ class WorkloadExecutorBuilder:
         mechanism = run_request.tunables.get("concurrencyMechanism", "multithreading")
         if mechanism == "multithreading":
             logger.info('Using multi-thread executor')
+            if cached_conn.cluster is None:
+                raise RuntimeError('The cached connection has no cluster, cannot build a multi-thread executor.')
             return MultiThreadExecutor.build_executor(
                 run_id,
                 run_request,

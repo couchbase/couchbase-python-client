@@ -3,10 +3,15 @@ from __future__ import annotations
 import multiprocessing as mp
 import threading
 from abc import ABC, abstractmethod
+from collections.abc import MutableMapping
 from datetime import datetime, timedelta
-from typing import Any
+from multiprocessing.managers import SyncManager
+from typing import TYPE_CHECKING, Any
 
-from ..generated.shared import bounds_pb2 as bounds_pb
+if TYPE_CHECKING:
+    from sdk import workload_pb2 as sdk_pb
+
+from shared import bounds_pb2 as bounds_pb
 
 
 class Counters:
@@ -33,9 +38,9 @@ class Counters:
     def __init__(self) -> None:
         # In-process backing by default: correct and fast for multi-threading, and for the
         # setCounter / clearAllCounters / counter_eq coordination, which all run in this process.
-        self._counters = {}
+        self._counters: MutableMapping[str, int] = {}
         self._lock = threading.Lock()
-        self._manager = None
+        self._manager: SyncManager | None = None
 
     def enable_cross_process_sharing(self) -> None:
         """Upgrade the backing to a ``multiprocessing.Manager`` so counters are visible to the
@@ -44,11 +49,12 @@ class Counters:
         """
         if self._manager is not None:
             return
-        self._manager = mp.get_context('forkserver').Manager()
-        shared = self._manager.dict()
+        manager = mp.get_context('forkserver').Manager()
+        shared: MutableMapping[str, int] = manager.dict()
         shared.update(self._counters)
+        self._manager = manager
         self._counters = shared
-        self._lock = self._manager.Lock()
+        self._lock = manager.Lock()
 
     def shutdown(self) -> None:
         """Release the ``Manager`` subprocess (if one was created) and fall back to in-process
@@ -62,7 +68,7 @@ class Counters:
         self._counters = preserved
         self._lock = threading.Lock()
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, Any]:
         # The Manager lives in the parent process only; workers coordinate through the dict / lock
         # proxies, which are picklable.  The SyncManager object itself is not, so drop it.
         state = self.__dict__.copy()
@@ -177,7 +183,7 @@ class SimpleBoundsExecutor(BoundsExecutor):
         return self._remaining >= 0
 
 
-def build_bounds_executor(workload: Any,
+def build_bounds_executor(workload: sdk_pb.Workload,
                           counters: Counters
                           ) -> BoundsExecutor:
     """Build the BoundsExecutor for a workload from its protobuf bounds.
