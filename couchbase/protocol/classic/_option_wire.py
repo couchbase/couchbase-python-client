@@ -129,7 +129,7 @@ KV_DURABLE_TIMEOUT = Wire(name='key_value_durable_timeout', transform=timedelta_
 KV_TIMEOUT = Wire(name='key_value_timeout', transform=timedelta_as_milliseconds)
 LOCKMODE = Wire(name=DROP)
 LOGGING_METER_EMIT_INTERVAL = Wire(name='cluster_metrics_emit_interval', transform=timedelta_as_milliseconds)
-LOG_REDACTION = Wire(name=DROP)
+LOG_REDACTION = Wire(transform=validate_bool)
 MANAGEMENT_TIMEOUT = Wire(transform=timedelta_as_milliseconds)
 MAX_HTTP_CONNECTIONS = Wire(transform=validate_int)
 METRICS_OPTIONS = Wire(name=DROP)

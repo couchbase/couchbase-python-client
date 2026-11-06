@@ -29,6 +29,7 @@ from typing import (Any,
 
 from couchbase.common._observability.observability_types import _ATTR_OPERATION_NAME, _ATTR_SERVICE
 from couchbase.common._operations import ServiceType
+from couchbase.common._redaction import metadata
 from couchbase.common.observability.metrics import Meter, ValueRecorder
 
 logger = logging.getLogger('couchbase.metrics')
@@ -170,7 +171,7 @@ class LoggingMeterReporter(Thread):
     def _report(self) -> None:
         report = self._logging_meter.create_report()
         if report:
-            logger.info(json.dumps(report, separators=(',', ':')))
+            logger.info('%s', metadata(json.dumps(report, separators=(',', ':'))))
 
 
 class LoggingValueRecorder(ValueRecorder):

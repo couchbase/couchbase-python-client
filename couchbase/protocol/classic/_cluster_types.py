@@ -26,6 +26,7 @@ from typing import (TYPE_CHECKING,
 from couchbase import USER_AGENT_EXTRA
 from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._option_diagnostics import OptionsBlock
+from couchbase.common._redaction import enable as enable_log_redaction
 from couchbase.common._transforms import timedelta_as_milliseconds
 from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.protocol.classic._bindings import ClusterMgmtBinding, ConnectionBinding
@@ -156,7 +157,11 @@ class CreateConnectionRequest:
 
     @classmethod
     def from_settings(cls, settings: ClusterSettings) -> CreateConnectionRequest:
-        return cls(settings.connstr, settings.auth, connect_options(settings))
+        options = connect_options(settings)
+        # The core turns its own redaction on when the connection opens; the SDK's log lines follow it.
+        if options.get('log_redaction'):
+            enable_log_redaction()
+        return cls(settings.connstr, settings.auth, options)
 
     @property
     def binding_method(self) -> str:

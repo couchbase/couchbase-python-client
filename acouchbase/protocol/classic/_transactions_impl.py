@@ -21,6 +21,7 @@ from typing import (TYPE_CHECKING,
                     Any,
                     TypeVar)
 
+from couchbase.common._redaction import user_data
 from couchbase.protocol.classic._capabilities import CAPABILITIES
 from couchbase.protocol.classic._pycbc_core import create_new_attempt_context
 from couchbase.protocol.classic._pycbc_core import pycbc_exception as PycbcCoreException
@@ -128,7 +129,7 @@ class AsyncAttemptContextImpl:
         ftr: Future[T] = self._loop.create_future()
 
         def on_ok(res: Any) -> None:
-            log.debug('%s completed with %s', op.__name__, loggable_result(res))
+            log.debug('%s completed with %s', op.__name__, user_data(loggable_result(res)))
             # BUG(PYCBC-1476): We might not need this once txn bug is fixed
             if isinstance(res, PycbcCoreException):
                 self._loop.call_soon_threadsafe(_settle, ftr.set_exception, as_transactions_exception(res))
@@ -136,13 +137,13 @@ class AsyncAttemptContextImpl:
             try:
                 result = wrap(res)
             except Exception as e:
-                log.error('%s result could not be built: %s', op.__name__, e)
+                log.error('%s result could not be built: %s', op.__name__, user_data(e))
                 self._loop.call_soon_threadsafe(_settle, ftr.set_exception, as_transactions_exception(e))
                 return
             self._loop.call_soon_threadsafe(_settle, ftr.set_result, result)
 
         def on_err(exc: Any) -> None:
-            log.error('%s failed with %s', op.__name__, exc)
+            log.error('%s failed with %s', op.__name__, user_data(exc))
             err = exc or RuntimeError(f'unknown error calling {op.__name__}')
             self._loop.call_soon_threadsafe(_settle, ftr.set_exception, as_transactions_exception(err))
 
@@ -154,7 +155,7 @@ class AsyncAttemptContextImpl:
 
         req['callback'] = on_ok
         req['errback'] = on_err
-        log.debug('%s called with %s', op.__name__, loggable_request(req))
+        log.debug('%s called with %s', op.__name__, user_data(loggable_request(req)))
         try:
             op(**req)
         except Exception as e:

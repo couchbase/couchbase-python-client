@@ -50,6 +50,32 @@ log at:
 It can be called before or after the first cluster connects, and raises ``RuntimeError`` when
 :envvar:`PYCBC_LOG_LEVEL` is set.
 
+Redaction
+---------
+
+A log can hold document keys, query statements, bucket names and hostnames, which an application may
+not be free to share.  ``log_redaction=True`` in :class:`~couchbase.options.ClusterOptions`, or
+``log_redaction=true`` in the connection string, makes the SDK tag each such value where it writes it,
+in the native core's log and in the ``couchbase`` loggers alike:
+
+* ``<ud>...</ud>``, user data: document keys and values, query statements, usernames;
+* ``<md>...</md>``, metadata: bucket, scope, collection and index names;
+* ``<sd>...</sd>``, system data: hostnames, IP addresses and ports.
+
+The threshold logging report, for example, is then logged as a whole as system data:
+
+.. code-block:: text
+
+    <sd>{"kv":{"total_count":3,"top_requests":[{"operation_name":"upsert","total_duration_us":1500}]}}</sd>
+
+The SDK only tags; it removes nothing, so the log stays as useful for the application's own
+debugging.  Redacting happens afterwards, on a copy of the log, with ``cblogredaction``, the tool that
+ships with Couchbase Server.  It replaces each piece of tagged user data with a salted hash, so a value
+logged twice still matches itself, and the copy can be shared.
+
+Redaction is for the whole process: once any cluster connects with it on, it stays on, for every
+cluster, until the process exits.
+
 Threshold logging
 =================
 

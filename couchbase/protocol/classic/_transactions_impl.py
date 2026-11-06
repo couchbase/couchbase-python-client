@@ -23,6 +23,7 @@ from typing import (TYPE_CHECKING,
                     Any,
                     cast)
 
+from couchbase.common._redaction import metadata, user_data
 from couchbase.common.exceptions import CouchbaseException, TransactionsErrorContext
 from couchbase.protocol.classic._capabilities import CAPABILITIES
 from couchbase.protocol.classic._error_mapping import ErrorMapper
@@ -95,7 +96,7 @@ def open_transactions(connection: pycbc_connection,
     ret = create_transactions(connection, cast('ParsedTransactionsConfig', wired))
     if isinstance(ret, PycbcCoreException):
         raise ErrorMapper.build_exception(ret)
-    log.info('created transactions object using config=%s, transcoder=%s', config, transcoder)
+    log.info('created transactions object using config=%s, transcoder=%s', metadata(config), transcoder)
     return ret, transcoder
 
 
@@ -145,12 +146,12 @@ def loggable_result(res: Any) -> Any:
 
 
 def _execute(op: Callable[..., Any], req: Mapping[str, Any]) -> Any:
-    log.debug('%s called with %s', op.__name__, loggable_request(req))
+    log.debug('%s called with %s', op.__name__, user_data(loggable_request(req)))
     try:
         ret = op(**req)
     except Exception as e:
         raise as_transactions_exception(e)
-    log.debug('%s returned %s', op.__name__, loggable_result(ret))
+    log.debug('%s returned %s', op.__name__, user_data(loggable_result(ret)))
     if isinstance(ret, (PycbcCoreException, Exception)):
         raise as_transactions_exception(ret)
     return ret

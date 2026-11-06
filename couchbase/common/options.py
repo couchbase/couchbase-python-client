@@ -789,7 +789,9 @@ class ClusterOptions(dict):
                 Use :class:`~couchbase.options.ClusterMetricsOptions` instead.
         transaction_config (:class:`~couchbase.options.TransactionConfig`, optional): Global configuration for
             transactions. Defaults to a default :class:`~couchbase.options.TransactionConfig`.
-        log_redaction (bool, optional): Set to True to enable log redaction.
+        log_redaction (bool, optional): Set to True to tag user data, metadata and system data in log output so it can
+            be redacted before logs are shared. Once any cluster enables it, it stays enabled for the life of the
+            process. Defaults to False (disabled).
         compression (:class:`~couchbase.options.Compression`, optional): Set compression mode.
         compression_min_size (int, optional): Set compression min size.
         compression_min_ratio (float, optional): Set compression min size.

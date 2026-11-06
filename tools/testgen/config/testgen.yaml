@@ -279,6 +279,7 @@ not_generated:
     - couchbase/tests/impl_registry_t.py
     - couchbase/tests/kv_options_completeness_t.py
     - couchbase/tests/kv_result_types_t.py
+    - couchbase/tests/log_redaction_t.py
     - couchbase/tests/logging_env_t.py
     - couchbase/tests/logging_meter_t.py
     - couchbase/tests/logging_smoke_t.py

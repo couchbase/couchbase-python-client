@@ -24,6 +24,7 @@ import pytest
 
 from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
 from couchbase.auth import PasswordAuthenticator
+from couchbase.common import _redaction
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.options import (ClusterMetricsOptions,
                                ClusterOptions,
@@ -199,6 +200,21 @@ class ClassicConnectOptionsUnitTests:
                              self._conn_options(ClusterOptions(self._auth()), **opts)):
             assert cluster_opts.pop('user_agent_extra', None) == USER_AGENT
             assert cluster_opts == expected_opts
+
+    @pytest.mark.parametrize('connstr, kwargs', [(CONNSTR, {'log_redaction': True}),
+                                                 (f'{CONNSTR}?log_redaction=true', {})],
+                             ids=['option', 'connection string'])
+    def test_log_redaction(self, monkeypatch: pytest.MonkeyPatch, connstr: str, kwargs: dict[str, Any]) -> None:
+        # Strict, so an option the protocol cannot act on would raise here.  The flag is
+        # process-wide and never cleared, so it is restored for the tests after this one.
+        monkeypatch.setattr(_redaction, '_enabled', False)
+        self._conn_options(ClusterOptions(self._auth(), option_validation='strict'), connstr=CONNSTR)
+        assert not _redaction.is_enabled()
+
+        conn_opts = self._conn_options(ClusterOptions(self._auth(), option_validation='strict'),
+                                       connstr=connstr, **kwargs)
+        assert conn_opts['log_redaction'] is True
+        assert _redaction.is_enabled()
 
     def test_connect_options_nest_each_block(self) -> None:
         # The plain options stay flat, the timeout and orphan blocks nest under the names the

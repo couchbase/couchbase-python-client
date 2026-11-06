@@ -130,7 +130,7 @@ KV_TIMEOUT = OptionSpec('kv_timeout', duration=True)
 LOCKMODE = OptionSpec('lockmode', inert=frozenset({'classic'}), deprecated='It has no effect.')
 LOGGING_METER_EMIT_INTERVAL = OptionSpec('logging_meter_emit_interval', deprecated='Use ClusterMetricsOptions instead.',
                                          duration=True)
-LOG_REDACTION = OptionSpec('log_redaction', inert=frozenset({'classic'}))
+LOG_REDACTION = OptionSpec('log_redaction')
 MANAGEMENT_TIMEOUT = OptionSpec('management_timeout', duration=True)
 MAX_HTTP_CONNECTIONS = OptionSpec('max_http_connections')
 METER = OptionSpec('meter')

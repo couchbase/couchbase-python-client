@@ -433,6 +433,7 @@ update_cluster_options_from_py(couchbase::core::cluster_options& options,
     pyObj_options, "user_agent_extra", options.user_agent_extra);
   extract_field<std::size_t>(pyObj_options, "max_http_connections", options.max_http_connections);
   extract_bool_field(pyObj_options, "dump_configuration", options.dump_configuration);
+  extract_bool_field(pyObj_options, "log_redaction", options.log_redaction);
 
   // Preferred server group (Python key "preferred_server_group" -> C++ field "server_group")
   {
@@ -594,6 +595,7 @@ cluster_options_to_py(const couchbase::core::cluster_options& opts,
   add_bool_field(dict, "enable_clustermap_notification", opts.enable_clustermap_notification);
   add_bool_field(dict, "allow_enterprise_analytics", opts.allow_enterprise_analytics);
   add_bool_field(dict, "dump_configuration", opts.dump_configuration);
+  add_bool_field(dict, "log_redaction", opts.log_redaction);
   add_bool_field(dict, "enable_app_telemetry", opts.enable_app_telemetry);
 
   // Other

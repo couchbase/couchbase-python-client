@@ -43,6 +43,7 @@ from couchbase.common._observability.observability_types import (_ATTR_DISPATCH_
                                                                  _DISP_SERVER_DURATION,
                                                                  _DISP_SERVER_PORT)
 from couchbase.common._operations import ServiceType
+from couchbase.common._redaction import system_data
 from couchbase.common._transforms import validate_int
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.observability.tracing import (RequestSpan,
@@ -283,7 +284,7 @@ class ThresholdLoggingReporter(Thread):
                     }
 
         if report:
-            logger.info(json.dumps(report, separators=(',', ':')))
+            logger.info('%s', system_data(json.dumps(report, separators=(',', ':'))))
 
 
 class ThresholdLoggingSpan(RequestSpan):
