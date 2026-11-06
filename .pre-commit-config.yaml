@@ -169,6 +169,15 @@ repos:
         language: python
         pass_filenames: false
         files: ^((a|tx)?couchbase/.*\.py|tools/check_capabilities\.py|tools/check_api_parity\.py)$
+      - id: check-license-headers
+        name: every source file carries the license header, and a changed one the current year
+        # Rewrites what fails, as autopep8 does, so the commit stops for the rewrite to be staged.
+        # It reads the staged files itself to know which have changed.  Rationale in the module
+        # docstring.
+        entry: python tools/check_license_headers.py --fix
+        language: python
+        pass_filenames: false
+        files: (\.(py|pyi|sh|cxx|hxx)|(^|/)CMakeLists\.txt|Dockerfile)$
 
   - repo: https://github.com/PyCQA/isort
     rev: 5.13.2
