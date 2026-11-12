@@ -88,6 +88,7 @@ Key-value
    GetAndTouchOptions
    GetAnyReplicaOptions
    GetOptions
+   GetReplicaOptions
    InsertOptions
    MutationOptions
    RemoveOptions
@@ -113,6 +114,9 @@ Key-value
    :members:
 
 .. autoclass:: GetOptions
+   :members:
+
+.. autoclass:: GetReplicaOptions
    :members:
 
 .. autoclass:: InsertOptions

@@ -37,6 +37,7 @@ from couchbase.common.exceptions import (AmbiguousTimeoutException,
                                          DocumentExistsException,
                                          DocumentLockedException,
                                          DocumentNotFoundException,
+                                         DocumentNotFoundOnReplicaException,
                                          DocumentNotJsonException,
                                          DocumentNotLockedException,
                                          DocumentUnretrievableException,
@@ -70,6 +71,8 @@ from couchbase.common.exceptions import (AmbiguousTimeoutException,
                                          QuotaLimitedException,
                                          RangeScanCompletedException,
                                          RateLimitedException,
+                                         ReplicaIndexCurrentlyUnavailableException,
+                                         ReplicaIndexOutOfBoundsException,
                                          RequestCanceledException,
                                          ScopeNotFoundException,
                                          SearchErrorContext,
@@ -142,6 +145,9 @@ ERROR_MAP: dict[int, type[CouchbaseException]] = {
     132: CannotReviveLivingDocumentException,
     133: MutationTokenOutdatedException,
     134: RangeScanCompletedException,
+    135: DocumentNotFoundOnReplicaException,
+    136: ReplicaIndexOutOfBoundsException,
+    137: ReplicaIndexCurrentlyUnavailableException,
     303: DatasetNotFoundException,
     304: DataverseNotFoundException,
     305: DatasetAlreadyExistsException,
@@ -320,3 +326,16 @@ class ErrorMapper:
                         category=base_exc.err_category(),
                         exc_info=err_info)
         return exc
+
+    @staticmethod
+    def on_replica(exc: DocumentNotFoundException) -> DocumentNotFoundOnReplicaException:
+        """``get_replica``'s error for a document the replica does not hold.
+
+        The core operation reports it as a plain document-not-found, and the exception users catch for it is the
+        replica one, which is still a :class:`DocumentNotFoundException`.
+        """
+        return DocumentNotFoundOnReplicaException('document not found on replica',
+                                                  context=exc.error_context,
+                                                  error_code=135,
+                                                  category=exc._category,
+                                                  exc_info={'inner_cause': exc})

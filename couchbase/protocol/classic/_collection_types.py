@@ -37,6 +37,7 @@ class CollectionOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
     GetAndTouch = 'GetAndTouchOptions'
     GetAnyReplica = 'GetAnyReplicaOptions'
     Get = 'GetOptions'
+    GetReplica = 'GetReplicaOptions'
     Increment = 'IncrementOptions'
     Insert = 'InsertOptions'
     LookupInAllReplicas = 'LookupInAllReplicasOptions'

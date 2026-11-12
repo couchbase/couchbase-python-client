@@ -52,6 +52,7 @@ if TYPE_CHECKING:
                                           GetAnyReplicaOptions,
                                           GetMultiOptions,
                                           GetOptions,
+                                          GetReplicaOptions,
                                           InsertMultiOptions,
                                           InsertOptions,
                                           LookupInAllReplicasOptions,
@@ -69,6 +70,7 @@ if TYPE_CHECKING:
                                           UnlockOptions,
                                           UpsertMultiOptions,
                                           UpsertOptions)
+    from couchbase.common.replica_reads import GetReplicaStrategy
     from couchbase.common.result import (ExistsResult,
                                          GetReplicaResult,
                                          GetResult,
@@ -114,6 +116,12 @@ class CollectionInterface(Protocol):
                         key: str,
                         opts: GetAnyReplicaOptions | None = None,
                         **kwargs: Any) -> GetReplicaResult: ...
+
+    def get_replica(self,
+                    key: str,
+                    strategy: GetReplicaStrategy,
+                    opts: GetReplicaOptions | None = None,
+                    **kwargs: Any) -> GetReplicaResult: ...
 
     def get_all_replicas(self,
                          key: str,
@@ -286,6 +294,12 @@ class AsyncCollectionInterface(Protocol):
                               opts: GetAnyReplicaOptions | None = None,
                               **kwargs: Any) -> GetReplicaResult: ...
 
+    async def get_replica(self,
+                          key: str,
+                          strategy: GetReplicaStrategy,
+                          opts: GetReplicaOptions | None = None,
+                          **kwargs: Any) -> GetReplicaResult: ...
+
     async def get_all_replicas(self,
                                key: str,
                                opts: GetAllReplicasOptions | None = None,
@@ -390,6 +404,12 @@ class TxCollectionInterface(Protocol):
                                  key: str,
                                  opts: GetAnyReplicaOptions | None = None,
                                  **kwargs: Any) -> Deferred[GetReplicaResult]: ...
+
+    def get_replica_deferred(self,
+                             key: str,
+                             strategy: GetReplicaStrategy,
+                             opts: GetReplicaOptions | None = None,
+                             **kwargs: Any) -> Deferred[GetReplicaResult]: ...
 
     def get_all_replicas_deferred(self,
                                   key: str,

@@ -48,6 +48,7 @@ if TYPE_CHECKING:
                                           GetAndTouchOptionsKwargs,
                                           GetAnyReplicaOptionsKwargs,
                                           GetOptionsKwargs,
+                                          GetReplicaOptionsKwargs,
                                           InsertOptionsKwargs,
                                           LookupInAllReplicasOptionsKwargs,
                                           LookupInAnyReplicaOptionsKwargs,
@@ -64,6 +65,7 @@ if TYPE_CHECKING:
                                    GetAndTouchOptions,
                                    GetAnyReplicaOptions,
                                    GetOptions,
+                                   GetReplicaOptions,
                                    InsertOptions,
                                    LookupInAllReplicasOptions,
                                    LookupInAnyReplicaOptions,
@@ -74,6 +76,7 @@ if TYPE_CHECKING:
                                    TouchOptions,
                                    UnlockOptions,
                                    UpsertOptions)
+    from couchbase.replica_reads import GetReplicaStrategy
     from couchbase.subdocument import Spec
     from txcouchbase.scope import TxScope
 
@@ -160,6 +163,37 @@ class Collection:
                 on the server.
         """
         return self._impl.get_all_replicas_deferred(key, opts, **kwargs)
+
+    def get_replica(self,
+                    key: str,
+                    strategy: GetReplicaStrategy,
+                    opts: GetReplicaOptions | None = None,
+                    **kwargs: Unpack[GetReplicaOptionsKwargs]) -> Deferred[GetReplicaResult]:
+        """Retrieves a document from the replica the strategy selects.
+
+        Args:
+            key (str): The key for the document to retrieve.
+            strategy (:class:`~couchbase.replica_reads.GetReplicaStrategy`): Selects the replica to read, created by
+                :meth:`~couchbase.replica_reads.GetReplicaStrategy.from_index`.
+            opts (:class:`~couchbase.options.GetReplicaOptions`): Optional parameters for this operation.
+            **kwargs: keyword arguments that can be used in place or to
+                override provided :class:`~couchbase.options.GetReplicaOptions`
+
+        Returns:
+            Deferred[:class:`~couchbase.result.GetReplicaResult`]: An instance of
+            :class:`~couchbase.result.GetReplicaResult`.
+
+        Raises:
+            :class:`~couchbase.exceptions.DocumentNotFoundOnReplicaException`: If the replica does not hold the
+                document.
+            :class:`~couchbase.exceptions.ReplicaIndexOutOfBoundsException`: If the bucket has no replica at the
+                requested index, and the strategy does not wrap.
+            :class:`~couchbase.exceptions.ReplicaIndexCurrentlyUnavailableException`: If the requested replica cannot
+                be read now, and the strategy does not wrap or no other replica can be read either.
+            :class:`~couchbase.exceptions.InvalidArgumentException`: If ``strategy`` was not created by
+                :meth:`~couchbase.replica_reads.GetReplicaStrategy.from_index`.
+        """
+        return self._impl.get_replica_deferred(key, strategy, opts, **kwargs)
 
     def exists(self,
                key: str,

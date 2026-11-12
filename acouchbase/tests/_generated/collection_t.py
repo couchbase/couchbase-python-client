@@ -37,17 +37,22 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   DocumentExistsException,
                                   DocumentLockedException,
                                   DocumentNotFoundException,
+                                  DocumentNotFoundOnReplicaException,
                                   DocumentNotLockedException,
                                   DocumentUnretrievableException,
                                   InvalidArgumentException,
+                                  ReplicaIndexOutOfBoundsException,
                                   TemporaryFailException)
 from couchbase.options import (GetAllReplicasOptions,
                                GetAnyReplicaOptions,
                                GetOptions,
+                               GetReplicaOptions,
                                InsertOptions,
                                ReplaceOptions,
                                UpsertOptions)
-from couchbase.replica_reads import ReadPreference
+from couchbase.replica_reads import (GetReplicaStrategy,
+                                     ReadPreference,
+                                     ReplicaIndex)
 from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   CollectionStrategy,
                                                   build_async_environment,
@@ -96,6 +101,10 @@ class CollectionTestSuite(TopologySuite):
         'test_get_any_replica_read_preference',
         'test_get_fails',
         'test_get_options',
+        'test_get_replica',
+        'test_get_replica_fail',
+        'test_get_replica_index_out_of_bounds',
+        'test_get_replica_wrap',
         'test_get_with_expiry',
         'test_insert',
         'test_insert_document_exists',
@@ -392,6 +401,54 @@ class CollectionTestSuite(TopologySuite):
         with pytest.raises(DocumentUnretrievableException):
             await cb_env.collection.get_any_replica(
                 key, GetAnyReplicaOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
+
+    @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+    @pytest.mark.usefixtures("check_replicas_configured")
+    @pytest.mark.usefixtures("check_replicas_online")
+    async def test_get_replica(self, cb_env: AsyncTestEnvironment) -> None:
+        key, value = await cb_env.get_existing_doc()
+        strategy = GetReplicaStrategy.from_index(ReplicaIndex.FIRST)
+        opts = GetReplicaOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        result = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get_replica, key, strategy, opts)
+        assert isinstance(result, GetReplicaResult)
+        assert result.is_replica is True
+        assert value == result.content_as[dict]
+
+    @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+    @pytest.mark.usefixtures("check_replicas_configured")
+    @pytest.mark.usefixtures("check_replicas_online")
+    async def test_get_replica_fail(self, cb_env: AsyncTestEnvironment) -> None:
+        strategy = GetReplicaStrategy.from_index(ReplicaIndex.FIRST)
+        opts = GetReplicaOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        with pytest.raises(DocumentNotFoundOnReplicaException):
+            await cb_env.collection.get_replica('not-a-key', strategy, opts)
+
+    # The bucket's replica count bounds the index, so the core refuses it without a round trip.
+    @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+    @pytest.mark.usefixtures("check_replicas_online")
+    async def test_get_replica_index_out_of_bounds(self,
+                                                   cb_env: AsyncTestEnvironment,
+                                                   replica_index_past_last: ReplicaIndex) -> None:
+        key = await cb_env.get_existing_doc(key_only=True)
+        with pytest.raises(ReplicaIndexOutOfBoundsException):
+            await cb_env.collection.get_replica(key, GetReplicaStrategy.from_index(replica_index_past_last))
+
+    # An index one past the last replica wraps to the first.
+    @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+    @pytest.mark.usefixtures("check_replicas_configured")
+    @pytest.mark.usefixtures("check_replicas_online")
+    async def test_get_replica_wrap(self, cb_env: AsyncTestEnvironment, replica_index_past_last: ReplicaIndex) -> None:
+        key, value = await cb_env.get_existing_doc()
+        strategy = GetReplicaStrategy.from_index(replica_index_past_last, wrap=True)
+        opts = GetReplicaOptions(timeout=self.REPLICA_READ_TIMEOUT)
+        result = await AsyncTestEnvironment.try_n_times(10, 3, cb_env.collection.get_replica, key, strategy, opts)
+        assert isinstance(result, GetReplicaResult)
+        assert result.is_replica is True
+        assert value == result.content_as[dict]
 
     @pytest.mark.asyncio
     async def test_get_options(self, cb_env: AsyncTestEnvironment) -> None:

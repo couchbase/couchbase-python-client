@@ -49,6 +49,7 @@ __all__ = [
     'GetAnyReplicaOptions',
     'GetMultiOptions',
     'GetOptions',
+    'GetReplicaOptions',
     'IncrementMultiOptions',
     'IncrementOptions',
     'InsertMultiOptions',
@@ -138,6 +139,7 @@ from couchbase.common.options import GetAnyReplicaMultiOptions  # noqa: F401
 from couchbase.common.options import GetAnyReplicaOptions  # noqa: F401
 from couchbase.common.options import GetMultiOptions  # noqa: F401
 from couchbase.common.options import GetOptions  # noqa: F401
+from couchbase.common.options import GetReplicaOptions  # noqa: F401
 from couchbase.common.options import IncrementMultiOptions  # noqa: F401
 from couchbase.common.options import IncrementOptions  # noqa: F401
 from couchbase.common.options import InsertMultiOptions  # noqa: F401

@@ -410,6 +410,9 @@ WIRES: dict[str, WireBlock] = {
     'GetOptions': WireBlock({
         'timeout': TIMEOUT,
     }),
+    'GetReplicaOptions': WireBlock({
+        'timeout': TIMEOUT,
+    }),
     'IncrementMultiOptions': WireBlock({
         'return_exceptions': RETURN_EXCEPTIONS,
         'timeout': TIMEOUT,

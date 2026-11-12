@@ -64,6 +64,8 @@ __all__ = [
     'GetMultiOptionsKwargs',
     'GetOptions',
     'GetOptionsKwargs',
+    'GetReplicaOptions',
+    'GetReplicaOptionsKwargs',
     'IncrementMultiOptions',
     'IncrementMultiOptionsKwargs',
     'IncrementOptions',
@@ -1328,6 +1330,31 @@ class GetOptions(dict):
     def with_expiry(self) -> bool:
         """The value of the ``with_expiry`` option, or ``False`` if it was not set."""
         return self.get("with_expiry", False)
+
+
+class GetReplicaOptionsKwargs(TypedDict, total=False):
+    """The keyword arguments of :class:`~couchbase.options.GetReplicaOptions`."""
+
+    timeout: timedelta | None
+    transcoder: Transcoder | None
+    parent_span: RequestSpan | None
+
+
+class GetReplicaOptions(dict):
+    """Available options for a key-value get-replica operation.
+
+    Args:
+        timeout (timedelta, optional): The timeout for this operation. Defaults to the cluster's ``kv_timeout``, from
+            :class:`~couchbase.options.ClusterTimeoutOptions`.
+        transcoder (:class:`~couchbase.transcoder.Transcoder`, optional): Specifies an explicit transcoder to use for
+            this specific operation. Defaults to :class:`~couchbase.transcoder.JSONTranscoder`.
+        parent_span (:class:`~couchbase.observability.tracing.RequestSpan`, optional): The parent span for this
+            operation.
+    """
+
+    def __init__(self, **kwargs: Unpack[GetReplicaOptionsKwargs]) -> None:
+        provided = {k: v for k, v in kwargs.items() if v is not None}
+        super().__init__(**provided)
 
 
 class InsertOptionsKwargs(TypedDict, total=False):

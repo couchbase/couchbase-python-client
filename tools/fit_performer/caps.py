@@ -45,6 +45,7 @@ SDK_CAPS = [
     sdk_caps_pb.SDK_SEARCH_RFC_REVISION_11,
     sdk_caps_pb.SDK_VECTOR_SEARCH_BASE64,
     sdk_caps_pb.SDK_ZONE_AWARE_READ_FROM_REPLICA,
+    sdk_caps_pb.SDK_GET_REPLICA,
     sdk_caps_pb.SDK_APP_TELEMETRY,
     sdk_caps_pb.SDK_BUCKET_SETTINGS_NUM_VBUCKETS,
     sdk_caps_pb.SDK_PREFILTER_VECTOR_SEARCH,

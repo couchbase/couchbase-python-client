@@ -47,6 +47,7 @@ __all__ = [
     'DocumentExistsException',
     'DocumentLockedException',
     'DocumentNotFoundException',
+    'DocumentNotFoundOnReplicaException',
     'DocumentNotJsonException',
     'DocumentNotLockedException',
     'DocumentUnretrievableException',
@@ -103,6 +104,8 @@ __all__ = [
     'QuotaLimitedException',
     'RangeScanCompletedException',
     'RateLimitedException',
+    'ReplicaIndexCurrentlyUnavailableException',
+    'ReplicaIndexOutOfBoundsException',
     'RequestCanceledException',
     'ScopeAlreadyExistsException',
     'ScopeNotFoundException',
@@ -764,6 +767,13 @@ class DocumentNotFoundException(CouchbaseException):
     """Raised when the document an operation names does not exist."""
 
 
+class DocumentNotFoundOnReplicaException(DocumentNotFoundException):
+    """Raised when the replica ``get_replica`` read from does not hold the document.
+
+    It is a :class:`DocumentNotFoundException`, so code that handles a missing document handles this too.
+    """
+
+
 class DocumentNotJsonException(CouchbaseException):
     """Raised when a sub-document operation targets a document that is not JSON."""
 
@@ -841,6 +851,24 @@ class PathTooBigException(CouchbaseException):
 
 class RangeScanCompletedException(CouchbaseException):
     """Raised when a range scan has already returned all of its items."""
+
+
+class ReplicaIndexOutOfBoundsException(CouchbaseException):
+    """Raised when ``get_replica`` asks for a replica index the bucket does not have.
+
+    The index is at or beyond the bucket's configured number of replicas, or the bucket has none. It is
+    raised without a network round trip, and retrying cannot help. Pass ``wrap=True`` to
+    :meth:`~couchbase.replica_reads.GetReplicaStrategy.from_index` to read a different replica instead.
+    """
+
+
+class ReplicaIndexCurrentlyUnavailableException(CouchbaseException):
+    """Raised when the replica ``get_replica`` asks for exists but cannot be read now.
+
+    The cluster map does not yet place that replica on a node, typically during a rebalance, which resolves
+    it. Pass ``wrap=True`` to :meth:`~couchbase.replica_reads.GetReplicaStrategy.from_index` to read another
+    replica instead.
+    """
 
 
 class PathTooDeepException(CouchbaseException):

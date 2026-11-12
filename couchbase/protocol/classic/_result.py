@@ -70,6 +70,7 @@ if TYPE_CHECKING:
                                                                           CppGetAllReplicasResponseEntry,
                                                                           CppGetAnyReplicaResponse,
                                                                           CppGetProjectedResponse,
+                                                                          CppGetReplicaResponse,
                                                                           CppIncrementResponse,
                                                                           CppLookupInAllReplicasResponseEntry,
                                                                           CppLookupInAnyReplicaResponse,
@@ -138,6 +139,14 @@ def _get_replica_from_core(raw: CppGetAnyReplicaResponse | CppGetAllReplicasResp
                              value=raw['value'],
                              flags=raw.get('flags', 0),
                              is_replica=raw.get('replica', False))
+
+
+def _get_selected_replica_from_core(raw: CppGetReplicaResponse) -> _GetReplicaRecord:
+    """``get_replica``, which reads only the replica its strategy selects."""
+    return _GetReplicaRecord(cas=raw.get('cas', 0),
+                             value=raw['value'],
+                             flags=raw.get('flags', 0),
+                             is_replica=True)
 
 
 def _exists_from_core(raw: CppExistsResponse) -> _ExistsRecord:

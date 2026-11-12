@@ -55,6 +55,7 @@ from couchbase.options import (AppendOptions,
                                GetAndTouchOptions,
                                GetAnyReplicaOptions,
                                GetOptions,
+                               GetReplicaOptions,
                                IncrementOptions,
                                InsertOptions,
                                LookupInAllReplicasOptions,
@@ -69,7 +70,10 @@ from couchbase.options import (AppendOptions,
                                TouchOptions,
                                UnlockOptions,
                                UpsertOptions)
-from couchbase.replica_reads import ReadPreference
+from couchbase.replica_reads import (GetReplicaStrategy,
+                                     GetReplicaStrategyFromIndex,
+                                     ReadPreference,
+                                     ReplicaIndex)
 from couchbase.result import (CounterResult,
                               ExistsResult,
                               GetReplicaResult,
@@ -109,6 +113,7 @@ if TYPE_CHECKING:
     from couchbase.collection import Collection
 
     from sdk.kv import options_pb2 as kv_options_pb
+    from sdk.kv import replicas_pb2 as kv_replicas_pb
     from sdk.kv.binary import options_pb2 as kv_binary_options_pb
     from shared import collection_pb2 as collection_pb
     from shared import doc_location_pb2 as doc_location_pb
@@ -207,6 +212,7 @@ VALID_KV_COMMAND_ARGS = {
     'duration': lambda d: isinstance(d, timedelta),
     'bytes': lambda c: True,
     'span_owner': lambda s: True,
+    'strategy': lambda s: isinstance(s, GetReplicaStrategyFromIndex),
 }
 
 STORE_SEMANTICS_MAP = {
@@ -238,6 +244,15 @@ READ_PREFERENCE_MAP = {
 
 
 class KvCommandOptions(SdkCommandOptions):
+    @staticmethod
+    def get_replica_strategy(strategy: kv_replicas_pb.GetReplicaStrategy) -> GetReplicaStrategyFromIndex:
+        strategy_type = strategy.WhichOneof('strategy')
+        if strategy_type != 'from_index':
+            raise NotImplementedError(f'Replica strategy `{strategy_type}` not implemented in performer')
+        from_index = strategy.from_index
+        wrap = from_index.options.wrap if from_index.options.HasField('wrap') else False
+        return GetReplicaStrategy.from_index(ReplicaIndex(from_index.index), wrap=wrap)
+
     @staticmethod
     def get_with_expiry(options: Any) -> bool | None:
         if not options.HasField("with_expiry"):
@@ -1070,6 +1085,10 @@ class KvCommandBuilder:
         if cmd_type == 'get_any_replica':
             cmd_kwargs['content_as'] = kv_cmd.content_as
             return GetAnyReplicaCommand.create_command(**cmd_kwargs)
+        if cmd_type == 'get_replica':
+            cmd_kwargs['content_as'] = kv_cmd.content_as
+            cmd_kwargs['strategy'] = KvCommandOptions.get_replica_strategy(kv_cmd.strategy)
+            return GetReplicaCommand.create_command(**cmd_kwargs)
         if cmd_type == 'get_all_replicas':
             cmd_kwargs['content_as'] = kv_cmd.content_as
             cmd_kwargs['stream_config'] = kv_cmd.stream_config
@@ -1917,6 +1936,42 @@ class GetAnyReplicaCommand(SdkCommand):
     @staticmethod
     def create_command(**kwargs: Any) -> GetAnyReplicaCommand:
         command = GetAnyReplicaCommand(**kwargs)
+        command.set_options()
+        return command
+
+
+class GetReplicaCommand(SdkCommand):
+    def __init__(self, **kwargs: Any) -> None:
+        validate_command(VALID_KV_COMMAND_ARGS, **kwargs)
+        self._collection: Collection = kwargs['collection']
+        self._doc_id: str = kwargs['doc_id']
+        self._strategy: GetReplicaStrategyFromIndex = kwargs['strategy']
+        self._initiated = kwargs['initiated']
+        self._return_result: bool = kwargs['return_result']
+        self._raw_options: kv_options_pb.GetReplicaOptions | None = kwargs['options']
+        self._options: GetReplicaOptions | None = None
+        self._content_as: content_pb.ContentAs = kwargs['content_as']
+        self._span_owner: SpanOwner | None = kwargs['span_owner']
+
+    def set_options(self) -> None:
+        if self._raw_options is None:
+            return
+
+        opt_kwargs: dict[str, Any] = {
+            'timeout': KvCommandOptions.get_timeout(self._raw_options),
+            'transcoder': KvCommandOptions.get_transcoder(self._raw_options),
+            'parent_span': KvCommandOptions.resolve_parent_span(self._raw_options, self._span_owner),
+        }
+
+        self._options = GetReplicaOptions(**opt_kwargs)
+
+    @KvCommandResult.as_get_replica_result
+    def execute_command(self) -> GetReplicaResult:
+        return self._collection.get_replica(self._doc_id, self._strategy, self._options)
+
+    @staticmethod
+    def create_command(**kwargs: Any) -> GetReplicaCommand:
+        command = GetReplicaCommand(**kwargs)
         command.set_options()
         return command
 

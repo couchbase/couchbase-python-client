@@ -166,6 +166,7 @@ Key-value
    DocumentExistsException
    DocumentLockedException
    DocumentNotFoundException
+   DocumentNotFoundOnReplicaException
    DocumentNotLockedException
    DocumentUnretrievableException
    DurabilityImpossibleException
@@ -175,6 +176,8 @@ Key-value
    DurableWriteReCommitInProgressException
    MutationTokenOutdatedException
    RangeScanCompletedException
+   ReplicaIndexCurrentlyUnavailableException
+   ReplicaIndexOutOfBoundsException
    TemporaryFailException
    ValueTooLargeException
 
@@ -197,6 +200,9 @@ Key-value
    :members:
 
 .. autoexception:: DocumentNotFoundException
+   :members:
+
+.. autoexception:: DocumentNotFoundOnReplicaException
    :members:
 
 .. autoexception:: DocumentNotLockedException
@@ -224,6 +230,12 @@ Key-value
    :members:
 
 .. autoexception:: RangeScanCompletedException
+   :members:
+
+.. autoexception:: ReplicaIndexCurrentlyUnavailableException
+   :members:
+
+.. autoexception:: ReplicaIndexOutOfBoundsException
    :members:
 
 .. autoexception:: TemporaryFailException

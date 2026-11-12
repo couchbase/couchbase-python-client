@@ -108,6 +108,9 @@ _CODE_CASES = [
     (132, 'CannotReviveLivingDocumentException'),
     (133, 'MutationTokenOutdatedException'),
     (134, 'RangeScanCompletedException'),
+    (135, 'DocumentNotFoundOnReplicaException'),
+    (136, 'ReplicaIndexOutOfBoundsException'),
+    (137, 'ReplicaIndexCurrentlyUnavailableException'),
     (303, 'DatasetNotFoundException'),
     (304, 'DataverseNotFoundException'),
     (305, 'DatasetAlreadyExistsException'),
@@ -136,7 +139,7 @@ _STRING_TABLES = {
     'QUERY_INDEX_MGMT_ERROR_MAP': 'couchbase.protocol.classic._management._query_index_mgmt_types',
 }
 
-_CODE_TABLES = {'ERROR_MAP': 57}
+_CODE_TABLES = {'ERROR_MAP': 60}
 
 _TABLES_BY_NAME: dict[str, dict[str, type[E.CouchbaseException]]] = {
     'KV_ERROR_CONTEXT_MAPPING': EM.KV_ERROR_CONTEXT_MAPPING,
@@ -679,6 +682,22 @@ class ErrorMappingUnitTests:
         positional: tuple[Any, ...] = (None, 'a second positional argument')
         with pytest.raises(TypeError):
             E.CouchbaseException(*positional)
+
+    # The core operation get_replica runs reports a missing document as a plain not-found.
+    def test_on_replica_keeps_the_not_found_and_its_context(self) -> None:
+        context = {'context_type': 'KeyValueErrorContext', 'key': 'a-key', 'retry_attempts': 0}
+        not_found = EM.ErrorMapper.build_exception(_CoreError(err_code=101,
+                                                              category='couchbase.key_value',
+                                                              strerror='document_not_found',
+                                                              context=context))
+        assert isinstance(not_found, E.DocumentNotFoundException)
+        exc = EM.ErrorMapper.on_replica(not_found)
+        assert type(exc) is E.DocumentNotFoundOnReplicaException
+        assert isinstance(exc, E.DocumentNotFoundException)
+        assert exc.error_code == 135
+        assert exc.message == 'document not found on replica'
+        assert exc.error_context is not_found.error_context
+        assert exc.inner_cause is not_found
 
     def test_error_code_reports_the_core_error_code(self) -> None:
         exc = EM.ErrorMapper.build_exception(_CoreError(err_code=103))

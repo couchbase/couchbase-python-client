@@ -112,6 +112,7 @@ key_value:
     - document_get_and_touch.hxx
     - document_get_any_replica.hxx
     - document_get.hxx
+    - document_get_replica.hxx
     - document_get_projected.hxx
     - document_increment.hxx
     - document_lookup_in_all_replicas.hxx
@@ -122,6 +123,8 @@ key_value:
     - document_unlock.hxx
   operation_overrides:
     - op_name: get_and_touch
+      has_multi: false
+    - op_name: get_replica
       has_multi: false
     - op_name: get_all_replicas
       is_streaming_op: true
@@ -302,6 +305,9 @@ cpp_core_types:
       # hand-written py_to_cbpp_t<couchbase::node_id>.
       ignored_fields: [dispatched_to_node_id]
       skip_request: true
+    - core_struct: couchbase::core::impl::replica_selection
+      header_file: "core/impl/replica_utils.hxx"
+      py_type: ReplicaSelection
     - core_struct: couchbase::core::impl::subdoc::command
       header_file: "core/impl/subdoc/command.hxx"
       py_type: SubdocCommand

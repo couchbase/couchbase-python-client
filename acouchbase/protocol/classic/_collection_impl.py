@@ -27,6 +27,7 @@ from couchbase.common._observability import (KeyspaceDetails,
                                              ObservableRequestHandler)
 from couchbase.common._operations import Op
 from couchbase.common._streaming import AsyncRowIterator
+from couchbase.common.exceptions import DocumentNotFoundException
 from couchbase.common.result import (CounterResult,
                                      ExistsResult,
                                      GetReplicaResult,
@@ -38,11 +39,13 @@ from couchbase.common.result import (CounterResult,
 from couchbase.protocol.classic._collection_impl import decode_replicas
 from couchbase.protocol.classic._collection_req_builder import CollectionRequestBuilder
 from couchbase.protocol.classic._collection_types import CollectionDetails
+from couchbase.protocol.classic._error_mapping import ErrorMapper
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._result import (_counter_from_core,
                                                 _exists_from_core,
                                                 _get_from_core,
                                                 _get_replica_from_core,
+                                                _get_selected_replica_from_core,
                                                 _lookup_in_from_core,
                                                 _lookup_in_replica_from_core,
                                                 _mutate_in_from_core,
@@ -63,6 +66,7 @@ if TYPE_CHECKING:
                                           GetAndTouchOptions,
                                           GetAnyReplicaOptions,
                                           GetOptions,
+                                          GetReplicaOptions,
                                           IncrementOptions,
                                           InsertOptions,
                                           LookupInAllReplicasOptions,
@@ -77,6 +81,7 @@ if TYPE_CHECKING:
                                           UnlockOptions,
                                           UpsertOptions)
     from couchbase.common.protocol import CouchbaseProtocol
+    from couchbase.common.replica_reads import GetReplicaStrategy
     from couchbase.common.subdocument import Spec
     from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
     from couchbase.serializer import Serializer
@@ -174,6 +179,16 @@ class AsyncCollectionImpl:
         async with ObservableRequestHandler.create(Op.GetAnyReplica, self.observability_instruments) as obs_handler:
             req, transcoder = self._request_builder.build_get_any_replica_request(key, obs_handler, opts, **kwargs)
             return await self._get_any_replica(req, transcoder, obs_handler)
+
+    async def get_replica(self,
+                          key: str,
+                          strategy: GetReplicaStrategy,
+                          opts: GetReplicaOptions | None = None,
+                          **kwargs: Any) -> GetReplicaResult:
+        async with ObservableRequestHandler.create(Op.GetReplica, self.observability_instruments) as obs_handler:
+            req, transcoder = self._request_builder.build_get_replica_request(
+                key, strategy, obs_handler, opts, **kwargs)
+            return await self._get_replica(req, transcoder, obs_handler)
 
     async def get_all_replicas(self,
                                key: str,
@@ -424,6 +439,17 @@ class AsyncCollectionImpl:
         await self.wait_until_bucket_connected()
         ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
         return GetReplicaResult(_get_replica_from_core(ret.raw_result), transcoder=transcoder, key=req.key)
+
+    async def _get_replica(self,
+                           req: PycbcCoreKeyValueRequest,
+                           transcoder: Transcoder,
+                           obs_handler: ObservableRequestHandler | None) -> GetReplicaResult:
+        await self.wait_until_bucket_connected()
+        try:
+            ret = await self.client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+        except DocumentNotFoundException as ex:
+            raise ErrorMapper.on_replica(ex) from ex
+        return GetReplicaResult(_get_selected_replica_from_core(ret.raw_result), transcoder=transcoder, key=req.key)
 
     async def _get(self,
                    req: PycbcCoreKeyValueRequest,

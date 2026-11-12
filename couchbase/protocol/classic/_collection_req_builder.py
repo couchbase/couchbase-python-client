@@ -36,6 +36,7 @@ from couchbase.common.options import (AppendOptions,
                                       GetAndTouchOptions,
                                       GetAnyReplicaOptions,
                                       GetOptions,
+                                      GetReplicaOptions,
                                       IncrementOptions,
                                       InsertOptions,
                                       LookupInAllReplicasOptions,
@@ -50,6 +51,7 @@ from couchbase.common.options import (AppendOptions,
                                       TouchOptions,
                                       UnlockOptions,
                                       UpsertOptions)
+from couchbase.common.replica_reads import GetReplicaStrategy, GetReplicaStrategyFromIndex
 from couchbase.common.subdocument import StoreSemantics, SubDocOp
 from couchbase.constants import FMT_BYTES
 from couchbase.durability import DurabilityLevel
@@ -355,6 +357,27 @@ class CollectionRequestBuilder:
         if obs_handler:
             obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
         req = self._create_kv_request(KV_OPCODE[(Op.GetAnyReplica, False)], key, obs_handler)
+        for k, v in final_args.items():
+            if v is not None:
+                setattr(req, k, v)
+        return req, transcoder
+
+    def build_get_replica_request(self,
+                                  key: str,
+                                  strategy: GetReplicaStrategy,
+                                  obs_handler: ObservableRequestHandler | None,
+                                  opts: GetReplicaOptions | None = None,
+                                  **kwargs: object) -> tuple[PycbcCoreKeyValueRequest, Transcoder]:
+        if not isinstance(strategy, GetReplicaStrategyFromIndex):
+            raise InvalidArgumentException(message='strategy must be created by GetReplicaStrategy.from_index.')
+        final_args = forward_args(kwargs, opts, block=CollectionOptionsBlock.GetReplica,
+                                  mode=self._collection_dtls.option_validation)
+        transcoder = self._collection_dtls.get_request_transcoder(final_args)
+        parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
+        if obs_handler:
+            obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
+        req = self._create_kv_request(KV_OPCODE[(Op.GetReplica, False)], key, obs_handler)
+        req.selection = {'replica_index': int(strategy.replica_index), 'wrap': strategy.wrap}
         for k, v in final_args.items():
             if v is not None:
                 setattr(req, k, v)

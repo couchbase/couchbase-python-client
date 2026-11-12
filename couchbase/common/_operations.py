@@ -84,6 +84,7 @@ class Op(Enum):
     GetAndLock = ('get_and_lock', 'get_and_lock', OpKind.KeyValue, ServiceType.KeyValue)
     GetAndTouch = ('get_and_touch', 'get_and_touch', OpKind.KeyValue, ServiceType.KeyValue)
     GetAnyReplica = ('get_any_replica', 'get_any_replica', OpKind.KeyValue, ServiceType.KeyValue)
+    GetReplica = ('get_replica', 'get_replica', OpKind.KeyValue, ServiceType.KeyValue)
     Increment = ('increment', 'increment', OpKind.KeyValue, ServiceType.KeyValue)
     Insert = ('insert', 'insert', OpKind.KeyValue, ServiceType.KeyValue)
     LookupIn = ('lookup_in', 'lookup_in', OpKind.KeyValue, ServiceType.KeyValue)

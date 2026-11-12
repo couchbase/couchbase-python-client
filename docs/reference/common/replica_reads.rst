@@ -6,6 +6,16 @@ Replica reads
 
 .. module:: couchbase.replica_reads
 
+.. autoclass:: GetReplicaStrategy
+   :members:
+
+.. autoclass:: GetReplicaStrategyFromIndex
+   :members:
+
 .. autoclass:: ReadPreference
+   :members:
+   :undoc-members:
+
+.. autoclass:: ReplicaIndex
    :members:
    :undoc-members:

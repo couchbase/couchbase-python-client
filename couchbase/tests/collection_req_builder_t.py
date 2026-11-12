@@ -39,6 +39,7 @@ from couchbase.options import (AppendMultiOptions,
                                DecrementOptions,
                                GetMultiOptions,
                                GetOptions,
+                               GetReplicaOptions,
                                IncrementMultiOptions,
                                IncrementOptions,
                                InsertMultiOptions,
@@ -57,12 +58,14 @@ from couchbase.options import (AppendMultiOptions,
                                UnlockOptions,
                                UpsertMultiOptions,
                                UpsertOptions)
+from couchbase.protocol.classic._bindings import KeyValueBinding
 from couchbase.protocol.classic._collection_multi_req_builder import CollectionMultiRequestBuilder
 from couchbase.protocol.classic._collection_req_builder import CollectionRequestBuilder
 from couchbase.protocol.classic._collection_types import CollectionDetails
 from couchbase.protocol.classic._pycbc_core import pycbc_connection
 from couchbase.protocol.classic._pycbc_core import pycbc_kv_request as PycbcCoreKeyValueRequest
 from couchbase.protocol.classic._range_scan import RangeScanStream
+from couchbase.replica_reads import GetReplicaStrategy, ReplicaIndex
 from couchbase.result import MutationToken
 from couchbase.serializer import DefaultJsonSerializer
 from couchbase.transcoder import (JSONTranscoder,
@@ -436,3 +439,40 @@ class SubdocRequestBuilderUnitTests:
 
         assert type(default) is DefaultJsonSerializer
         assert chosen is serializer
+
+
+class GetReplicaRequestBuilderUnitTests:
+
+    def test_the_strategy_is_sent_as_the_selection(self) -> None:
+        strategy = GetReplicaStrategy.from_index(ReplicaIndex.SECOND, wrap=True)
+        req, _ = _request_builder().build_get_replica_request('k', strategy, None,
+                                                              GetReplicaOptions(timeout=timedelta(seconds=3)))
+
+        assert req.opcode == KeyValueBinding.GetReplica
+        assert req.selection == {'replica_index': 1, 'wrap': True}
+        assert req.timeout == 3000
+
+    def test_a_strategy_not_from_from_index_is_refused(self) -> None:
+        with pytest.raises(InvalidArgumentException):
+            _request_builder().build_get_replica_request('k', GetReplicaStrategy(), None)
+
+    def test_from_index_does_not_wrap_by_default(self) -> None:
+        strategy = GetReplicaStrategy.from_index(ReplicaIndex.THIRD)
+        assert strategy.replica_index is ReplicaIndex.THIRD
+        assert strategy.wrap is False
+        assert repr(strategy) == 'GetReplicaStrategyFromIndex(replica_index=ReplicaIndex.THIRD, wrap=False)'
+
+    @pytest.mark.parametrize('replica_index, wrap', [
+        (0, False),
+        (1, False),
+        (3, False),
+        (-1, False),
+        (True, False),
+        (1.0, False),
+        ('1', False),
+        (ReplicaIndex.FIRST, 'yes'),
+        (ReplicaIndex.FIRST, 1),
+    ])
+    def test_from_index_refuses_what_it_cannot_send(self, replica_index: Any, wrap: Any) -> None:
+        with pytest.raises(InvalidArgumentException):
+            GetReplicaStrategy.from_index(replica_index, wrap=wrap)

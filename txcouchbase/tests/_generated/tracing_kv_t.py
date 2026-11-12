@@ -30,6 +30,7 @@ from couchbase.common._operations import Op
 from couchbase.durability import DurabilityLevel, ServerDurability
 from couchbase.exceptions import (DocumentExistsException,
                                   DocumentNotFoundException,
+                                  DocumentNotFoundOnReplicaException,
                                   DocumentUnretrievableException,
                                   InvalidArgumentException)
 from couchbase.options import (ExistsOptions,
@@ -38,6 +39,7 @@ from couchbase.options import (ExistsOptions,
                                GetAndTouchOptions,
                                GetAnyReplicaOptions,
                                GetOptions,
+                               GetReplicaOptions,
                                InsertOptions,
                                LookupInAllReplicasOptions,
                                LookupInAnyReplicaOptions,
@@ -48,6 +50,7 @@ from couchbase.options import (ExistsOptions,
                                TouchOptions,
                                UnlockOptions,
                                UpsertOptions)
+from couchbase.replica_reads import GetReplicaStrategy, ReplicaIndex
 from couchbase.transcoder import Transcoder
 from tests.environments.managers import TwistedTestEnvironmentBucketManager
 from tests.environments.test_environment import TestProtocol
@@ -168,6 +171,9 @@ class KeyValueTracingTestSuite(TopologySuite):
         'test_get_any_replica',
         'test_get_any_replica_missing_key',
         'test_get_any_replica_with_parent',
+        'test_get_replica',
+        'test_get_replica_missing_key',
+        'test_get_replica_with_parent',
         'test_get_invalid_project',
         'test_get_missing_key',
         'test_get_with_parent',
@@ -274,6 +280,13 @@ class KeyValueTracingTestSuite(TopologySuite):
         kv_validator.validate_kv_op(Op.GetAnyReplica,
                                     nested_ops=REPLICA_READ_OPS,
                                     server_duration_gt_zero=False)
+
+    @pytest.mark.usefixtures('check_replicas_configured')
+    @pytest.mark.usefixtures('check_replicas_online')
+    def test_get_replica(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        run_in_reactor_thread(cb_env.collection.get_replica, key, GetReplicaStrategy.from_index(ReplicaIndex.FIRST))
+        kv_validator.validate_kv_op(Op.GetReplica)
 
     def test_get_and_lock(self, cb_env: TwistedTestEnvironment, kv_validator: KeyValueSpanValidator) -> None:
         key = cb_env.get_existing_doc(key_only=True)
@@ -442,6 +455,15 @@ class KeyValueTracingTestSuite(TopologySuite):
                                     nested_ops=REPLICA_READ_OPS,
                                     validate_error=True,
                                     server_duration_gt_zero=False)
+
+    @pytest.mark.usefixtures('check_replicas_configured')
+    @pytest.mark.usefixtures('check_replicas_online')
+    def test_get_replica_missing_key(self, cb_env: TwistedTestEnvironment,
+                                     kv_validator: KeyValueSpanValidator) -> None:
+        strategy = GetReplicaStrategy.from_index(ReplicaIndex.FIRST)
+        with pytest.raises(DocumentNotFoundOnReplicaException):
+            run_in_reactor_thread(cb_env.collection.get_replica, TwistedTestEnvironment.NOT_A_KEY, strategy)
+        kv_validator.validate_kv_op(Op.GetReplica, validate_error=True)
 
     def test_get_and_lock_missing_key(self, cb_env: TwistedTestEnvironment,
                                       kv_validator: KeyValueSpanValidator) -> None:
@@ -646,6 +668,17 @@ class KeyValueTracingTestSuite(TopologySuite):
                                     parent_span=parent,
                                     nested_ops=REPLICA_READ_OPS,
                                     server_duration_gt_zero=False)
+
+    @pytest.mark.usefixtures('check_replicas_configured')
+    @pytest.mark.usefixtures('check_replicas_online')
+    def test_get_replica_with_parent(self, cb_env: TwistedTestEnvironment,
+                                     kv_validator: KeyValueSpanValidator) -> None:
+        key = cb_env.get_existing_doc(key_only=True)
+        parent = kv_validator.new_parent_span(Op.GetReplica)
+        run_in_reactor_thread(cb_env.collection.get_replica, key,
+                              GetReplicaStrategy.from_index(ReplicaIndex.FIRST),
+                              GetReplicaOptions(parent_span=parent))
+        kv_validator.validate_kv_op(Op.GetReplica, parent_span=parent)
 
     def test_get_and_lock_with_parent(self, cb_env: TwistedTestEnvironment,
                                       kv_validator: KeyValueSpanValidator) -> None:

@@ -51,6 +51,7 @@ __all__ = [
     'DocumentExistsException',
     'DocumentLockedException',
     'DocumentNotFoundException',
+    'DocumentNotFoundOnReplicaException',
     'DocumentNotJsonException',
     'DocumentNotLockedException',
     'DocumentUnretrievableException',
@@ -107,6 +108,8 @@ __all__ = [
     'QuotaLimitedException',
     'RangeScanCompletedException',
     'RateLimitedException',
+    'ReplicaIndexCurrentlyUnavailableException',
+    'ReplicaIndexOutOfBoundsException',
     'RequestCanceledException',
     'ScopeAlreadyExistsException',
     'ScopeNotFoundException',
@@ -171,6 +174,7 @@ from couchbase.common.exceptions import DesignDocumentNotFoundException  # noqa:
 from couchbase.common.exceptions import DocumentExistsException  # noqa: F401
 from couchbase.common.exceptions import DocumentLockedException  # noqa: F401
 from couchbase.common.exceptions import DocumentNotFoundException  # noqa: F401
+from couchbase.common.exceptions import DocumentNotFoundOnReplicaException  # noqa: F401
 from couchbase.common.exceptions import DocumentNotJsonException  # noqa: F401
 from couchbase.common.exceptions import DocumentNotLockedException  # noqa: F401
 from couchbase.common.exceptions import DocumentUnretrievableException  # noqa: F401
@@ -227,6 +231,8 @@ from couchbase.common.exceptions import QueueEmpty  # noqa: F401
 from couchbase.common.exceptions import QuotaLimitedException  # noqa: F401
 from couchbase.common.exceptions import RangeScanCompletedException  # noqa: F401
 from couchbase.common.exceptions import RateLimitedException  # noqa: F401
+from couchbase.common.exceptions import ReplicaIndexCurrentlyUnavailableException  # noqa: F401
+from couchbase.common.exceptions import ReplicaIndexOutOfBoundsException  # noqa: F401
 from couchbase.common.exceptions import RequestCanceledException  # noqa: F401
 from couchbase.common.exceptions import ScopeAlreadyExistsException  # noqa: F401
 from couchbase.common.exceptions import ScopeNotFoundException  # noqa: F401

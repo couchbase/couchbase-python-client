@@ -45,6 +45,7 @@ groups:
       GetAndLock: {}
       GetAndTouch: {}
       GetAnyReplica: {}
+      GetReplica: {}
       Increment: {}
       Insert: {}
       LookupIn: {}

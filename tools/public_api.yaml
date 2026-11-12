@@ -163,6 +163,7 @@ modules:
       - DocumentExistsException
       - DocumentLockedException
       - DocumentNotFoundException
+      - DocumentNotFoundOnReplicaException
       - DocumentNotJsonException
       - DocumentNotLockedException
       - DocumentUnretrievableException
@@ -219,6 +220,8 @@ modules:
       - QuotaLimitedException
       - RangeScanCompletedException
       - RateLimitedException
+      - ReplicaIndexCurrentlyUnavailableException
+      - ReplicaIndexOutOfBoundsException
       - RequestCanceledException
       - ScopeAlreadyExistsException
       - ScopeNotFoundException
@@ -513,6 +516,7 @@ modules:
       - GetAnyReplicaOptions
       - GetMultiOptions
       - GetOptions
+      - GetReplicaOptions
       - IncrementMultiOptions
       - IncrementOptions
       - InsertMultiOptions
@@ -579,7 +583,10 @@ modules:
     compat: {}
   acouchbase.replica_reads:
     public:
+      - GetReplicaStrategy
+      - GetReplicaStrategyFromIndex
       - ReadPreference
+      - ReplicaIndex
     compat: {}
   acouchbase.result:
     docs: true
@@ -996,6 +1003,7 @@ modules:
       - DocumentExistsException
       - DocumentLockedException
       - DocumentNotFoundException
+      - DocumentNotFoundOnReplicaException
       - DocumentNotJsonException
       - DocumentNotLockedException
       - DocumentUnretrievableException
@@ -1052,6 +1060,8 @@ modules:
       - QuotaLimitedException
       - RangeScanCompletedException
       - RateLimitedException
+      - ReplicaIndexCurrentlyUnavailableException
+      - ReplicaIndexOutOfBoundsException
       - RequestCanceledException
       - ScopeAlreadyExistsException
       - ScopeNotFoundException
@@ -1431,6 +1441,8 @@ modules:
       - GetMultiOptionsKwargs
       - GetOptions
       - GetOptionsKwargs
+      - GetReplicaOptions
+      - GetReplicaOptionsKwargs
       - IncrementMultiOptions
       - IncrementMultiOptionsKwargs
       - IncrementOptions
@@ -1523,7 +1535,10 @@ modules:
     compat: {}
   couchbase.common.replica_reads:
     public:
+      - GetReplicaStrategy
+      - GetReplicaStrategyFromIndex
       - ReadPreference
+      - ReplicaIndex
     compat: {}
   couchbase.common.result:
     public:
@@ -1815,6 +1830,7 @@ modules:
       - DocumentExistsException
       - DocumentLockedException
       - DocumentNotFoundException
+      - DocumentNotFoundOnReplicaException
       - DocumentNotJsonException
       - DocumentNotLockedException
       - DocumentUnretrievableException
@@ -1871,6 +1887,8 @@ modules:
       - QuotaLimitedException
       - RangeScanCompletedException
       - RateLimitedException
+      - ReplicaIndexCurrentlyUnavailableException
+      - ReplicaIndexOutOfBoundsException
       - RequestCanceledException
       - ScopeAlreadyExistsException
       - ScopeNotFoundException
@@ -2179,6 +2197,7 @@ modules:
       - GetAnyReplicaOptions
       - GetMultiOptions
       - GetOptions
+      - GetReplicaOptions
       - IncrementMultiOptions
       - IncrementOptions
       - InsertMultiOptions
@@ -2253,7 +2272,10 @@ modules:
   couchbase.replica_reads:
     docs: true
     public:
+      - GetReplicaStrategy
+      - GetReplicaStrategyFromIndex
       - ReadPreference
+      - ReplicaIndex
     compat: {}
   couchbase.result:
     docs: true
@@ -2630,6 +2652,7 @@ modules:
       - DocumentExistsException
       - DocumentLockedException
       - DocumentNotFoundException
+      - DocumentNotFoundOnReplicaException
       - DocumentNotJsonException
       - DocumentNotLockedException
       - DocumentUnretrievableException
@@ -2686,6 +2709,8 @@ modules:
       - QuotaLimitedException
       - RangeScanCompletedException
       - RateLimitedException
+      - ReplicaIndexCurrentlyUnavailableException
+      - ReplicaIndexOutOfBoundsException
       - RequestCanceledException
       - ScopeAlreadyExistsException
       - ScopeNotFoundException
@@ -2944,6 +2969,7 @@ modules:
       - GetAnyReplicaOptions
       - GetMultiOptions
       - GetOptions
+      - GetReplicaOptions
       - IncrementMultiOptions
       - IncrementOptions
       - InsertMultiOptions
@@ -3010,7 +3036,10 @@ modules:
     compat: {}
   txcouchbase.replica_reads:
     public:
+      - GetReplicaStrategy
+      - GetReplicaStrategyFromIndex
       - ReadPreference
+      - ReplicaIndex
     compat: {}
   txcouchbase.result:
     public:

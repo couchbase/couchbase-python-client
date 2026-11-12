@@ -51,7 +51,9 @@ from couchbase.protocol.classic._collection_multi_req_builder import CollectionM
 from couchbase.protocol.classic._collection_req_builder import CollectionRequestBuilder
 from couchbase.protocol.classic._collection_types import CollectionDetails, CollectionOptionsBlock
 from couchbase.protocol.classic._pycbc_core import pycbc_kv_request
-from couchbase.replica_reads import ReadPreference
+from couchbase.replica_reads import (GetReplicaStrategy,
+                                     ReadPreference,
+                                     ReplicaIndex)
 from couchbase.result import MutationToken
 from couchbase.serializer import DefaultJsonSerializer
 from couchbase.subdocument import StoreSemantics
@@ -159,6 +161,8 @@ BUILDS: dict[str, Callable[[CollectionRequestBuilder, CollectionMultiRequestBuil
     'GetAndTouchOptions': lambda b, m, o, h, a: b.build_get_and_touch_request(_KEY, a, h, o),
     'GetAnyReplicaOptions': lambda b, m, o, h, a: b.build_get_any_replica_request(_KEY, h, o),
     'GetOptions': lambda b, m, o, h, a: b.build_get_request(_KEY, h, o),
+    'GetReplicaOptions': lambda b, m, o, h, a: b.build_get_replica_request(
+        _KEY, GetReplicaStrategy.from_index(ReplicaIndex.FIRST), h, o),
     'IncrementOptions': lambda b, m, o, h, a: b.build_increment_request(_KEY, h, o),
     'InsertOptions': lambda b, m, o, h, a: b.build_insert_request(_KEY, _DOC, h, o),
     'LookupInAllReplicasOptions': lambda b, m, o, h, a: b.build_lookup_in_all_replicas_request(_KEY, _LOOKUP, h, o),

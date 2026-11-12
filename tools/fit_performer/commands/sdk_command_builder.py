@@ -131,7 +131,7 @@ class SdkCommandBuilder:
                     collection_cmd.query_index_manager, **cmd_kwargs)
             if collection_cmd_type in ['lookup_in', 'lookup_in_any_replica', 'lookup_in_all_replicas', 'binary',
                                        'get_and_touch', 'touch', 'get_and_lock', 'unlock', 'get_any_replica',
-                                       'get_all_replicas', 'exists', 'mutate_in']:
+                                       'get_all_replicas', 'get_replica', 'exists', 'mutate_in']:
                 return KvCommandBuilder.build_command(
                     cluster, getattr(collection_cmd, collection_cmd_type),
                     collection_cmd_type, counters, **cmd_kwargs)

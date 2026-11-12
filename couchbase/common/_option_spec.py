@@ -428,6 +428,9 @@ BLOCKS: dict[str, BlockSpec] = {
     'GetOptions': block(
         PROJECT, WITH_EXPIRY, TIMEOUT, TRANSCODER, PARENT_SPAN, SPAN,
     ),
+    'GetReplicaOptions': block(
+        TIMEOUT, TRANSCODER, PARENT_SPAN,
+    ),
     'IncrementMultiOptions': block(
         DELTA, INITIAL, PER_KEY_OPTIONS, RETURN_EXCEPTIONS, TIMEOUT, DURABILITY, PARENT_SPAN,
         refuses_unknown=True,

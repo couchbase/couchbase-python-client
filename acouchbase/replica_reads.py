@@ -20,7 +20,13 @@ package.
 """
 
 __all__ = [
+    'GetReplicaStrategy',
+    'GetReplicaStrategyFromIndex',
     'ReadPreference',
+    'ReplicaIndex',
 ]
 
+from couchbase.common.replica_reads import GetReplicaStrategy  # noqa: F401
+from couchbase.common.replica_reads import GetReplicaStrategyFromIndex  # noqa: F401
 from couchbase.common.replica_reads import ReadPreference  # noqa: F401
+from couchbase.common.replica_reads import ReplicaIndex  # noqa: F401

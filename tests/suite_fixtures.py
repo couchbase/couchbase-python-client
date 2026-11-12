@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import pytest
 
+from couchbase.replica_reads import ReplicaIndex
 from tests.environments.test_environment import SuiteRequirements, TestEnvironment
 from tests.mock_server import MockServerType
 from tests.skips import (env_degraded,
@@ -105,6 +106,15 @@ class TopologySuite(SuiteRequirements):
                          server=server_label(cb_env.is_mock_server),
                          note='num_replicas needs TestEnvironmentBucketManager in MANAGERS')
         return replicas
+
+    @pytest.fixture(scope='class')
+    def replica_index_past_last(self, num_replicas: int) -> ReplicaIndex:
+        """The replica index one past the test bucket's last replica."""
+        if num_replicas >= len(ReplicaIndex):
+            skip_topology(replicas=num_replicas,
+                          required_replicas=f'<{len(ReplicaIndex)}',
+                          note='every ReplicaIndex names a configured replica')
+        return ReplicaIndex(num_replicas)
 
     @pytest.fixture(scope='class')
     def check_multi_node(self, num_nodes: int) -> None:

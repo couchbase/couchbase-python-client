@@ -28,7 +28,9 @@ from couchbase.common._observability import (KeyspaceDetails,
                                              ObservableRequestHandler)
 from couchbase.common._operations import Op
 from couchbase.common._streaming import RowIterator
-from couchbase.common.exceptions import CouchbaseException, InvalidArgumentException
+from couchbase.common.exceptions import (CouchbaseException,
+                                         DocumentNotFoundException,
+                                         InvalidArgumentException)
 from couchbase.common.result import (CounterResult,
                                      ExistsResult,
                                      GetReplicaResult,
@@ -56,6 +58,7 @@ from couchbase.protocol.classic._result import (_counter_from_core,
                                                 _exists_from_core,
                                                 _get_from_core,
                                                 _get_replica_from_core,
+                                                _get_selected_replica_from_core,
                                                 _lookup_in_from_core,
                                                 _lookup_in_replica_from_core,
                                                 _mutate_in_from_core,
@@ -84,6 +87,7 @@ if TYPE_CHECKING:
                                           GetAnyReplicaOptions,
                                           GetMultiOptions,
                                           GetOptions,
+                                          GetReplicaOptions,
                                           IncrementMultiOptions,
                                           IncrementOptions,
                                           InsertMultiOptions,
@@ -106,6 +110,7 @@ if TYPE_CHECKING:
                                           UpsertMultiOptions,
                                           UpsertOptions)
     from couchbase.common.protocol import CouchbaseProtocol
+    from couchbase.common.replica_reads import GetReplicaStrategy
     from couchbase.common.result import MultiResultType
     from couchbase.common.subdocument import Spec
     from couchbase.protocol.classic._client_adapter import ClientAdapter
@@ -249,6 +254,20 @@ class CollectionImpl:
             req, transcoder = self._request_builder.build_get_any_replica_request(key, obs_handler, opts, **kwargs)
             ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
             return GetReplicaResult(_get_replica_from_core(ret.raw_result), transcoder=transcoder, key=req.key)
+
+    def get_replica(self,
+                    key: str,
+                    strategy: GetReplicaStrategy,
+                    opts: GetReplicaOptions | None = None,
+                    **kwargs: Any) -> GetReplicaResult:
+        with ObservableRequestHandler.create(Op.GetReplica, self.observability_instruments) as obs_handler:
+            req, transcoder = self._request_builder.build_get_replica_request(
+                key, strategy, obs_handler, opts, **kwargs)
+            try:
+                ret = self._client_adapter.execute_collection_request(req.opcode, req, obs_handler=obs_handler)
+            except DocumentNotFoundException as ex:
+                raise ErrorMapper.on_replica(ex) from ex
+            return GetReplicaResult(_get_selected_replica_from_core(ret.raw_result), transcoder=transcoder, key=req.key)
 
     def get_all_replicas(self,
                          key: str,

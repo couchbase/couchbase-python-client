@@ -38,6 +38,7 @@ if TYPE_CHECKING:
                                           GetAndTouchOptions,
                                           GetAnyReplicaOptions,
                                           GetOptions,
+                                          GetReplicaOptions,
                                           IncrementOptions,
                                           InsertOptions,
                                           LookupInAllReplicasOptions,
@@ -50,6 +51,7 @@ if TYPE_CHECKING:
                                           TouchOptions,
                                           UnlockOptions,
                                           UpsertOptions)
+    from couchbase.common.replica_reads import GetReplicaStrategy
     from couchbase.common.result import (CounterResult,
                                          ExistsResult,
                                          GetReplicaResult,
@@ -88,6 +90,20 @@ class TxCollectionImpl(AsyncCollectionImpl):
         def start() -> Coroutine[Any, Any, GetReplicaResult]:
             req, transcoder = self._request_builder.build_get_any_replica_request(key, obs_handler, opts, **kwargs)
             return self._get_any_replica(req, transcoder, obs_handler)
+
+        return defer(self.loop, obs_handler, start)
+
+    def get_replica_deferred(self,
+                             key: str,
+                             strategy: GetReplicaStrategy,
+                             opts: GetReplicaOptions | None = None,
+                             **kwargs: Any) -> Deferred[GetReplicaResult]:
+        obs_handler = ObservableRequestHandler.create_or_none(Op.GetReplica, self.observability_instruments)
+
+        def start() -> Coroutine[Any, Any, GetReplicaResult]:
+            req, transcoder = self._request_builder.build_get_replica_request(
+                key, strategy, obs_handler, opts, **kwargs)
+            return self._get_replica(req, transcoder, obs_handler)
 
         return defer(self.loop, obs_handler, start)
 
