@@ -86,6 +86,5 @@ async def run():
     print(f'after txns, we have {results}')
 
 
-loop = asyncio.get_event_loop()
-loop.run_until_complete(run())
+asyncio.run(run())
 print('done')

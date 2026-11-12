@@ -21,7 +21,6 @@ from typing import List
 from uuid import uuid4
 
 import acouchbase.search as search
-from acouchbase import get_event_loop
 from acouchbase.auth import PasswordAuthenticator
 from acouchbase.cluster import AsyncCluster
 from acouchbase.collection import AsyncCollection
@@ -174,5 +173,4 @@ async def main():
 
 
 if __name__ == '__main__':
-    loop = get_event_loop()
-    loop.run_until_complete(main())
+    asyncio.run(main())

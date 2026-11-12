@@ -23,100 +23,79 @@ __all__ = [
 ]
 
 import asyncio
-import selectors
-from typing import (TYPE_CHECKING,
-                    Any,
-                    TypeGuard)
+import sys
+from typing import TYPE_CHECKING, Any
 
 from couchbase.common._logging import configure_logging, enable_protocol_logger_to_save_network_traffic_to_file
+from couchbase.common._supportability import Supportability
 
 
-class LoopValidator:
-    REQUIRED_METHODS = {'add_reader', 'remove_reader',
-                        'add_writer', 'remove_writer'}
+def _current_event_loop() -> asyncio.AbstractEventLoop | None:
+    """The thread's current loop, or None.  Unlike ``asyncio.get_event_loop()``, never creates one."""
+    if sys.version_info < (3, 14):
+        # Before 3.14 the default policy creates and installs a loop when the main thread has none,
+        # and 3.12 and 3.13 warn as they do it.  Ask the policy's thread state first, so the SDK
+        # never owns a loop it did not mean to create.  A policy without that state is asked
+        # directly.
+        local = getattr(asyncio.get_event_loop_policy(), '_local', None)
+        if local is not None and getattr(local, '_loop', None) is None and not getattr(local, '_set_called', True):
+            return None
+    try:
+        return asyncio.get_event_loop()
+    except RuntimeError:
+        return None
 
-    @staticmethod
-    def _get_working_loop() -> asyncio.AbstractEventLoop:
-        try:
-            # A running loop belongs to the caller.  Never validate, close or replace it; closing
-            # is only ever safe for a loop this class created.
-            return asyncio.get_running_loop()
-        except RuntimeError:
-            # Nothing is running in this thread, so fall through and resolve one.
-            pass  # nosec
 
-        try:
-            # Python <= 3.13: Returns existing or auto-creates a new loop.
-            # Python 3.14+: Returns existing or raises RuntimeError.
-            evloop = asyncio.get_event_loop()
-        except RuntimeError:
-            # No event loop exists in the current thread.
-            evloop = None
-
-        if LoopValidator._is_valid_loop(evloop):
-            return evloop
-
-        # Only attempt to close the loop if it actually exists
-        if evloop is not None and not evloop.is_closed():
-            evloop.close()
-
-        selector = selectors.SelectSelector()
-        new_loop = asyncio.SelectorEventLoop(selector)
-        asyncio.set_event_loop(new_loop)
-        return new_loop
-
-    @staticmethod
-    def _is_valid_loop(evloop: asyncio.AbstractEventLoop | None) -> TypeGuard[asyncio.AbstractEventLoop]:
-        if not evloop:
-            return False
-        for meth in LoopValidator.REQUIRED_METHODS:
-            abs_meth, actual_meth = (
-                getattr(asyncio.AbstractEventLoop, meth), getattr(evloop.__class__, meth))
-            if abs_meth == actual_meth:
-                return False
-        return True
-
-    @staticmethod
-    def get_event_loop(evloop: asyncio.AbstractEventLoop | None) -> asyncio.AbstractEventLoop:
-        if LoopValidator._is_valid_loop(evloop):
-            return evloop
-        return LoopValidator._get_working_loop()
-
-    @staticmethod
-    def close_loop() -> None:
-        try:
-            evloop = asyncio.get_event_loop()
-            if not evloop.is_closed():
-                evloop.close()
-        except RuntimeError:
-            # If there is no loop to get, there is no loop to close.
-            pass  # nosec
+def _get_event_loop(loop: asyncio.AbstractEventLoop | None = None) -> asyncio.AbstractEventLoop:
+    """**INTERNAL** :func:`get_event_loop` without the deprecation warning."""
+    if loop is not None:
+        return loop
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        # Nothing is running in this thread, so fall through to the current loop.
+        pass  # nosec
+    current = _current_event_loop()
+    if current is not None:
+        return current
+    new_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(new_loop)
+    return new_loop
 
 
 def couchbase_loop_factory() -> asyncio.AbstractEventLoop:
-    """Dumb factory that simply builds a SelectorEventLoop.
+    """Build a new event loop.
+
+    .. deprecated:: 4.7.0
+        acouchbase runs on any event loop.  Use :func:`asyncio.new_event_loop`, or let
+        :func:`asyncio.run` create the loop.
 
     Returns:
-        A SelectorEventLoop instance.
+        A new event loop of the platform's default type.  It is not set as the thread's current loop.
     """
-    selector = selectors.SelectSelector()
-    return asyncio.SelectorEventLoop(selector)
+    Supportability.method_deprecated('couchbase_loop_factory', 'asyncio.new_event_loop')
+    return asyncio.new_event_loop()
 
 
 def get_event_loop(evloop: asyncio.AbstractEventLoop | None = None) -> asyncio.AbstractEventLoop:
-    """Get an event loop compatible with acouchbase.
+    """Get an event loop for acouchbase.
 
-    Some Event loops, such as ProactorEventLoop (the default asyncio event loop for Python 3.8 on Windows)
-    are not compatible with acouchbase as they don't implement all members in the abstract base class.
+    .. deprecated:: 4.7.0
+        acouchbase runs on any event loop.  Run the application with :func:`asyncio.run`, and use
+        :func:`asyncio.get_running_loop` inside it where a loop is needed.
+
+    Resolves, in order: ``evloop`` when given, the running loop, the thread's current loop, and
+    otherwise a new loop of the platform's default type, which is set as the thread's current loop.
+    No loop is checked, closed or replaced.
 
     Args:
-        evloop (asyncio.AbstractEventLoop, optional): An optional event loop to validate. If not provided, the default
-            event loop will be used.
+        evloop (asyncio.AbstractEventLoop, optional): A loop to return as is.
 
     Returns:
-        The preferred event loop, if compatible, otherwise, a compatible alternative event loop.
+        The resolved event loop.
     """
-    return LoopValidator.get_event_loop(evloop)
+    Supportability.method_deprecated('get_event_loop', 'asyncio.run or asyncio.get_running_loop')
+    return _get_event_loop(evloop)
 
 
 if TYPE_CHECKING:

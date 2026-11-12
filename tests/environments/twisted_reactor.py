@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
+from importlib import import_module
 from typing import Any, ClassVar
 
 
@@ -81,37 +82,16 @@ def _run_reactor(reactor: Any) -> None:
 
 
 def init_reactor() -> None:
-    from twisted.internet import asyncioreactor
-    from twisted.internet.error import ReactorAlreadyInstalledError
-
-    from acouchbase import get_event_loop
-    try:
-        asyncioreactor.install(get_event_loop())
-    except ReactorAlreadyInstalledError:
-        # Expected on every run, not a warning.  `txcouchbase/__init__.py` installs the
-        # asyncioreactor over `get_event_loop()` at import time, and this tree imports
-        # txcouchbase long before pytest_configure gets here, so the install this function
-        # asks for has already happened with the same arguments.  Swallowing it silently
-        # loses nothing: the checks below report the case that is worth reporting, which is a
-        # reactor that is not the one wanted.
-        pass
-    finally:
-        import twisted.internet.reactor  # noqa: F401 (side-effect: sets reactor)
-
-    import twisted.internet.reactor as _reactor
-    TwistedObjects._REACTOR = _reactor
+    # Importing txcouchbase installs the asyncio reactor on the loop it resolves, and must come
+    # first: importing the reactor module before any install installs Twisted's default reactor.
+    import txcouchbase  # noqa: F401
+    TwistedObjects._REACTOR = import_module('twisted.internet.reactor')
 
     if not hasattr(TwistedObjects._REACTOR, '_asyncioEventloop'):
         raise RuntimeError(
             f'Reactor installed is not the asyncioreactor, it is '
             f'{type(TwistedObjects._REACTOR).__name__}.'
         )
-    # Not the same check.  Having *an* asyncio reactor is not the same as having one driving
-    # the loop acouchbase hands out, and a mismatch is silent: every Deferred resolves on a
-    # loop nothing here ever runs, so the suite hangs rather than failing.
-    if TwistedObjects._REACTOR._asyncioEventloop is not get_event_loop():
-        raise RuntimeError('The installed asyncioreactor is running a different event loop '
-                           'than acouchbase.get_event_loop() returns.')
 
     TwistedObjects._TWISTED_THREAD = threading.Thread(
         target=lambda: _run_reactor(TwistedObjects._REACTOR),

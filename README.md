@@ -379,7 +379,9 @@ The Python Couchbase SDK supports asynchronous I/O through the use of the asynci
 To use asyncio, import ```acouchbase.cluster``` instead of ```couchbase.cluster```.  The ```acouchbase``` API offers an API similar to the ```couchbase``` API.
 
 ```python
-from acouchbase.cluster import Cluster, get_event_loop
+import asyncio
+
+from acouchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
 from couchbase.auth import PasswordAuthenticator
 
@@ -394,8 +396,7 @@ async def write_and_read(key, value):
     result = await cb_coll.get(key)
     return result
 
-loop = get_event_loop()
-rv = loop.run_until_complete(write_and_read('foo', 'bar'))
+rv = asyncio.run(write_and_read('foo', 'bar'))
 print(rv.content_as[str])
 ```
 ### Twisted

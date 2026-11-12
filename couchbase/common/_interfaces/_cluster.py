@@ -145,7 +145,11 @@ class ClusterInterface(Protocol):
 
 
 class AsyncClusterInterface(Protocol):
-    def __init__(self, connstr: str, *options: ClusterOptions, **kwargs: Any) -> None: ...
+    def __init__(self,
+                 connstr: str,
+                 *options: ClusterOptions,
+                 loop: AbstractEventLoop | None = None,
+                 **kwargs: Any) -> None: ...
 
     @property
     def loop(self) -> AbstractEventLoop: ...

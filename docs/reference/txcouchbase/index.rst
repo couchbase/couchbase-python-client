@@ -7,6 +7,13 @@ Twisted API
 The ``txcouchbase`` package: every operation returns a Twisted ``Deferred``.  The types its operations
 take and return are in the :doc:`/reference/common/index`.
 
+Importing ``txcouchbase`` installs Twisted's ``asyncioreactor``, or uses the one already installed.  The
+reactor runs on the running event loop, otherwise the thread's current loop, otherwise a new
+``SelectorEventLoop`` that becomes the current loop.  It needs a loop that implements ``add_reader`` and
+``add_writer``, which ``ProactorEventLoop``, the Windows default, does not.  A current ``ProactorEventLoop``
+is replaced with a ``RuntimeWarning`` and left open.  A running one, or a reactor of another kind, raises
+:class:`~couchbase.exceptions.InvalidArgumentException`.
+
 .. toctree::
    :maxdepth: 2
 

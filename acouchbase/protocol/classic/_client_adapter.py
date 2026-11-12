@@ -15,14 +15,13 @@
 
 from __future__ import annotations
 
-from asyncio import Future
+from asyncio import Future, get_running_loop
 from collections.abc import Callable, Mapping
 from functools import partial
 from typing import (TYPE_CHECKING,
                     Any,
                     cast)
 
-from acouchbase import get_event_loop
 from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._registry import CLOSED_CLUSTER_MSG
 from couchbase.common.exceptions import CouchbaseException, InternalSDKException
@@ -67,9 +66,9 @@ class AsyncClientAdapter:
         num_io_threads = connect_req.options.get('num_io_threads', None)
         conn = pycbc_connection(num_io_threads) if num_io_threads is not None else pycbc_connection()
         self._connection: pycbc_connection | None = conn
-        # The loop will be setup prior to running the first async op.
-        # This is the preferred mechanism to handling the event loop.
-        self._loop: AbstractEventLoop | None = loop
+        # Checked on first use by the same gate as a derived loop.
+        self._supplied_loop = loop
+        self._loop: AbstractEventLoop | None = None
         self._loop_validator = loop_validator
         self._connect_req = connect_req
         self._binding_map = BindingMap(conn)
@@ -116,8 +115,8 @@ class AsyncClientAdapter:
 
     @property
     def loop(self) -> AbstractEventLoop:
-        if not self._loop:
-            self._loop = self._get_loop()
+        if self._loop is None:
+            self._loop = self._get_loop(self._supplied_loop)
         return self._loop
 
     def _ensure_not_closed(self) -> None:
@@ -396,11 +395,13 @@ class AsyncClientAdapter:
             raise excptn from None
 
     def _get_loop(self, loop: AbstractEventLoop | None = None) -> AbstractEventLoop:
-        if not loop:
-            if self._loop_validator:
-                loop = self._loop_validator(loop)
-            else:
-                loop = get_event_loop()
+        if self._loop_validator:
+            loop = self._loop_validator(loop)
+        elif loop is None:
+            try:
+                loop = get_running_loop()
+            except RuntimeError:
+                raise RuntimeError('Event loop is not running.') from None
 
         if not loop.is_running():
             raise RuntimeError('Event loop is not running.')

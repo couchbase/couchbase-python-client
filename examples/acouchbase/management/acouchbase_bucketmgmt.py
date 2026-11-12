@@ -16,7 +16,7 @@
 import asyncio
 
 from acouchbase.auth import PasswordAuthenticator
-from acouchbase.cluster import Cluster, get_event_loop
+from acouchbase.cluster import Cluster
 from acouchbase.exceptions import BucketAlreadyExistsException, BucketDoesNotExistException
 from acouchbase.management.buckets import (BucketSettings,
                                            BucketType,
@@ -91,5 +91,4 @@ async def main():
 
 
 if __name__ == "__main__":
-    loop = get_event_loop()
-    loop.run_until_complete(main())
+    asyncio.run(main())

@@ -25,8 +25,9 @@ from typing import Any
 import pytest
 import pytest_asyncio
 
+from acouchbase import _get_event_loop
 from acouchbase.bucket import AsyncBucket
-from acouchbase.cluster import AsyncCluster, get_event_loop
+from acouchbase.cluster import AsyncCluster
 from acouchbase.collection import AsyncCollection
 from acouchbase.scope import AsyncScope
 from couchbase.durability import DurabilityLevel, ServerDurability
@@ -523,7 +524,7 @@ async def teardown_async_environment(
 # reads that flag.
 @pytest.fixture(scope='session')
 def event_loop() -> Generator[AbstractEventLoop, None, None]:
-    loop = get_event_loop()
+    loop = _get_event_loop()
     yield loop
     loop.close()
 

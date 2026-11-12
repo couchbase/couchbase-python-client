@@ -15,19 +15,15 @@
 
 # Hand-written and cluster-free: the event loop txcouchbase installs its reactor with.
 #
-# Importing txcouchbase runs asyncioreactor.install(get_event_loop()), so the loop acouchbase
-# resolves becomes the reactor's loop.  Two things depend on that:
-#
-#   * _validate_loop requires reactor._asyncioEventloop to be the loop get_event_loop() returns,
-#     and that identity holds only because resolution installs the loop it creates as the thread
-#     default.  Anything that changes loop resolution has to keep that invariant or replace it.
-#   * Twisted's AsyncioSelectorReactor drives add_reader and add_writer directly and refuses a
-#     ProactorEventLoop, so on Windows the reactor works only because resolution substitutes a
-#     selector loop for the platform default.
+# Twisted's asyncioreactor drives add_reader and add_writer directly, which ProactorEventLoop, the
+# Windows default, does not implement.  So importing txcouchbase resolves a loop the reactor can
+# drive, in order: the loop of an asyncio reactor that is already installed, the running loop, the
+# thread's current loop, and otherwise a new SelectorEventLoop it sets as the current one.  A
+# current loop the reactor cannot drive is replaced with a warning and never closed; a running one,
+# or a reactor of another kind, is an error.  acouchbase/tests/loop_selection_t.py covers acouchbase.
 #
 # Installing a reactor is process-wide and cannot be undone, and this session's conftest has
-# already installed one, so the probe imports txcouchbase in a subprocess starting from a thread
-# default the validator rejects.  acouchbase/tests/loop_selection_t.py covers resolution itself.
+# already installed one, so each starting state imports txcouchbase in a subprocess of its own.
 from __future__ import annotations
 
 import json
@@ -46,77 +42,137 @@ _PACKAGE_PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(couchbase.
 
 _REACTOR_PROBE = """
 import asyncio
+import importlib
 import json
 import selectors
 import sys
+import warnings
 
 
 class _ProactorShapedEventLoop(asyncio.SelectorEventLoop):
-    # Inherits the four methods LoopValidator checks, the way ProactorEventLoop does.
+    # Inherits the four reader and writer methods unimplemented, the way ProactorEventLoop does.
     add_reader = asyncio.AbstractEventLoop.add_reader
     remove_reader = asyncio.AbstractEventLoop.remove_reader
     add_writer = asyncio.AbstractEventLoop.add_writer
     remove_writer = asyncio.AbstractEventLoop.remove_writer
 
 
-# The Windows starting state.  Without it the POSIX default is already acceptable and the import
-# exercises nothing.
-if sys.platform == 'win32':
-    rejected = asyncio.ProactorEventLoop()
-else:
-    rejected = _ProactorShapedEventLoop(selectors.DefaultSelector())
-asyncio.set_event_loop(rejected)
+def proactor_loop():
+    if sys.platform == 'win32':
+        return asyncio.ProactorEventLoop()
+    return _ProactorShapedEventLoop(selectors.DefaultSelector())
 
-import txcouchbase  # noqa: F401,E402  installing the reactor is the point of this import
-from acouchbase import get_event_loop  # noqa: E402
-from twisted.internet import reactor  # noqa: E402
 
-reactor_loop = getattr(reactor, '_asyncioEventloop', None)
-loop = get_event_loop()
+scenario = sys.argv[1]
+start = None
+if scenario in ('selector', 'running_selector', 'asyncio_reactor'):
+    start = asyncio.SelectorEventLoop(selectors.DefaultSelector())
+elif scenario in ('proactor', 'running_proactor'):
+    start = proactor_loop()
+if start is not None:
+    asyncio.set_event_loop(start)
+if scenario == 'asyncio_reactor':
+    from twisted.internet import asyncioreactor
+    asyncioreactor.install(start)
+elif scenario == 'other_reactor':
+    from twisted.internet import selectreactor
+    selectreactor.install()
+
+
+async def import_while_running():
+    importlib.import_module('txcouchbase')
+
+
+error = None
+with warnings.catch_warnings(record=True) as caught:
+    warnings.simplefilter('always')
+    try:
+        if scenario.startswith('running_'):
+            start.run_until_complete(import_while_running())
+        else:
+            importlib.import_module('txcouchbase')
+    except Exception as ex:
+        error = type(ex).__name__
+
+reactor_loop = None
+if error is None:
+    from twisted.internet import reactor
+    reactor_loop = reactor._asyncioEventloop
+try:
+    current = asyncio.get_event_loop()
+except RuntimeError:
+    current = None
 json.dump({
-    'reactor_loop_is_resolved_loop': reactor_loop is loop,
-    'reactor_loop_replaced_the_default': reactor_loop is not None and reactor_loop is not rejected,
-    'is_selector_loop': isinstance(reactor_loop, asyncio.SelectorEventLoop),
-    'rejected_loop_closed': rejected.is_closed(),
-    'reactor_loop_closed': reactor_loop is not None and reactor_loop.is_closed(),
+    'error': error,
+    'reactor_loop_is_start': reactor_loop is not None and reactor_loop is start,
+    'reactor_loop_is_current': reactor_loop is not None and reactor_loop is current,
     'reactor_loop_type': type(reactor_loop).__name__,
+    'reactor_loop_is_selector': isinstance(reactor_loop, asyncio.SelectorEventLoop),
+    'start_closed': start is not None and start.is_closed(),
+    'warnings': [(w.category.__name__, str(w.message)) for w in caught],
 }, sys.stdout)
 """
+
+
+def _probe(scenario: str) -> dict[str, Any]:
+    env = dict(os.environ)
+    env['PYTHONPATH'] = os.pathsep.join(filter(None, [_PACKAGE_PARENT_DIR, os.environ.get('PYTHONPATH')]))
+    proc = subprocess.run([sys.executable, '-c', _REACTOR_PROBE, scenario],  # nosec
+                          env=env,
+                          capture_output=True,
+                          text=True,
+                          timeout=120)
+    assert proc.returncode == 0, f'The {scenario} probe exited with {proc.returncode}.\n{proc.stderr}'
+    probe: dict[str, Any] = json.loads(proc.stdout)
+    return probe
+
+
+def _loop_warnings(probe: dict[str, Any]) -> list[str]:
+    # Twisted may warn about its own deprecations on import; only warnings about loops count here.
+    return [message for _, message in probe['warnings'] if 'loop' in message.lower()]
 
 
 class TxLoopSelectionUnitTests:
     # No TEST_MANIFEST: the manifest is a parity contract between api trees, and this file is
     # one tree's own.
 
-    @pytest.fixture(name='reactor_probe', scope='class')
-    def import_txcouchbase_in_a_subprocess(self) -> dict[str, Any]:
-        env = dict(os.environ)
-        env['PYTHONPATH'] = os.pathsep.join(filter(None, [_PACKAGE_PARENT_DIR,
-                                                          os.environ.get('PYTHONPATH')]))
-        proc = subprocess.run([sys.executable, '-c', _REACTOR_PROBE],  # nosec
-                              env=env,
-                              capture_output=True,
-                              text=True,
-                              timeout=120)
-        assert proc.returncode == 0, (f'Importing txcouchbase exited with {proc.returncode}.\n'
-                                      f'{proc.stderr}')
-        probe: dict[str, Any] = json.loads(proc.stdout)
-        return probe
+    def test_new_selector_loop_when_there_is_none(self) -> None:
+        probe = _probe('none')
+        assert probe['error'] is None
+        assert probe['reactor_loop_is_selector'] is True
+        assert probe['reactor_loop_is_current'] is True
+        assert _loop_warnings(probe) == []
 
-    def test_reactor_is_installed_with_the_resolved_loop(self, reactor_probe: dict[str, Any]) -> None:
-        assert reactor_probe['reactor_loop_is_resolved_loop'] is True, (
-            f"the reactor holds a {reactor_probe['reactor_loop_type']} that is not the loop "
-            f'get_event_loop() returns; _validate_loop will reject every cluster.')
+    def test_current_selector_loop_is_used(self) -> None:
+        probe = _probe('selector')
+        assert probe['error'] is None
+        assert probe['reactor_loop_is_start'] is True
+        assert _loop_warnings(probe) == []
 
-    def test_reactor_loop_is_a_selector_loop(self, reactor_probe: dict[str, Any]) -> None:
-        assert reactor_probe['is_selector_loop'] is True, (
-            f"reactor installed with a {reactor_probe['reactor_loop_type']}, which Twisted's "
-            f'asyncioreactor does not support.')
+    def test_current_proactor_loop_is_replaced_not_closed(self) -> None:
+        probe = _probe('proactor')
+        assert probe['error'] is None
+        assert probe['reactor_loop_is_start'] is False
+        assert probe['reactor_loop_is_selector'] is True
+        assert probe['reactor_loop_is_current'] is True
+        assert probe['start_closed'] is False
+        assert [category for category, _ in probe['warnings']].count('RuntimeWarning') == 1
 
-    def test_rejected_thread_default_is_closed_and_replaced(self,
-                                                            reactor_probe: dict[str, Any]) -> None:
-        assert reactor_probe['reactor_loop_replaced_the_default'] is True
-        assert reactor_probe['rejected_loop_closed'] is True
+    def test_running_selector_loop_is_used(self) -> None:
+        probe = _probe('running_selector')
+        assert probe['error'] is None
+        assert probe['reactor_loop_is_start'] is True
 
-    def test_resolved_loop_survives_the_import(self, reactor_probe: dict[str, Any]) -> None:
-        assert reactor_probe['reactor_loop_closed'] is False
+    def test_running_proactor_loop_is_refused(self) -> None:
+        probe = _probe('running_proactor')
+        assert probe['error'] == 'InvalidArgumentException'
+        assert probe['start_closed'] is False
+
+    def test_installed_asyncio_reactor_is_used(self) -> None:
+        probe = _probe('asyncio_reactor')
+        assert probe['error'] is None
+        assert probe['reactor_loop_is_start'] is True
+
+    @pytest.mark.skipif(sys.platform == 'win32', reason='selectreactor is the only other reactor every platform has')
+    def test_other_reactor_is_refused(self) -> None:
+        assert _probe('other_reactor')['error'] == 'InvalidArgumentException'

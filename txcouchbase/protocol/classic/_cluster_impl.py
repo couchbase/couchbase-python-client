@@ -22,7 +22,6 @@ from typing import (TYPE_CHECKING,
 
 from twisted.internet.defer import Deferred
 
-from acouchbase import get_event_loop
 from acouchbase.protocol.classic._cluster_impl import AsyncClusterImpl
 from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._operations import Op
@@ -209,20 +208,15 @@ class TxClusterImpl(AsyncClusterImpl):
         d = Deferred.fromFuture(future)
         return d
 
-    def _validate_loop(self, loop: AbstractEventLoop | None = None) -> AbstractEventLoop:
-        """**INTERNAL**"""
-        if not loop:
-            loop = get_event_loop()
-
+    def _validate_loop(self, _: AbstractEventLoop | None = None) -> AbstractEventLoop:
+        """**INTERNAL** The reactor's loop, once the reactor is running."""
         from twisted.internet import reactor
-        if hasattr(reactor, '_asyncioEventloop') and reactor._asyncioEventloop is loop:
-            # We're in Twisted context - check reactor.running instead
-            if not cast('IReactorCore', reactor).running:
-                raise RuntimeError('Reactor is not running.')
-        else:
+        loop: AbstractEventLoop | None = getattr(reactor, '_asyncioEventloop', None)
+        if loop is None:
             msg = ('The asyncio event loop has not been installed.  Be sure to import txcouchbase prior to'
                    ' importing the Twisted reactor. Importing txcouchbase will setup and install the event'
                    ' loop using Twisted\'s asyncioreactor.')
             raise RuntimeError(msg)
-
+        if not cast('IReactorCore', reactor).running:
+            raise RuntimeError('Reactor is not running.')
         return loop

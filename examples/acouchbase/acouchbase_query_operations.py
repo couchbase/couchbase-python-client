@@ -13,10 +13,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import asyncio
 import uuid
 
 from acouchbase.auth import PasswordAuthenticator
-from acouchbase.cluster import Cluster, get_event_loop
+from acouchbase.cluster import Cluster
 from acouchbase.exceptions import ParsingFailedException
 from acouchbase.mutation_state import MutationState
 from acouchbase.n1ql import QueryScanConsistency
@@ -132,5 +133,4 @@ async def main():
     rows = [r async for r in result]
 
 if __name__ == "__main__":
-    loop = get_event_loop()
-    loop.run_until_complete(main())
+    asyncio.run(main())

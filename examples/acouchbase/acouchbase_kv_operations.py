@@ -13,10 +13,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import asyncio
 from datetime import timedelta
 
 from acouchbase.auth import PasswordAuthenticator
-from acouchbase.cluster import Cluster, get_event_loop
+from acouchbase.cluster import Cluster
 from acouchbase.durability import (ClientDurability,
                                    DurabilityLevel,
                                    PersistTo,
@@ -162,5 +163,4 @@ async def main():
             initial=SignedInt64(1000)))
 
 if __name__ == "__main__":
-    loop = get_event_loop()
-    loop.run_until_complete(main())
+    asyncio.run(main())

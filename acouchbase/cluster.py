@@ -88,6 +88,9 @@ class AsyncCluster:
         options (:class:`~couchbase.options.ClusterOptions`): Global options to set for the cluster.
             Some operations allow the global options to be overriden by passing in options to the
             operation.
+        loop (:class:`asyncio.AbstractEventLoop`, optional): The event loop the cluster runs on.  It must be
+            running when the cluster is created.  If not provided, the running loop is used.  Any loop type is
+            accepted.
         **kwargs: keyword arguments that can be used in place or to
             overrride provided :class:`~couchbase.options.ClusterOptions`
 
@@ -99,9 +102,13 @@ class AsyncCluster:
 
     """
 
-    def __init__(self, connstr: str, *options: ClusterOptions, **kwargs: Unpack[ClusterKwargs]) -> None:
+    def __init__(self,
+                 connstr: str,
+                 *options: ClusterOptions,
+                 loop: AbstractEventLoop | None = None,
+                 **kwargs: Unpack[ClusterKwargs]) -> None:
         impl = resolve(ASYNC_CLUSTER, CouchbaseProtocol.from_connstr(connstr))
-        self._impl: AsyncClusterInterface = impl(connstr, *options, **kwargs)
+        self._impl: AsyncClusterInterface = impl(connstr, *options, loop=loop, **kwargs)
 
     @property
     def loop(self) -> AbstractEventLoop:
@@ -690,7 +697,10 @@ class AsyncCluster:
         return EventingFunctionManager(self._impl.eventing_function_mgmt())
 
     @staticmethod
-    async def connect(connstr: str, *options: ClusterOptions, **kwargs: Unpack[ClusterKwargs]) -> AsyncCluster:
+    async def connect(connstr: str,
+                      *options: ClusterOptions,
+                      loop: AbstractEventLoop | None = None,
+                      **kwargs: Unpack[ClusterKwargs]) -> AsyncCluster:
         """Create a cluster and connect to it.
 
         Args:
@@ -705,6 +715,8 @@ class AsyncCluster:
             options (:class:`~couchbase.options.ClusterOptions`): Global options to set for the cluster.
                 Some operations allow the global options to be overriden by passing in options to the
                 operation.
+            loop (:class:`asyncio.AbstractEventLoop`, optional): The event loop the cluster runs on.  It must be
+                the running loop.  If not provided, the running loop is used.
             **kwargs: keyword arguments that can be used in place or to
                 overrride provided :class:`~couchbase.options.ClusterOptions`
 
@@ -752,7 +764,7 @@ class AsyncCluster:
                                                 ClusterOptions(auth, timeout_options=timeout_opts))
 
         """
-        cluster = AsyncCluster(connstr, *options, **kwargs)
+        cluster = AsyncCluster(connstr, *options, loop=loop, **kwargs)
         await cluster.on_connect()
         return cluster
 
