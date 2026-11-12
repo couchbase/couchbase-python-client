@@ -218,7 +218,10 @@ endif()
 message(STATUS "USE_STATIC_STDLIB=${USE_STATIC_STDLIB}")
 
 option(DOWNLOAD_MOZILLA_CA_BUNDLE "Allow C++ client to download and embed Mozilla certificates" TRUE)
-if(DOWNLOAD_MOZILLA_CA_BUNDLE)
+# OFF still embeds a bundle already in EMBED_MOZILLA_CA_BUNDLE_ROOT (the sdist's CPM cache).
+set(_pycbc_ca_root "${COUCHBASE_CXX_CLIENT_EMBED_MOZILLA_CA_BUNDLE_ROOT}")
+if(DOWNLOAD_MOZILLA_CA_BUNDLE
+   OR (EXISTS "${_pycbc_ca_root}/mozilla-ca-bundle.crt" AND EXISTS "${_pycbc_ca_root}/mozilla-ca-bundle.sha256"))
   set(COUCHBASE_CXX_CLIENT_EMBED_MOZILLA_CA_BUNDLE
       ON
       CACHE BOOL "" FORCE)
