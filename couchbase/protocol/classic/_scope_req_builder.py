@@ -16,8 +16,7 @@
 from __future__ import annotations
 
 from couchbase.common._observability import ObservableRequestHandler
-from couchbase.common._supportability import Supportability
-from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common._search_args import check_search_query_argument
 from couchbase.common.option_enums import OptionValidationMode
 from couchbase.common.options import (AnalyticsOptions,
                                       QueryOptions,
@@ -96,11 +95,7 @@ class ScopeRequestBuilder:
                              **kwargs: object) -> SearchQueryRequest:
         check_streaming_args((options,), kwargs, block=ScopeOptionsBlock.Search, options_type=SearchOptions,
                              mode=self._option_validation)
-        if isinstance(request, SearchQuery):
-            Supportability.method_param_type_deprecated('search', 'request', 'SearchQuery', 'SearchRequest')
-            query_builder = SearchQueryBuilder.create_search_query_object(index, request, options, **kwargs)
-        else:
-            query_builder = SearchQueryBuilder.create_search_query_from_request(index, request, options, **kwargs)
+        query_builder = SearchQueryBuilder.create_search_query_from_request(index, request, options, **kwargs)
 
         scope_name = query_builder.params.get('scope_name', None) or self._scope_name
         return SearchQueryRequest(query_builder, obs_handler, self._bucket_name, scope_name)
@@ -113,10 +108,7 @@ class ScopeRequestBuilder:
                                    **kwargs: object) -> SearchQueryRequest:
         check_streaming_args((options,), kwargs, block=ScopeOptionsBlock.Search, options_type=SearchOptions,
                              mode=self._option_validation)
-        if isinstance(query, SearchRequest):
-            raise InvalidArgumentException(
-                message=('A SearchRequest is not a valid search_query() query. '
-                         'Pass it to search() instead.'))
+        check_search_query_argument(query)
 
         query_builder = SearchQueryBuilder.create_search_query_object(index, query, options, **kwargs)
 

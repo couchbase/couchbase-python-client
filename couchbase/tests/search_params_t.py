@@ -1085,7 +1085,6 @@ class VectorSearchParamsUnitTests:
         return {'query': {'match_none': None},
                 'index_name': INDEX_NAME,
                 'metrics': True,
-                'show_request': False,
                 'vector_search': list(vector_queries),
                 **overrides}
 

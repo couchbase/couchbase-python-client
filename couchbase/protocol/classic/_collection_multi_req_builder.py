@@ -16,9 +16,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from copy import copy
 from typing import TYPE_CHECKING, Any
 
+from couchbase.common._multi_args import refuse_projection, unlock_keys_and_cas
 from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._operations import Op
 from couchbase.common.exceptions import InternalSDKException, InvalidArgumentException
@@ -64,12 +64,6 @@ if TYPE_CHECKING:
 def _without_transcoders(req: KeyValueMultiWithTranscoderRequest) -> KeyValueMultiRequest:
     """For an operation whose response has no document to decode."""
     return KeyValueMultiRequest(req.opcode, req.request_list, req.return_exceptions)
-
-
-def _refuse_projection(final_args: dict[str, Any], per_key_args: dict[str, dict[str, Any]] | None) -> None:
-    """Each key of a multi get goes out as a plain get, which carries no projection."""
-    if any(args.get('project') is not None for args in (final_args, *(per_key_args or {}).values())):
-        raise InvalidArgumentException('A multi get cannot project fields; use get for each key instead.')
 
 
 def _multi_opcodes(op: Op, legacy: bool) -> tuple[KeyValueMultiBinding, KeyValueBinding]:
@@ -357,7 +351,7 @@ class CollectionMultiRequestBuilder:
         if op_keys_cas:
             per_key_args = {k: {**per_key_args.get(k, {}), 'cas': v} for k, v in op_keys_cas.items()}
         if op is Op.GetMulti:
-            _refuse_projection(final_args, per_key_args)
+            refuse_projection(final_args, per_key_args)
         return_exceptions = final_args.pop('return_exceptions', True)
         legacy = isinstance(durability, dict)
         self._maybe_update_durable_timeout(final_args, durability)
@@ -579,19 +573,7 @@ class CollectionMultiRequestBuilder:
                                    obs_handler: ObservableRequestHandler | None,
                                    opts: UnlockMultiOptions | None = None,
                                    **kwargs: object) -> KeyValueMultiRequest:
-        op_keys_cas: dict[str, int] = {}
-        if isinstance(keys, dict):
-            if not all(map(lambda k: isinstance(k, str), keys.keys())):
-                raise InvalidArgumentException('If providing keys of type dict, all values must be type int.')
-            if not all(map(lambda v: isinstance(v, int), keys.values())):
-                raise InvalidArgumentException('If providing keys of type dict, all values must be type int.')
-            op_keys_cas = copy(keys)
-        elif isinstance(keys, (MultiGetResult, MultiMutationResult)):
-            for k, v in keys.results.items():
-                op_keys_cas[k] = v.cas
-        else:
-            raise InvalidArgumentException(
-                'keys type must be MultiGetResult | MultiMutationResult | dict[str, int].')
+        op_keys_cas = unlock_keys_and_cas(keys)
         # use the non-mutation logic even though unlock is a mutation
         req = self._get_multi_op_non_value_req(list(op_keys_cas.keys()),
                                                UnlockMultiOptions,

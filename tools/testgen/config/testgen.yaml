@@ -288,6 +288,7 @@ not_generated:
     - couchbase/tests/option_diagnostics_t.py
     - couchbase/tests/pycbc_core_t.py
     - couchbase/tests/protocol_gates_t.py
+    - couchbase/tests/query_args_t.py
     - couchbase/tests/query_metadata_t.py
     - couchbase/tests/query_params_t.py
     - couchbase/tests/repr_t.py

@@ -22,9 +22,10 @@ from typing import TYPE_CHECKING, Any
 
 from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._operations import Op
-from couchbase.common.exceptions import (AmbiguousTimeoutException,
-                                         QueryIndexNotFoundException,
-                                         WatchQueryIndexTimeoutException)
+from couchbase.common.exceptions import AmbiguousTimeoutException
+from couchbase.common.management._query_index_mgmt_args import (WATCH_POLL_SECONDS,
+                                                                indexes_online,
+                                                                watch_timed_out)
 from couchbase.common.management.queries import QueryIndex
 from couchbase.protocol.classic._management._query_index_mgmt_req_builder import QueryIndexMgmtRequestBuilder
 from couchbase.protocol.classic._management._query_index_mgmt_types import GetAllIndexesRequest
@@ -181,7 +182,6 @@ class AsyncQueryIndexMgmtImpl:
     async def _watch_indexes(self, req: WatchIndexesRequest, obs_handler: ObservableRequestHandler) -> None:
         # timeout is converted to millisecs via options processing
         deadline = time.monotonic() + req.timeout / 1000
-        delay = 0.1  # seconds
 
         get_all_indexes_req = GetAllIndexesRequest(self._request_builder._error_map,
                                                    bucket_name=req.bucket_name,
@@ -200,24 +200,11 @@ class AsyncQueryIndexMgmtImpl:
                 # A poll that timed out says nothing about the indexes; poll again until the deadline.
                 indexes = None
 
-            if indexes is not None and self._check_indexes(req.index_names, indexes):
+            if indexes is not None and indexes_online(req.index_names, indexes):
                 break
 
-            if deadline < (time.monotonic() + delay):
-                msg = 'Failed to find all indexes online within the alloted time.'
-                raise WatchQueryIndexTimeoutException(msg)
-            await asyncio.sleep(delay)
+            if deadline < (time.monotonic() + WATCH_POLL_SECONDS):
+                raise watch_timed_out()
+            await asyncio.sleep(WATCH_POLL_SECONDS)
             # needs to be int b/c req.timeout expects int (this is what the bindings want)
             get_all_indexes_req.timeout = int((deadline - time.monotonic()) * 1e3)
-
-    def _check_indexes(self, index_names: Iterable[str], indexes: Iterable[QueryIndex]) -> bool:
-        watched = []
-        for idx_name in index_names:
-            match = next((i for i in indexes if i.name == idx_name), None)
-            if not match:
-                raise QueryIndexNotFoundException(f'Cannot find index with name: {idx_name}')
-            watched.append(match)
-
-        # Only the named indexes: another index on the keyspace, deferred and never built, is not
-        # the caller's to wait for.
-        return all(i.state == 'online' for i in watched)

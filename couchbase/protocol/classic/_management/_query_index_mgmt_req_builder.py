@@ -16,10 +16,16 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common.exceptions import InvalidArgumentException
+from couchbase.common.management._query_index_mgmt_args import (check_create,
+                                                                index_keys,
+                                                                scope_and_collection,
+                                                                validate_bucket_name,
+                                                                validate_index_name,
+                                                                watched_names)
 from couchbase.common.option_enums import OptionValidationMode
 from couchbase.protocol.classic._management._query_index_mgmt_types import (QUERY_INDEX_MGMT_ERROR_MAP,
                                                                             BuildDeferredIndexesRequest,
@@ -61,13 +67,7 @@ class QueryIndexMgmtRequestBuilder:
                               timeout: int | None = None
                               ) -> CreateIndexRequest:
 
-        if primary and keys:
-            raise InvalidArgumentException('Cannot create primary index with explicit keys')
-        elif not primary and not keys:
-            raise InvalidArgumentException('Keys required for non-primary index')
-
-        if condition and primary:
-            raise InvalidArgumentException('cannot specify condition for primary index')
+        check_create(bool(primary), list(keys), condition)
 
         return CreateIndexRequest(self._error_map,
                                   bucket_name=bucket_name,
@@ -101,33 +101,6 @@ class QueryIndexMgmtRequestBuilder:
                                 collection_name=collection_name,
                                 timeout=timeout)
 
-    def _validate_bucket_name(self, bucket_name: str) -> None:
-        if not isinstance(bucket_name, str):
-            raise InvalidArgumentException('The bucket_name must be provided when creating a secondary index.')
-
-    def _validate_index_name(self, index_name: str) -> None:
-        if not isinstance(index_name, str):
-            raise InvalidArgumentException('The index_name must be provided when creating a secondary index.')
-
-    def _validate_index_names(self, index_names: Iterable[str]) -> list[str]:
-        if isinstance(index_names, str) or not isinstance(index_names, Iterable):
-            raise InvalidArgumentException(
-                'An iterable of index names must be provided when watching indexes.')
-        return list(index_names)
-
-    def _validate_index_keys(self, keys: Iterable[str]) -> list[str]:
-        if isinstance(keys, str) or not isinstance(keys, Iterable):
-            raise InvalidArgumentException('Index keys must be provided when creating a secondary index.')
-        return list(keys)
-
-    def _valid_collection_context(self, final_args: dict[str, Any]) -> None:
-        if 'scope_name' in final_args:
-            raise InvalidArgumentException('scope_name cannot be set in the options when using the '
-                                           'collection-level query index manager')
-        if 'collection_name' in final_args:
-            raise InvalidArgumentException('collection_name cannot be set in the options when using the '
-                                           'collection-level query index manager')
-
     def build_create_index_request(self,
                                    bucket_name: str,
                                    index_name: str,
@@ -140,17 +113,11 @@ class QueryIndexMgmtRequestBuilder:
             kwargs, options, block=QueryIndexMgmtOptionsBlock.CreateQueryIndex, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        self._validate_bucket_name(bucket_name)
-        self._validate_index_name(index_name)
-        keys = self._validate_index_keys(keys)
+        validate_bucket_name(bucket_name)
+        validate_index_name(index_name)
+        keys = index_keys(keys)
         timeout = final_args.pop('timeout', None)
-        if collection_context is not None:
-            self._valid_collection_context(final_args)
-            collection_name = collection_context[0]
-            scope_name = collection_context[1]
-        else:
-            collection_name = final_args.pop('collection_name', None)
-            scope_name = final_args.pop('scope_name', None)
+        scope_name, collection_name = scope_and_collection(final_args, collection_context)
 
         return self._create_index_request(bucket_name,
                                           keys,
@@ -173,15 +140,9 @@ class QueryIndexMgmtRequestBuilder:
                                   mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        self._validate_bucket_name(bucket_name)
+        validate_bucket_name(bucket_name)
         timeout = final_args.pop('timeout', None)
-        if collection_context is not None:
-            self._valid_collection_context(final_args)
-            collection_name = collection_context[0]
-            scope_name = collection_context[1]
-        else:
-            collection_name = final_args.pop('collection_name', None)
-            scope_name = final_args.pop('scope_name', None)
+        scope_name, collection_name = scope_and_collection(final_args, collection_context)
 
         return self._create_index_request(bucket_name,
                                           [],
@@ -206,16 +167,10 @@ class QueryIndexMgmtRequestBuilder:
             kwargs, options, block=QueryIndexMgmtOptionsBlock.DropQueryIndex, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        self._validate_bucket_name(bucket_name)
-        self._validate_index_name(index_name)
+        validate_bucket_name(bucket_name)
+        validate_index_name(index_name)
         timeout = final_args.pop('timeout', None)
-        if collection_context is not None:
-            self._valid_collection_context(final_args)
-            collection_name = collection_context[0]
-            scope_name = collection_context[1]
-        else:
-            collection_name = final_args.pop('collection_name', None)
-            scope_name = final_args.pop('scope_name', None)
+        scope_name, collection_name = scope_and_collection(final_args, collection_context)
 
         return self._drop_index_request(bucket_name,
                                         index_name=index_name,
@@ -234,15 +189,9 @@ class QueryIndexMgmtRequestBuilder:
             kwargs, options, block=QueryIndexMgmtOptionsBlock.DropPrimaryQueryIndex, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        self._validate_bucket_name(bucket_name)
+        validate_bucket_name(bucket_name)
         timeout = final_args.pop('timeout', None)
-        if collection_context is not None:
-            self._valid_collection_context(final_args)
-            collection_name = collection_context[0]
-            scope_name = collection_context[1]
-        else:
-            collection_name = final_args.pop('collection_name', None)
-            scope_name = final_args.pop('scope_name', None)
+        scope_name, collection_name = scope_and_collection(final_args, collection_context)
 
         return self._drop_index_request(bucket_name,
                                         primary=True,
@@ -262,15 +211,9 @@ class QueryIndexMgmtRequestBuilder:
             kwargs, options, block=QueryIndexMgmtOptionsBlock.GetAllQueryIndex, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        self._validate_bucket_name(bucket_name)
+        validate_bucket_name(bucket_name)
         timeout = final_args.pop('timeout', None)
-        if collection_context is not None:
-            self._valid_collection_context(final_args)
-            collection_name = collection_context[0]
-            scope_name = collection_context[1]
-        else:
-            collection_name = final_args.pop('collection_name', None)
-            scope_name = final_args.pop('scope_name', None)
+        scope_name, collection_name = scope_and_collection(final_args, collection_context)
 
         return GetAllIndexesRequest(self._error_map,
                                     bucket_name=bucket_name,
@@ -288,15 +231,9 @@ class QueryIndexMgmtRequestBuilder:
                                   mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        self._validate_bucket_name(bucket_name)
+        validate_bucket_name(bucket_name)
         timeout = final_args.pop('timeout', None)
-        if collection_context is not None:
-            self._valid_collection_context(final_args)
-            collection_name = collection_context[0]
-            scope_name = collection_context[1]
-        else:
-            collection_name = final_args.pop('collection_name', None)
-            scope_name = final_args.pop('scope_name', None)
+        scope_name, collection_name = scope_and_collection(final_args, collection_context)
 
         return BuildDeferredIndexesRequest(self._error_map,
                                            bucket_name=bucket_name,
@@ -315,18 +252,12 @@ class QueryIndexMgmtRequestBuilder:
             kwargs, options, block=QueryIndexMgmtOptionsBlock.WatchQueryIndex, mode=self._option_validation)
         parent_span = ObservableRequestHandler.maybe_get_parent_span(parent_span=final_args.pop('parent_span', None))
         obs_handler.create_http_span(parent_span=parent_span)
-        self._validate_bucket_name(bucket_name)
-        index_names = self._validate_index_names(index_names)
+        validate_bucket_name(bucket_name)
+        index_names = watched_names(index_names)
         timeout = final_args.pop('timeout', None)
         if timeout is None:
             raise InvalidArgumentException('Must specify a timeout when watching indexes.')
-        if collection_context is not None:
-            self._valid_collection_context(final_args)
-            collection_name = collection_context[0]
-            scope_name = collection_context[1]
-        else:
-            collection_name = final_args.pop('collection_name', None)
-            scope_name = final_args.pop('scope_name', None)
+        scope_name, collection_name = scope_and_collection(final_args, collection_context)
 
         if final_args.get('watch_primary', False):
             index_names = [*index_names, '#primary']

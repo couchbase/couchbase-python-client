@@ -19,8 +19,12 @@ from collections.abc import Iterable
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
+from couchbase.common._binary_args import binary_value, read_counter_args
 from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._operations import Op
+from couchbase.common._subdoc_args import (check_preserve_expiry,
+                                           encode_spec_value,
+                                           read_store_semantics_keywords)
 from couchbase.common._transforms import timedelta_as_milliseconds
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.kv_range_scan import (PrefixScan,
@@ -29,7 +33,6 @@ from couchbase.common.kv_range_scan import (PrefixScan,
                                             ScanType)
 from couchbase.common.options import (AppendOptions,
                                       DecrementOptions,
-                                      DeltaValue,
                                       ExistsOptions,
                                       GetAllReplicasOptions,
                                       GetAndLockOptions,
@@ -47,12 +50,10 @@ from couchbase.common.options import (AppendOptions,
                                       RemoveOptions,
                                       ReplaceOptions,
                                       ScanOptions,
-                                      SignedInt64,
                                       TouchOptions,
                                       UnlockOptions,
                                       UpsertOptions)
 from couchbase.common.replica_reads import GetReplicaStrategy, GetReplicaStrategyFromIndex
-from couchbase.common.subdocument import StoreSemantics, SubDocOp
 from couchbase.constants import FMT_BYTES
 from couchbase.durability import DurabilityLevel
 from couchbase.protocol.classic._bindings import KV_OPCODE, KeyValueBinding
@@ -72,18 +73,6 @@ if TYPE_CHECKING:
 
 # What `ClusterTimeoutOptions` documents for `kv_durable_timeout` when the cluster sets none.
 DEFAULT_KV_DURABLE_TIMEOUT = timedelta_as_milliseconds(timedelta(seconds=10))
-
-ALLOWED_MULTI_OP_LOOKUP = {
-    SubDocOp.ARRAY_PUSH_FIRST: True,
-    SubDocOp.ARRAY_PUSH_LAST: True,
-    SubDocOp.ARRAY_INSERT: True,
-}
-
-MUTATE_IN_SEMANTICS = {
-    'insert_doc': StoreSemantics.INSERT,
-    'upsert_doc': StoreSemantics.UPSERT,
-    'replace_doc': StoreSemantics.REPLACE
-}
 
 
 class CollectionRequestBuilder:
@@ -129,38 +118,13 @@ class CollectionRequestBuilder:
 
     def _process_counter_options(self, args: dict[str, Any]) -> None:
         """**INTERNAL**"""
-        initial = args.pop('initial', None)
-        delta = args.pop('delta', None)
-        if not initial:
-            initial = SignedInt64(0)
-        if not delta:
-            delta = DeltaValue(1)
-
-        # @TODO: remove deprecation next .minor
-        if delta is not None:
-            if not isinstance(delta, DeltaValue):
-                raise InvalidArgumentException("Argument is not valid DeltaValue")
+        args['delta'], initial = read_counter_args(args)
         if initial is not None:
-            if not isinstance(initial, SignedInt64):
-                raise InvalidArgumentException("Argument is not valid SignedInt64")
-
-        args['delta'] = int(delta)
-        initial = int(initial)
-        # Negative 'initial' means no initial value
-        if initial >= 0:
             args['initial_value'] = initial  # C++ expects initial_value
 
     def _process_binary_value(self, value: str | bytes | bytearray) -> tuple[bytes, int]:
-        if isinstance(value, str):
-            value = value.encode('utf-8')
-        elif isinstance(value, bytearray):
-            value = bytes(value)
-
-        if not isinstance(value, bytes):
-            raise ValueError('The value provided must of type str, bytes or bytearray.')
-
         # we don't use flags for binary ops, but passing the flags around helps reduce logic for request types
-        return value, FMT_BYTES
+        return binary_value(value), FMT_BYTES
 
     def _spec_as_dict(self, spec: Spec, original_index: int, value: bytes | None = None) -> CppSubdocCommand:
         if len(spec) == 3:
@@ -535,47 +499,24 @@ class CollectionRequestBuilder:
         )
         if obs_handler:
             obs_handler.create_kv_span(self._collection_dtls.get_details_as_dict(), parent_span=parent_span)
-        expiry = final_args.get('expiry', None)
-        preserve_expiry = final_args.get('preserve_expiry', False)
         # read twice when preserve_expiry is set, so a one-shot iterable has to be materialized first
         specs = tuple(specs)
-        if preserve_expiry is True:
-            spec_ops = {s[0] for s in specs}
-            if SubDocOp.DICT_ADD in spec_ops:
-                raise InvalidArgumentException(
-                    'The preserve_expiry option cannot be set for mutate_in with insert operations.')
-            if SubDocOp.REPLACE in spec_ops and expiry:
-                raise InvalidArgumentException(
-                    'The expiry and preserve_expiry options cannot both be set for mutate_in '
-                    'with replace operations.')
-
-        semantics = [v for k, v in MUTATE_IN_SEMANTICS.items() if final_args.pop(k, None) is not None]
-        if len(semantics) > 1:
-            raise InvalidArgumentException("Cannot set multiple store semantics.")
-        elif len(semantics) == 1:
-            final_args['store_semantics'] = semantics[0]
+        check_preserve_expiry(specs, final_args)
+        read_store_semantics_keywords(final_args)
 
         final_specs = []
         serializer = self._subdoc_serializer(final_args)
 
-        def _encode(value: Any, is_array_op: bool) -> tuple[bytes, int]:
-            encoded = serializer.serialize(value)
-            if is_array_op:
-                # An array op carries its values as a bare list, without the enclosing brackets.
-                encoded = encoded.strip()[1:-1]
-            return encoded, FMT_BYTES  # a subdocument value carries no flags
+        def _encode(spec: Spec) -> tuple[bytes, int]:
+            return encode_spec_value(serializer, spec[0], spec[5]), FMT_BYTES  # a subdocument value carries no flags
 
         for idx, spec in enumerate(specs):
             encoded_value = None
             if len(spec) == 6:
-                spec_value = spec[5]
-                is_array_op = ALLOWED_MULTI_OP_LOOKUP.get(spec[0], False) is True
                 if not obs_handler or obs_handler.is_noop:
-                    encoded_value, _ = _encode(spec_value, is_array_op)
+                    encoded_value, _ = _encode(spec)
                 else:
-                    encoded_value, _ = obs_handler.maybe_add_encoding_span(
-                        lambda v=spec_value, a=is_array_op: _encode(v, a)
-                    )
+                    encoded_value, _ = obs_handler.maybe_add_encoding_span(lambda s=spec: _encode(s))
             final_specs.append(self._spec_as_dict(spec, idx, encoded_value))
 
         opcode = KV_OPCODE[(Op.MutateIn, isinstance(durability, dict))]

@@ -106,23 +106,18 @@ class ClusterRequestBuilderUnitTests:
             warnings.simplefilter('always')
             deprecated = _search_request(TermQuery('term'))
 
-        # Built the same way down either branch, so the deprecated spelling is equivalent
-        # rather than merely tolerated.
+        # Built as its request is, so the deprecated spelling is equivalent rather than merely
+        # tolerated.
         assert json.loads(deprecated['query']) == {'term': 'term'}
         assert len(_search_query_deprecations(recorded)) == 1
 
-    def test_only_the_request_branch_sends_show_request(self) -> None:
-        # The one key the two branches differ by: `create_search_query_from_request` writes
-        # it explicitly and `create_search_query_object` leaves it out.  The property reads
-        # `_params.get('show_request', False)` either way, so the difference exists only in
-        # what is sent.
+    def test_a_bare_query_builds_what_its_request_does(self) -> None:
         with warnings.catch_warnings():
             warnings.simplefilter('ignore', CouchbaseDeprecationWarning)
             from_query = _search_request(TermQuery('term'))
         from_request = _search_request(SearchRequest.create(TermQuery('term')))
 
-        assert from_request['show_request'] is False
-        assert 'show_request' not in from_query
+        assert from_query == from_request
 
     def test_search_request_carries_what_only_a_request_can_express(self) -> None:
         vector_search = VectorSearch.from_vector_query(VectorQuery('vector_field', [0.1, 0.2]))

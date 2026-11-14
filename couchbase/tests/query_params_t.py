@@ -146,6 +146,17 @@ class QueryParamsUnitTests:
         query = N1QLQuery.create_query_object(self.Q_STR, QueryOptions(metrics=True))
         assert query.params == self._expected(metrics=True)
 
+    def test_params_named_parameters_take_one_dollar(self) -> None:
+        query = N1QLQuery.create_query_object(self.Q_STR, QueryOptions(named_parameters={'$city': 'Paris'}), limit=1)
+        assert query.params['named_parameters'] == {'$city': b'"Paris"', '$limit': b'1'}
+
+    def test_params_second_options_is_a_positional_parameter(self) -> None:
+        # Pins a known defect, PYCBC-2019: an options object straight after another is sent as a
+        # positional parameter. That ticket replaces this with a test of what it decides.
+        query = N1QLQuery.create_query_object(self.Q_STR, QueryOptions(read_only=True), QueryOptions(metrics=True))
+        assert query.params['readonly'] is True
+        assert query.params['positional_parameters'] == [b'{"metrics": true}']
+
     def test_params_pipeline_batch(self) -> None:
         query = N1QLQuery.create_query_object(self.Q_STR, QueryOptions(pipeline_batch=5))
         assert query.params == self._expected(pipeline_batch=5)

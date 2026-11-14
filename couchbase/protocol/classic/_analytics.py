@@ -20,6 +20,7 @@ from datetime import timedelta
 from typing import Any
 
 from couchbase.common._observability import SpanProtocol
+from couchbase.common._query_args import sort_query_args
 from couchbase.common._transforms import to_milliseconds
 from couchbase.common.analytics import AnalyticsScanConsistency
 from couchbase.common.exceptions import InvalidArgumentException
@@ -212,39 +213,18 @@ class AnalyticsQuery:
 
     @classmethod
     def create_query_object(cls, statement: str, *options: Any, **kwargs: Any) -> AnalyticsQuery:
-        # lets make a copy of the options, and update with kwargs...
         opt = AnalyticsOptions()
         opts = list(options)
+        # Removing while iterating skips the argument after each options object, so a second
+        # options object straight after the first is sent as a positional parameter.
         for o in opts:
             if isinstance(o, AnalyticsOptions):
                 opt = o
                 opts.remove(o)
-        args = opt.copy()
-        args.update(kwargs)
-
-        # now lets get positional parameters.  Actual positional
-        # params OVERRIDE positional_parameters
-        positional_parameters = args.pop("positional_parameters", [])
-        if opts and len(opts) > 0:
-            positional_parameters = opts
-
-        # now the named parameters.  NOTE: all the kwargs that are
-        # not VALID_OPTS must be named parameters, and the kwargs
-        # OVERRIDE the list of named_parameters
-        new_keys = list(filter(lambda x: x not in cls._VALID_OPTS, args.keys()))
-        named_parameters = args.pop("named_parameters", {})
-        for k in new_keys:
-            named_parameters[k] = args[k]
-
-        query = cls(statement, *positional_parameters, **named_parameters)
-        # now lets try to setup the options.
-        # but for now we will use the existing N1QLQuery.  Could be we can
-        # add to it, etc...
-
-        # default to True on analytics metrics
-        query.metrics = args.get("metrics", True)
-
-        for k, v in ((k, args[k]) for k in (args.keys() & cls._VALID_OPTS)):
+        args = sort_query_args(AnalyticsOptions, opt, opts, kwargs)
+        query = cls(statement, *args.positional, **args.named)
+        query.metrics = args.options.get("metrics", True)
+        for k, v in args.options.items():
             for target, transform in cls._VALID_OPTS[k].items():
                 setattr(query, target, transform(v))
         return query

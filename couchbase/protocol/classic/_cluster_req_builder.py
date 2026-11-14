@@ -19,7 +19,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from couchbase.common._observability import ObservableRequestHandler
-from couchbase.common._supportability import Supportability
+from couchbase.common._search_args import check_search_query_argument
 from couchbase.common.diagnostics import ClusterState, ServiceType
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.option_enums import OptionValidationMode
@@ -123,11 +123,7 @@ class ClusterRequestBuilder:
                              **kwargs: object) -> SearchQueryRequest:
         check_streaming_args((options,), kwargs, block=ClusterOptionsBlock.Search, options_type=SearchOptions,
                              mode=self._option_validation)
-        if isinstance(request, SearchQuery):
-            Supportability.method_param_type_deprecated('search', 'request', 'SearchQuery', 'SearchRequest')
-            query_builder = SearchQueryBuilder.create_search_query_object(index, request, options, **kwargs)
-        else:
-            query_builder = SearchQueryBuilder.create_search_query_from_request(index, request, options, **kwargs)
+        query_builder = SearchQueryBuilder.create_search_query_from_request(index, request, options, **kwargs)
 
         return SearchQueryRequest(query_builder, obs_handler)
 
@@ -139,10 +135,7 @@ class ClusterRequestBuilder:
                                    **kwargs: object) -> SearchQueryRequest:
         check_streaming_args((options,), kwargs, block=ClusterOptionsBlock.Search, options_type=SearchOptions,
                              mode=self._option_validation)
-        if isinstance(query, SearchRequest):
-            raise InvalidArgumentException(
-                message=('A SearchRequest is not a valid search_query() query. '
-                         'Pass it to search() instead.'))
+        check_search_query_argument(query)
 
         query_builder = SearchQueryBuilder.create_search_query_object(index, query, options, **kwargs)
 

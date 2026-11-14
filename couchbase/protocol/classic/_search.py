@@ -20,14 +20,13 @@ from collections.abc import Sequence
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
+from couchbase.common import _search_args
 from couchbase.common._observability import SpanProtocol
-from couchbase.common._option_spec import BLOCKS
-from couchbase.common._supportability import Supportability
+from couchbase.common._search_args import FacetDict
 from couchbase.common._transforms import to_milliseconds
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.common.options import SearchOptions
-from couchbase.common.search import (Facet,
-                                     HighlightStyle,
+from couchbase.common.search import (HighlightStyle,
                                      SearchScanConsistency,
                                      Sort)
 from couchbase.common.search_scoring import SearchScoring
@@ -39,48 +38,6 @@ if TYPE_CHECKING:
     from couchbase.common.search_request import SearchRequest
     from couchbase.common.vector_search import VectorSearch
     from couchbase.mutation_state import MutationState  # noqa: F401
-
-# The two deprecated search options warn from their setters rather than from `to_wire`, which
-# never sees a block a request builder maps, and in the words of their docstring directives.
-_DEPRECATED = {key: BLOCKS['SearchOptions'].keys[key].deprecated for key in ('disable_scoring', 'scope_name')}
-
-
-class _FacetDict(dict[str, Facet]):
-    """
-    Internal dict subclass which ensures that facets added to this dictionary
-    have properly defined ranges.
-    """
-
-    # noinspection PyMissingConstructor
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.update(*args, **kwargs)
-
-    def __setitem__(self, key: str, value: Facet) -> None:
-        if not isinstance(value, Facet):
-            raise ValueError('Can only add facet')
-        if hasattr(value, 'date_ranges') and not getattr(value, 'date_ranges'):
-            raise InvalidArgumentException(message=(f'{value.__class__.__name__} object must have at '
-                                                    'least one range. Use add_range()'))
-        if hasattr(value, 'numeric_ranges') and not getattr(value, 'numeric_ranges'):
-            raise InvalidArgumentException(message=(f'{value.__class__.__name__} object must have at '
-                                                    'least one range. Use add_range()'))
-
-        super().__setitem__(key, value)
-
-    def update(self, *args: Any, **kwargs: Any) -> None:
-        if args:
-            if len(args) > 1:
-                raise TypeError('only one merge at a time!')
-            other = dict(args[0])
-            for key in other:
-                self[key] = other[key]
-        for key in kwargs:
-            self[key] = kwargs[key]
-
-    def setdefault(self, key: str, value: Any = None) -> Facet:
-        if key not in self:
-            self[key] = value
-        return self[key]
 
 
 class SearchQueryBuilder:
@@ -125,7 +82,7 @@ class SearchQueryBuilder:
         self._params: dict[str, Any] = {}
         self._query = query
         self._vector_search = vector_search
-        self.facets = _FacetDict(**kwargs.pop('facets', {}))
+        self.facets = FacetDict(**kwargs.pop('facets', {}))
         self._sort: Sequence[str | Sort] | None = None
         sort = kwargs.pop('sort', None)
         if sort is not None:
@@ -255,7 +212,7 @@ class SearchQueryBuilder:
     def disable_scoring(self, value: bool) -> None:
         # False keeps the default behavior and does not need a warning.
         if value:
-            Supportability.option_deprecated('disable_scoring', message=_DEPRECATED['disable_scoring'])
+            _search_args.warn_deprecated('disable_scoring')
         self.set_option('disable_scoring', value)
 
     @property
@@ -264,10 +221,7 @@ class SearchQueryBuilder:
 
     @scoring.setter
     def scoring(self, value: SearchScoring) -> None:
-        if not isinstance(value, SearchScoring):
-            raise InvalidArgumentException(message=('Expected scoring to be of type SearchScoring, i.e. '
-                                                    'ReciprocalRankFusion, RelativeScoreFusion or ScoringNone.'))
-        self.set_option('scoring', value.as_encodable())
+        self.set_option('scoring', _search_args.scoring(value).as_encodable())
 
     @property
     def include_locations(self) -> bool:
@@ -283,8 +237,7 @@ class SearchQueryBuilder:
 
     @fields.setter
     def fields(self, value: list[str]) -> None:
-        if not (isinstance(value, list) and all(map(lambda f: isinstance(f, str), value))):
-            raise InvalidArgumentException(message='Expected a list of strings')
+        _search_args.check_string_list(value)
         self.set_option('fields', value)
 
     @property
@@ -298,15 +251,9 @@ class SearchQueryBuilder:
 
     @highlight_style.setter
     def highlight_style(self, value: HighlightStyle | str) -> None:
-        if isinstance(value, HighlightStyle):
-            self.set_option('highlight_style', value.value)
-        elif isinstance(value, str):
-            if value in [HighlightStyle.Html.value, HighlightStyle.Ansi.value]:
-                self.set_option('highlight_style', value)
-        else:
-            raise InvalidArgumentException(message=("Expected highlight_style to be either of type "
-                                                    "HighlightStyle or str representation "
-                                                    "of HighlightStyle"))
+        style = _search_args.highlight_style(value)
+        if style is not None:
+            self.set_option('highlight_style', style.value)
 
     @property
     def highlight_fields(self) -> list[str] | None:
@@ -314,8 +261,7 @@ class SearchQueryBuilder:
 
     @highlight_fields.setter
     def highlight_fields(self, value: list[str]) -> None:
-        if not (isinstance(value, list) and all(map(lambda f: isinstance(f, str), value))):
-            raise InvalidArgumentException(message='Expected a list of strings')
+        _search_args.check_string_list(value)
         self.set_option('highlight_fields', value)
 
     @property
@@ -335,27 +281,8 @@ class SearchQueryBuilder:
 
     @consistency.setter
     def consistency(self, value: SearchScanConsistency | str) -> None:
-        invalid_argument = False
         if 'mutation_state' not in self._params:
-            if isinstance(value, SearchScanConsistency):
-                if value == SearchScanConsistency.AT_PLUS:
-                    invalid_argument = True
-                else:
-                    self.set_option('scan_consistency', value.value)
-            elif isinstance(value, str) and value in [sc.value for sc in SearchScanConsistency]:
-                if value == SearchScanConsistency.AT_PLUS.value:
-                    invalid_argument = True
-                else:
-                    self.set_option('scan_consistency', value)
-            else:
-                raise InvalidArgumentException(message=("Expected consistency to be either of type "
-                                                        "SearchScanConsistency or str representation "
-                                                        "of SearchScanConsistency"))
-
-        if invalid_argument:
-            raise InvalidArgumentException(message=("Cannot set consistency to AT_PLUS.  Use "
-                                                    "consistent_with instead or set consistency "
-                                                    "to NOT_BOUNDED"))
+            self.set_option('scan_consistency', _search_args.scan_consistency(value).value)
 
     @property
     def consistent_with(self) -> dict[str, Any]:
@@ -388,12 +315,12 @@ class SearchQueryBuilder:
 
     @property
     def scope_name(self) -> str | None:
-        Supportability.option_deprecated('scope_name', message=_DEPRECATED['scope_name'])
+        _search_args.warn_deprecated('scope_name')
         return self._params.get('scope_name', None)
 
     @scope_name.setter
     def scope_name(self, value: str) -> None:
-        Supportability.option_deprecated('scope_name', message=_DEPRECATED['scope_name'])
+        _search_args.warn_deprecated('scope_name')
         self.set_option('scope_name', value)
 
     @property
@@ -402,8 +329,7 @@ class SearchQueryBuilder:
 
     @collections.setter
     def collections(self, value: list[str]) -> None:
-        if not (isinstance(value, list) and all(map(lambda f: isinstance(f, str), value))):
-            raise InvalidArgumentException(message='Expected a list of strings')
+        _search_args.check_string_list(value)
         self.set_option('collections', value)
 
     @property
@@ -420,15 +346,7 @@ class SearchQueryBuilder:
 
     @sort.setter
     def sort(self, value: list[str] | list[Sort] | list[str | Sort]) -> None:
-        if isinstance(value, str):
-            value = [value]
-        if all(map(lambda s: isinstance(s, str), value)):
-            self._sort = value
-        elif all(map(lambda s: isinstance(s, (Sort, str)), value)):
-            self._sort = value
-        else:
-            raise InvalidArgumentException(
-                message='sort option must be list[str] | list[Sort] | list[Sort | str]')
+        self._sort = _search_args.sort(value)
 
     @property
     def raw(self) -> dict[str, Any] | None:
@@ -450,8 +368,7 @@ class SearchQueryBuilder:
 
     @serializer.setter
     def serializer(self, value: Serializer) -> None:
-        if not issubclass(value.__class__, Serializer):
-            raise InvalidArgumentException(message='Serializer should implement Serializer interface.')
+        _search_args.check_serializer(value)
         self.set_option('serializer', value)
 
     @property
@@ -489,15 +406,9 @@ class SearchQueryBuilder:
 
     @vector_query_combination.setter
     def vector_query_combination(self, value: VectorQueryCombination | str) -> None:
-        if isinstance(value, VectorQueryCombination):
-            self.set_option('vector_query_combination', value.value)
-        elif isinstance(value, str):
-            if value.lower() in [VectorQueryCombination.AND.value, VectorQueryCombination.OR.value]:
-                self.set_option('vector_query_combination', value.lower())
-        else:
-            raise InvalidArgumentException(message=("Expected vector_query_combination to be either of type "
-                                                    "VectorQueryCombination or str representation "
-                                                    "of VectorQueryCombination"))
+        combination = _search_args.vector_query_combination(value)
+        if combination is not None:
+            self.set_option('vector_query_combination', combination.value)
 
     @property
     def log_request(self) -> bool:
@@ -517,8 +428,7 @@ class SearchQueryBuilder:
 
     def _validate_options(self) -> None:
         # Option order is undefined, so validate combinations after applying all options.
-        if 'scoring' in self._params and self._params.get('disable_scoring', False):
-            raise InvalidArgumentException(message='scoring cannot be used together with disable_scoring.')
+        _search_args.check_scoring_alone('scoring' in self._params, self._params.get('disable_scoring', False))
 
     @classmethod
     def _apply_opts(cls, query: SearchQueryBuilder, args: dict[str, Any]) -> SearchQueryBuilder:
@@ -534,64 +444,36 @@ class SearchQueryBuilder:
                                    search_query: SearchQuery,
                                    *options: SearchOptions | None,
                                    **kwargs: Any) -> SearchQueryBuilder:
-        args = SearchQueryBuilder.get_search_query_args(*options, **kwargs)
-
-        facets = args.pop('facets', {})
-        sort = args.pop('sort', None)
-
-        query = cls(index_name, query=search_query, facets=facets, sort=sort)
-
-        # metrics defaults to True
-        query.metrics = args.get("metrics", True)
-
-        return cls._apply_opts(query, args)
+        return cls._create(index_name, search_query, None, _search_args.search_args(*options, **kwargs))
 
     @classmethod
     def create_search_query_from_request(cls,
                                          index_name: str,
-                                         request: SearchRequest,
+                                         request: SearchRequest | SearchQuery,
                                          *options: SearchOptions | None,
                                          **kwargs: Any) -> SearchQueryBuilder:
-        args = SearchQueryBuilder.get_search_query_args(*options, **kwargs)
+        """The builder for `search()`, which takes a request, or a bare query with a deprecation warning."""
+        search_query, vector_search = _search_args.search_argument(request)
+        return cls._create(index_name, search_query, vector_search, _search_args.search_args(*options, **kwargs))
 
+    @classmethod
+    def _create(cls,
+                index_name: str,
+                search_query: SearchQuery,
+                vector_search: VectorSearch | None,
+                args: dict[str, Any]) -> SearchQueryBuilder:
         facets = args.pop('facets', {})
         sort = args.pop('sort', None)
 
-        # the search_query should default to MatchNoneQuery if SearchRequest only has vector_search
-        search_query = request.search_query
-        if search_query is None:
-            # avoid circular import
-            from couchbase.common.search_queries import MatchNoneQuery
-            search_query = MatchNoneQuery()
-
         # only set query vector_query_combination if applicable
-        if request.vector_search and request.vector_search.options:
-            combo = request.vector_search.options.get('vector_query_combination', None)
+        if vector_search and vector_search.options:
+            combo = vector_search.options.get('vector_query_combination', None)
             if combo:
                 args['vector_query_combination'] = combo
 
-        query = cls(index_name,
-                    query=search_query,
-                    vector_search=request.vector_search,
-                    facets=facets,
-                    sort=sort)
+        query = cls(index_name, query=search_query, vector_search=vector_search, facets=facets, sort=sort)
 
         # metrics defaults to True
         query.metrics = args.get("metrics", True)
-        # show_request defaults to False
-        query.show_request = args.get("show_request", False)
 
         return cls._apply_opts(query, args)
-
-    @staticmethod
-    def get_search_query_args(*options: SearchOptions | None, **kwargs: Any) -> dict[str, Any]:
-        # lets make a copy of the options, and update with kwargs...
-        opt = SearchOptions()
-        opts = list(options)
-        for o in opts:
-            if isinstance(o, SearchOptions):
-                opt = o
-                opts.remove(o)
-        args = opt.copy()
-        args.update(kwargs)
-        return args
