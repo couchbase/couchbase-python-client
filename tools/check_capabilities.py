@@ -213,8 +213,9 @@ def declarations(root: pathlib.Path) -> tuple[list[Declaration], list[str]]:
         checked: set[str] = set()
         for node in ast.walk(tree):
             if (isinstance(node, ast.Assign) and any(_name(t) == 'CAPABILITIES' for t in node.targets)
-                    and isinstance(node.value, ast.Call) and node.value.args):
-                elements = node.value.args[0]
+                    and isinstance(node.value, ast.Call)):
+                # `frozenset[Capability]()` declares none.
+                elements = node.value.args[0] if node.value.args else ast.Set(elts=[])
                 items = elements.elts if isinstance(elements, (ast.Set, ast.List, ast.Tuple)) else []
                 declared = {_capability(e) or '?' for e in items}
             elif isinstance(node, ast.If) and _name(node.test) == 'TYPE_CHECKING':

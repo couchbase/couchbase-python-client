@@ -1,0 +1,23 @@
+# The couchbase2 protocol's schema and the tools that turn it into
+# `couchbase/protocol/couchbase2/_generated/`.  Changing anything here means regenerating:
+#
+#   python -m tools.autogen protos generate --write
+#
+# protostellar  the schema.  `digest` is `core.protos.digest` over its `.proto` files, which is
+#               what the download, or a checkout passed with `--source`, is checked against.
+# generator     the tools `protoc` runs from, in a venv of their own.  The protoc inside
+#               `grpcio-tools` sets the oldest `protobuf` and `grpcio` the generated code loads on,
+#               so raising it raises the floor for every user.
+#               `googleapis-common-protos` supplies `google/rpc/status.proto` to import from.
+#               `mypy-protobuf` writes the service modules' stubs, `*_pb2_grpc.pyi`, which protoc
+#               does not.  Its release has to suit the `protobuf` major the code targets.
+
+protostellar:
+  repository: https://github.com/couchbase/protostellar
+  commit: 36d4d9aba03a388f7edb05290f1093d9497b1005
+  digest: b5f4770c37f42c6ebbf3f5f327f21911d6d39c60636c3b9c0e3af678adadadf6
+
+generator:
+  grpcio-tools: 1.71.2
+  googleapis-common-protos: 1.73.1
+  mypy-protobuf: 3.6.0

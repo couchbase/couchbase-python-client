@@ -21,6 +21,7 @@ from pathlib import Path
 import click
 
 from tools.autogen.commands.operations import operations_group
+from tools.autogen.commands.protos import protos_group
 
 
 class _Lazy(click.Group):
@@ -65,6 +66,7 @@ def cli(ctx):
 # Register command groups.
 
 cli.add_command(operations_group)
+cli.add_command(protos_group)
 
 
 if __name__ == "__main__":

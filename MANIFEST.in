@@ -1,6 +1,7 @@
 include *.txt LICENSE CONTRIBUTING.md BUILDING.md CMakeLists.txt pyproject.toml couchbase_version.py pycbc_build_setup.py
 include couchbase-sdk-python-black-duck-manifest.yaml
 recursive-include couchbase *.py
+recursive-include couchbase/protocol/couchbase2/_generated *.pyi
 recursive-include acouchbase *.py
 recursive-include txcouchbase *.py
 include couchbase/py.typed acouchbase/py.typed txcouchbase/py.typed

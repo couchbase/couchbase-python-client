@@ -9,3 +9,8 @@ pytest-rerunfailures~=15.1
 pytest-xdist~=3.8
 requests~=2.26
 Twisted~=24.7
+# What the couchbase2 protocol runs on, for its unit tests; the floor is the generated code's.
+certifi
+googleapis-common-protos
+grpcio>=1.71.2
+protobuf>=5.29.0

@@ -2269,6 +2269,9 @@ modules:
   couchbase.protocol.classic:
     public: []
     compat: {}
+  couchbase.protocol.couchbase2:
+    public: []
+    compat: {}
   couchbase.replica_reads:
     docs: true
     public:
@@ -3328,6 +3331,9 @@ counterparts:
   couchbase.protocol.classic:
     acouchbase: own
     txcouchbase: own
+  couchbase.protocol.couchbase2:
+    acouchbase: 'none: the couchbase2 cluster has no asyncio impl yet'
+    txcouchbase: 'none: the couchbase2 cluster has no Twisted impl yet'
   couchbase.replica_reads:
     acouchbase: shim
     txcouchbase: shim

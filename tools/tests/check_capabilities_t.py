@@ -205,6 +205,12 @@ def test_a_protocol_without_a_declaration_is_a_finding(tree: pathlib.Path) -> No
     assert any("protocol 'couchbase2' declares no capabilities" in p for p in problems)
 
 
+def test_a_protocol_may_declare_no_capabilities(tree: pathlib.Path) -> None:
+    _write(tree, 'couchbase/protocol/couchbase2/__init__.py', '')
+    _write(tree, 'couchbase/protocol/couchbase2/_capabilities.py', 'CAPABILITIES = frozenset[Capability]()\n')
+    assert check(tree, _FACADES)[1] == []
+
+
 def test_the_tree_is_clean() -> None:
     sites, problems = check(ROOT, FACADES)
     assert problems == []

@@ -39,6 +39,8 @@ PYCBC_VERSION = couchbase_version.get_version()
 
 
 package_data = {pkg: ['py.typed'] for pkg in ('couchbase', 'acouchbase', 'txcouchbase')}
+# find_packages takes modules only, so the stubs beside the generated protobuf modules are named here.
+package_data['couchbase.protocol.couchbase2._generated'] = ['**/*.pyi']
 # some more Windows tomfoolery...
 if platform.system() == 'Windows':
     # glob so both build modes match: _core.pyd (abi3) and _core.cp3XY-win_amd64.pyd
@@ -51,6 +53,16 @@ if not CMAKE_EXE:
     setup_requires += ["cmake>=3.19.0,<4.0.0"]
 
 print(f'Python SDK version: {PYCBC_VERSION}')
+
+# What couchbase2:// needs.  The floor is the oldest release the generated code loads on, and on 3.15
+# the first grpcio with wheels for it.
+couchbase2_requires = [
+    'certifi',
+    'googleapis-common-protos>=1.63.1',
+    'grpcio>=1.71.2',
+    'grpcio>=1.84.0; python_version>="3.15"',
+    'protobuf>=5.29.0',
+]
 
 # Optional dependencies
 extras_require = {
@@ -72,6 +84,7 @@ setup(name='couchbase',
       python_requires='>=3.10',
       install_requires=[
           'typing-extensions>=4.14; python_version<"3.13"',
+          *couchbase2_requires,
       ],
       setup_requires=setup_requires,
       extras_require=extras_require,

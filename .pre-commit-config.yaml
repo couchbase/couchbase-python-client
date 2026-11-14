@@ -4,8 +4,12 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.6.0
     hooks:
+      # protoc's output is checked in exactly as written, so no hook that rewrites or lints source
+      # touches it; the autogen-protos hook below holds it to the generator instead.
       - id: trailing-whitespace
+        exclude: &generated ^couchbase/protocol/couchbase2/_generated/
       - id: end-of-file-fixer
+        exclude: *generated
       - id: check-yaml
         args: [--allow-multiple-documents]
       - id: check-added-large-files
@@ -23,7 +27,7 @@ repos:
     rev: v2.3.2
     hooks:
       - id: autopep8
-        exclude: ^(deps/|src/)
+        exclude: ^(deps/|src/|couchbase/protocol/couchbase2/_generated/)
   - repo: https://github.com/pycqa/flake8
     rev: 5.0.4
     hooks:
@@ -36,7 +40,8 @@ repos:
               simple_couchbase.py|
               simple_txcouchbase.py|
               couchbase_kv_tests.py|
-              examples/
+              examples/|
+              couchbase/protocol/couchbase2/_generated/
           )
         args:
           [
@@ -67,6 +72,10 @@ repos:
         # to be repeated here; it cannot see dev_requirements.txt.
         additional_dependencies:
           - types-requests~=2.32
+          - types-grpcio~=1.84
+          - types-protobuf
+          - googleapis-common-protos
+          - certifi
           - pytest~=8.3.5
           - pytest-asyncio~=1.1
           - Twisted~=24.7
@@ -137,11 +146,13 @@ repos:
         name: modules outside classic import without the native extension, against a baseline
         # Each module is imported in an interpreter that refuses the package's extensions, so it
         # needs what the modules import at load: typing-extensions below 3.13, Twisted for
-        # txcouchbase and the OpenTelemetry API for `couchbase.otel_tracer`.  A module that fails
-        # for want of one is reported as unchecked, not passed.  Rationale in the module docstring.
+        # txcouchbase, the OpenTelemetry API for `couchbase.otel_tracer`, and grpcio, the
+        # `google.rpc` messages and certifi for couchbase2.  A module that fails for want of one is
+        # reported as unchecked, not passed.  Rationale in the module docstring.
         entry: python tools/check_binding_free_imports.py
         language: python
-        additional_dependencies: ['typing-extensions>=4.14', 'Twisted~=24.7', 'opentelemetry-api~=1.22']
+        additional_dependencies: ['typing-extensions>=4.14', 'Twisted~=24.7', 'opentelemetry-api~=1.22',
+                                  'grpcio>=1.71.2', 'googleapis-common-protos', 'certifi']
         pass_filenames: false
         files: ^((a|tx)?couchbase/.*\.py|tools/check_binding_free_imports\.py|tools/binding_free_imports_baseline\.txt)$
       - id: check-api-parity
@@ -187,7 +198,8 @@ repos:
           (?x)^(
               deps/|
               src/|
-              examples/txcouchbase/
+              examples/txcouchbase/|
+              couchbase/protocol/couchbase2/_generated/
           )
         args:
           [
@@ -207,6 +219,16 @@ repos:
         additional_dependencies: [click, jinja2, pyyaml]
         pass_filenames: false
         files: ^(tools/autogen/(cli\.py|(config|templates|core|commands)/operations[./])|couchbase/common/_operations\.py$)
+      - id: autogen-protos
+        name: Protostellar against the code generated from it
+        # Downloads the pinned schema and builds a venv for the pinned grpcio-tools on the first
+        # run, both into ~/.cache/pycbc-autogen; later runs are offline.  Rationale in the docstring
+        # of tools/autogen/core/protos.py.
+        entry: python -m tools.autogen protos check
+        language: python
+        additional_dependencies: [click, jinja2, pyyaml]
+        pass_filenames: false
+        files: ^(tools/autogen/(cli\.py|(config|core|commands)/protos[./])|couchbase/protocol/couchbase2/_generated/)
   - repo: local
     hooks:
       - id: docgen
@@ -236,7 +258,8 @@ repos:
               simple_couchbase.py|
               simple_txcouchbase.py|
               couchbase_kv_tests.py|
-              couchbase_version.py
+              couchbase_version.py|
+              couchbase/protocol/couchbase2/_generated/
           )
         args:
           [

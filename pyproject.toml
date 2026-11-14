@@ -64,6 +64,23 @@ warn_unused_ignores = true
 # so it names the code as well.
 enable_error_code = ["ignore-without-code"]
 
+# `googleapis-common-protos` ships a `.pyi` beside every module but no `py.typed`, so mypy has to be
+# told to read them.
+[[tool.mypy.overrides]]
+module = ["google.rpc", "google.rpc.*"]
+follow_untyped_imports = true
+
+# protoc and mypy-protobuf output, regenerated rather than edited, and checked like the rest.
+# mypy-protobuf's stubs carry ignores that types-grpcio leaves unused.  protoc leaves `**kwargs`
+# unannotated on `HookAction.__init__`.
+[[tool.mypy.overrides]]
+module = ["couchbase.protocol.couchbase2._generated.*"]
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = ["couchbase.protocol.couchbase2._generated.internal.hooks.v1.hooks_pb2"]
+disable_error_code = ["no-untyped-def"]
+
 # Third-party packages that ship no stubs.  These are test-only dependencies and none of
 # them appear in an annotation we care about checking.
 [[tool.mypy.overrides]]
@@ -91,7 +108,7 @@ line-length = 120
 # pre-commit passes file names, and ruff checks a named file even when `exclude` matches it
 # unless this is set.
 force-exclude = true
-extend-exclude = ["deps", "src", "examples"]
+extend-exclude = ["deps", "src", "examples", "couchbase/protocol/couchbase2/_generated"]
 
 [tool.ruff.lint]
 select = ["UP006", "UP007", "UP035", "UP045", "TID251", "D"]

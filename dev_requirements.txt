@@ -6,6 +6,7 @@ isort==5.13.2
 mypy~=2.3
 pre-commit~=4.2.0
 ruff==0.16.9
+types-grpcio~=1.84
 types-requests~=2.32
 -r test_requirements.txt
 -r sphinx_requirements.txt
