@@ -85,77 +85,79 @@ TIMEOUT = OptionSpec('timeout', duration=True)
 # ==========================================================================================
 # cluster
 # ==========================================================================================
-ALLOWED_SASL_MECHANISMS = OptionSpec('allowed_sasl_mechanisms', suggest=False)
-ALLOW_ENTERPRISE_ANALYTICS = OptionSpec('allow_enterprise_analytics')
-ANALYTICS_TIMEOUT = OptionSpec('analytics_timeout', duration=True)
-APP_TELEMETRY_BACKOFF = OptionSpec('app_telemetry_backoff', duration=True)
-APP_TELEMETRY_ENDPOINT = OptionSpec('app_telemetry_endpoint')
-APP_TELEMETRY_PING_INTERVAL = OptionSpec('app_telemetry_ping_interval', duration=True)
-APP_TELEMETRY_PING_TIMEOUT = OptionSpec('app_telemetry_ping_timeout', duration=True)
+ALLOWED_SASL_MECHANISMS = OptionSpec('allowed_sasl_mechanisms', suggest=False, inert=frozenset({'couchbase2'}))
+ALLOW_ENTERPRISE_ANALYTICS = OptionSpec('allow_enterprise_analytics', inert=frozenset({'couchbase2'}))
+ANALYTICS_TIMEOUT = OptionSpec('analytics_timeout', inert=frozenset({'couchbase2'}), duration=True)
+APP_TELEMETRY_BACKOFF = OptionSpec('app_telemetry_backoff', inert=frozenset({'couchbase2'}), duration=True)
+APP_TELEMETRY_ENDPOINT = OptionSpec('app_telemetry_endpoint', inert=frozenset({'couchbase2'}))
+APP_TELEMETRY_PING_INTERVAL = OptionSpec('app_telemetry_ping_interval', inert=frozenset({'couchbase2'}), duration=True)
+APP_TELEMETRY_PING_TIMEOUT = OptionSpec('app_telemetry_ping_timeout', inert=frozenset({'couchbase2'}), duration=True)
 AUTHENTICATOR = OptionSpec('authenticator')
-BOOTSTRAP_TIMEOUT = OptionSpec('bootstrap_timeout', duration=True)
+BOOTSTRAP_TIMEOUT = OptionSpec('bootstrap_timeout', inert=frozenset({'couchbase2'}), duration=True)
 CERT_PATH = OptionSpec('cert_path', suggest=False)
-COMPRESSION = OptionSpec('compression', inert=frozenset({'classic'}))
-COMPRESSION_MIN_RATIO = OptionSpec('compression_min_ratio', inert=frozenset({'classic'}))
-COMPRESSION_MIN_SIZE = OptionSpec('compression_min_size', inert=frozenset({'classic'}))
-CONFIG_IDLE_REDIAL_TIMEOUT = OptionSpec('config_idle_redial_timeout', duration=True)
-CONFIG_POLL_FLOOR = OptionSpec('config_poll_floor', duration=True)
-CONFIG_POLL_INTERVAL = OptionSpec('config_poll_interval', duration=True)
-CONFIG_TOTAL_TIMEOUT = OptionSpec('config_total_timeout', inert=frozenset({'classic'}), deprecated='It has no effect.',
-                                  duration=True)
-CONNECT_TIMEOUT = OptionSpec('connect_timeout', duration=True)
+COMPRESSION = OptionSpec('compression', inert=frozenset({'classic', 'couchbase2'}))
+COMPRESSION_MIN_RATIO = OptionSpec('compression_min_ratio', inert=frozenset({'classic', 'couchbase2'}))
+COMPRESSION_MIN_SIZE = OptionSpec('compression_min_size', inert=frozenset({'classic', 'couchbase2'}))
+CONFIG_IDLE_REDIAL_TIMEOUT = OptionSpec('config_idle_redial_timeout', inert=frozenset({'couchbase2'}), duration=True)
+CONFIG_POLL_FLOOR = OptionSpec('config_poll_floor', inert=frozenset({'couchbase2'}), duration=True)
+CONFIG_POLL_INTERVAL = OptionSpec('config_poll_interval', inert=frozenset({'couchbase2'}), duration=True)
+CONFIG_TOTAL_TIMEOUT = OptionSpec('config_total_timeout', inert=frozenset({'classic', 'couchbase2'}),
+                                  deprecated='It has no effect.', duration=True)
+CONNECT_TIMEOUT = OptionSpec('connect_timeout', inert=frozenset({'couchbase2'}), duration=True)
 DESIRED_STATE = OptionSpec('desired_state')
 DISABLE_MOZILLA_CA_CERTIFICATES = OptionSpec('disable_mozilla_ca_certificates')
-DNS_NAMESERVER = OptionSpec('dns_nameserver')
-DNS_PORT = OptionSpec('dns_port')
-DNS_SRV_TIMEOUT = OptionSpec('dns_srv_timeout', duration=True)
-DUMP_CONFIGURATION = OptionSpec('dump_configuration')
+DNS_NAMESERVER = OptionSpec('dns_nameserver', inert=frozenset({'couchbase2'}))
+DNS_PORT = OptionSpec('dns_port', inert=frozenset({'couchbase2'}))
+DNS_SRV_TIMEOUT = OptionSpec('dns_srv_timeout', inert=frozenset({'couchbase2'}), duration=True)
+DUMP_CONFIGURATION = OptionSpec('dump_configuration', inert=frozenset({'couchbase2'}))
 EMIT_INTERVAL = OptionSpec('emit_interval', duration=True)
-ENABLE_APP_TELEMETRY = OptionSpec('enable_app_telemetry')
-ENABLE_CLUSTERMAP_NOTIFICATION = OptionSpec('enable_clustermap_notification')
-ENABLE_COMPRESSION = OptionSpec('enable_compression')
-ENABLE_DNS_SRV = OptionSpec('enable_dns_srv')
-ENABLE_LAZY_CONNECTIONS = OptionSpec('enable_lazy_connections')
+ENABLE_APP_TELEMETRY = OptionSpec('enable_app_telemetry', inert=frozenset({'couchbase2'}))
+ENABLE_CLUSTERMAP_NOTIFICATION = OptionSpec('enable_clustermap_notification', inert=frozenset({'couchbase2'}))
+ENABLE_COMPRESSION = OptionSpec('enable_compression', inert=frozenset({'couchbase2'}))
+ENABLE_DNS_SRV = OptionSpec('enable_dns_srv', inert=frozenset({'couchbase2'}))
+ENABLE_LAZY_CONNECTIONS = OptionSpec('enable_lazy_connections', inert=frozenset({'couchbase2'}))
 ENABLE_METRICS = OptionSpec('enable_metrics')
-ENABLE_MUTATION_TOKENS = OptionSpec('enable_mutation_tokens')
-ENABLE_ORPHAN_REPORTING = OptionSpec('enable_orphan_reporting')
-ENABLE_TCP_KEEP_ALIVE = OptionSpec('enable_tcp_keep_alive')
+ENABLE_MUTATION_TOKENS = OptionSpec('enable_mutation_tokens', inert=frozenset({'couchbase2'}))
+ENABLE_ORPHAN_REPORTING = OptionSpec('enable_orphan_reporting', inert=frozenset({'couchbase2'}))
+ENABLE_TCP_KEEP_ALIVE = OptionSpec('enable_tcp_keep_alive', inert=frozenset({'couchbase2'}))
 ENABLE_TLS = OptionSpec('enable_tls')
 ENABLE_TRACING = OptionSpec('enable_tracing')
-ENABLE_UNORDERED_EXECUTION = OptionSpec('enable_unordered_execution')
-IDLE_HTTP_CONNECTION_TIMEOUT = OptionSpec('idle_http_connection_timeout', duration=True)
-IP_PROTOCOL = OptionSpec('ip_protocol')
+ENABLE_UNORDERED_EXECUTION = OptionSpec('enable_unordered_execution', inert=frozenset({'couchbase2'}))
+IDLE_HTTP_CONNECTION_TIMEOUT = OptionSpec('idle_http_connection_timeout', inert=frozenset({'couchbase2'}),
+                                          duration=True)
+IP_PROTOCOL = OptionSpec('ip_protocol', inert=frozenset({'couchbase2'}))
 KV_DURABLE_TIMEOUT = OptionSpec('kv_durable_timeout', duration=True)
 KV_TIMEOUT = OptionSpec('kv_timeout', duration=True)
-LOCKMODE = OptionSpec('lockmode', inert=frozenset({'classic'}), deprecated='It has no effect.')
+LOCKMODE = OptionSpec('lockmode', inert=frozenset({'classic', 'couchbase2'}), deprecated='It has no effect.')
 LOGGING_METER_EMIT_INTERVAL = OptionSpec('logging_meter_emit_interval', deprecated='Use ClusterMetricsOptions instead.',
                                          duration=True)
 LOG_REDACTION = OptionSpec('log_redaction')
 MANAGEMENT_TIMEOUT = OptionSpec('management_timeout', duration=True)
-MAX_HTTP_CONNECTIONS = OptionSpec('max_http_connections')
+MAX_HTTP_CONNECTIONS = OptionSpec('max_http_connections', inert=frozenset({'couchbase2'}))
 METER = OptionSpec('meter')
 METRICS_OPTIONS = OptionSpec('metrics_options')
-NETWORK = OptionSpec('network')
-NUM_IO_THREADS = OptionSpec('num_io_threads', suggest=False)
+NETWORK = OptionSpec('network', inert=frozenset({'couchbase2'}))
+NUM_IO_THREADS = OptionSpec('num_io_threads', suggest=False, inert=frozenset({'couchbase2'}))
 OPTION_VALIDATION = OptionSpec('option_validation')
 ORPHAN_REPORTING_OPTIONS = OptionSpec('orphan_reporting_options')
-PREFERRED_SERVER_GROUP = OptionSpec('preferred_server_group')
+PREFERRED_SERVER_GROUP = OptionSpec('preferred_server_group', inert=frozenset({'couchbase2'}))
 QUERY_TIMEOUT = OptionSpec('query_timeout', duration=True)
 REPORT_ID = OptionSpec('report_id')
-RESOLVE_TIMEOUT = OptionSpec('resolve_timeout', duration=True)
-SAMPLE_SIZE = OptionSpec('sample_size')
+RESOLVE_TIMEOUT = OptionSpec('resolve_timeout', inert=frozenset({'couchbase2'}), duration=True)
+SAMPLE_SIZE = OptionSpec('sample_size', inert=frozenset({'couchbase2'}))
 SEARCH_TIMEOUT = OptionSpec('search_timeout', duration=True)
 SERVICE_TYPES = OptionSpec('service_types')
-SHOW_QUERIES = OptionSpec('show_queries')
-TCP_KEEP_ALIVE_INTERVAL = OptionSpec('tcp_keep_alive_interval', duration=True)
+SHOW_QUERIES = OptionSpec('show_queries', inert=frozenset({'couchbase2'}))
+TCP_KEEP_ALIVE_INTERVAL = OptionSpec('tcp_keep_alive_interval', inert=frozenset({'couchbase2'}), duration=True)
 TIMEOUT_OPTIONS = OptionSpec('timeout_options')
 TLS_VERIFY = OptionSpec('tls_verify')
 TRACER = OptionSpec('tracer')
 TRACING_OPTIONS = OptionSpec('tracing_options')
 TRACING_ORPHANED_QUEUE_FLUSH_INTERVAL = OptionSpec('tracing_orphaned_queue_flush_interval',
+                                                   inert=frozenset({'couchbase2'}),
                                                    deprecated='Use ClusterOrphanReportingOptions instead.',
                                                    duration=True)
-TRACING_ORPHANED_QUEUE_SIZE = OptionSpec('tracing_orphaned_queue_size',
+TRACING_ORPHANED_QUEUE_SIZE = OptionSpec('tracing_orphaned_queue_size', inert=frozenset({'couchbase2'}),
                                          deprecated='Use ClusterOrphanReportingOptions instead.')
 TRACING_THRESHOLD_ANALYTICS = OptionSpec('tracing_threshold_analytics', duration=True)
 TRACING_THRESHOLD_EVENTING = OptionSpec('tracing_threshold_eventing', duration=True)
@@ -166,10 +168,10 @@ TRACING_THRESHOLD_QUEUE_FLUSH_INTERVAL = OptionSpec('tracing_threshold_queue_flu
 TRACING_THRESHOLD_QUEUE_SIZE = OptionSpec('tracing_threshold_queue_size')
 TRACING_THRESHOLD_SEARCH = OptionSpec('tracing_threshold_search', duration=True)
 TRACING_THRESHOLD_VIEW = OptionSpec('tracing_threshold_view', duration=True)
-TRANSACTION_CONFIG = OptionSpec('transaction_config')
+TRANSACTION_CONFIG = OptionSpec('transaction_config', inert=frozenset({'couchbase2'}))
 TRUST_STORE_PATH = OptionSpec('trust_store_path')
 USER_AGENT_EXTRA = OptionSpec('user_agent_extra')
-VIEWS_TIMEOUT = OptionSpec('views_timeout', duration=True)
+VIEWS_TIMEOUT = OptionSpec('views_timeout', inert=frozenset({'couchbase2'}), duration=True)
 
 # ==========================================================================================
 # kv
@@ -313,7 +315,7 @@ BLOCKS: dict[str, BlockSpec] = {
     ),
     'ClusterOptions': block(
         AUTHENTICATOR, OPTION_VALIDATION, ALLOWED_SASL_MECHANISMS, CERT_PATH, NUM_IO_THREADS,
-        replace(SPAN, inert=frozenset({'classic'})), TRUST_STORE_PATH, TIMEOUT_OPTIONS,
+        replace(SPAN, inert=frozenset({'classic', 'couchbase2'})), TRUST_STORE_PATH, TIMEOUT_OPTIONS,
         ORPHAN_REPORTING_OPTIONS, METRICS_OPTIONS, TRACING_OPTIONS, ENABLE_TLS, ENABLE_MUTATION_TOKENS,
         ENABLE_TCP_KEEP_ALIVE, IP_PROTOCOL, ENABLE_DNS_SRV, SHOW_QUERIES, ENABLE_UNORDERED_EXECUTION,
         ENABLE_CLUSTERMAP_NOTIFICATION, ENABLE_COMPRESSION, ENABLE_TRACING, ENABLE_METRICS,
@@ -336,14 +338,14 @@ BLOCKS: dict[str, BlockSpec] = {
             replace(EMIT_INTERVAL, stored='metrics_emit_interval'),
             replace(ENABLE_ORPHAN_REPORTING, stored='orphan_enable_orphan_reporting'),
             replace(SAMPLE_SIZE, stored='orphan_sample_size'),
-            replace(EMIT_INTERVAL, stored='orphan_emit_interval'),
+            replace(EMIT_INTERVAL, inert=frozenset({'couchbase2'}), stored='orphan_emit_interval'),
         ),
         refuses_unknown=True,
     ),
     'ClusterOrphanReportingOptions': block(
         replace(ENABLE_ORPHAN_REPORTING, stored='orphan_enable_orphan_reporting'),
         replace(SAMPLE_SIZE, stored='orphan_sample_size'),
-        replace(EMIT_INTERVAL, stored='orphan_emit_interval'),
+        replace(EMIT_INTERVAL, inert=frozenset({'couchbase2'}), stored='orphan_emit_interval'),
         refuses_unknown=True,
     ),
     'ClusterTimeoutOptions': block(
@@ -367,7 +369,8 @@ BLOCKS: dict[str, BlockSpec] = {
         TIMEOUT, REPORT_ID, SERVICE_TYPES, replace(PARENT_SPAN, inert=frozenset({'classic'})),
     ),
     'WaitUntilReadyOptions': block(
-        DESIRED_STATE, SERVICE_TYPES, TIMEOUT, PARENT_SPAN,
+        replace(DESIRED_STATE, inert=frozenset({'couchbase2'})),
+        replace(SERVICE_TYPES, inert=frozenset({'couchbase2'})), TIMEOUT, PARENT_SPAN,
     ),
 
     # ==========================================================================================

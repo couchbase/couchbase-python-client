@@ -27,11 +27,17 @@ from couchbase.common._registry import ImplKey, resolve
 from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.exceptions import FeatureUnavailableException
 from couchbase.protocol.classic import _registry as classic_registry
+from couchbase.protocol.couchbase2 import _registry as couchbase2_registry
 from tests.test_features import TestProtocol
 
-# What is checked here is classic's registration.
+# It reads classic's registration as well as couchbase2's, so a couchbase2 run skips it and a
+# classic run checks both.
 pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
+_REGISTRIES = {
+    CouchbaseProtocol.CLASSIC: classic_registry.IMPLS,
+    CouchbaseProtocol.COUCHBASE2: couchbase2_registry.IMPLS,
+}
 _REPO_ROOT = pathlib.Path(couchbase.__file__).resolve().parents[1]
 
 
@@ -68,26 +74,57 @@ class ImplRegistryUnitTests:
     def test_the_protocol_is_read_from_the_scheme(self, connstr: str, expected: CouchbaseProtocol) -> None:
         assert CouchbaseProtocol.from_connstr(connstr) is expected
 
-    def test_classic_registers_exactly_the_declared_keys(self) -> None:
-        assert set(classic_registry.IMPLS) == set(_keys())
+    def test_every_protocol_registers(self) -> None:
+        assert _registry.registered_protocols() == frozenset(CouchbaseProtocol)
 
-    def test_each_classic_entry_names_a_class_its_module_defines(self) -> None:
+    @pytest.mark.parametrize('protocol', list(CouchbaseProtocol))
+    def test_a_protocol_registers_exactly_the_declared_keys(self, protocol: CouchbaseProtocol) -> None:
+        assert set(_REGISTRIES[protocol]) == set(_keys())
+
+    @pytest.mark.parametrize('protocol', list(CouchbaseProtocol))
+    def test_each_entry_names_a_class_its_module_defines(self, protocol: CouchbaseProtocol) -> None:
+        package = protocol.name.lower()
         missing = []
-        for name, target in classic_registry.IMPLS.items():
+        for name, target in _REGISTRIES[protocol].items():
             module, _, cls = target.partition(':')
-            if not module.startswith(f'{_api(name)}.protocol.classic.') or not _defines(module, cls):
+            if not module.startswith(f'{_api(name)}.protocol.{package}.') or not _defines(module, cls):
                 missing.append(name)
         assert missing == []
 
-    @pytest.mark.parametrize('name', sorted(name for name in classic_registry.IMPLS if _api(name) == 'couchbase'))
-    def test_a_sync_key_resolves_to_the_class_it_names(self, name: str) -> None:
-        impl = resolve(_keys()[name], CouchbaseProtocol.CLASSIC)
-        assert impl.__name__ == f'{name}Impl'
-        assert impl.__module__.startswith('couchbase.protocol.classic.')
+    @pytest.mark.parametrize('protocol', list(CouchbaseProtocol))
+    def test_the_sync_key_resolves_to_the_class_it_names(self, protocol: CouchbaseProtocol) -> None:
+        impl = resolve(_registry.CLUSTER, protocol)
+        assert impl.__name__ == 'ClusterImpl'
+        assert impl.__module__ == f'couchbase.protocol.{protocol.name.lower()}._cluster_impl'
 
-    def test_an_unregistered_protocol_raises(self) -> None:
+    def test_an_unregistered_protocol_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delitem(_registry._REGISTRATIONS, CouchbaseProtocol.COUCHBASE2)
         with pytest.raises(FeatureUnavailableException, match='couchbase2 protocol'):
             resolve(_registry.CLUSTER, CouchbaseProtocol.COUCHBASE2)
+
+    def test_a_missing_dependency_is_unavailable(self, monkeypatch: pytest.MonkeyPatch,
+                                                 tmp_path: pathlib.Path) -> None:
+        tmp_path.joinpath('_needs_a_dependency.py').write_text('import _a_dependency_not_installed\n')
+        monkeypatch.syspath_prepend(str(tmp_path))
+        monkeypatch.setitem(couchbase2_registry.IMPLS, _registry.CLUSTER.name, '_needs_a_dependency:ClusterImpl')
+        with pytest.raises(FeatureUnavailableException,
+                           match=r'needs _a_dependency_not_installed.*reinstall couchbase') as ex:
+            resolve(_registry.CLUSTER, CouchbaseProtocol.COUCHBASE2)
+        assert isinstance(ex.value.__cause__, ModuleNotFoundError)
+
+    def test_a_missing_module_of_the_sdks_own_is_raised_as_it_is(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setitem(couchbase2_registry.IMPLS, _registry.CLUSTER.name,
+                            'couchbase.protocol.couchbase2._no_such_module:ClusterImpl')
+        with pytest.raises(ModuleNotFoundError):
+            resolve(_registry.CLUSTER, CouchbaseProtocol.COUCHBASE2)
+
+    def test_a_protocol_with_no_dependencies_raises_the_missing_module(self, monkeypatch: pytest.MonkeyPatch,
+                                                                       tmp_path: pathlib.Path) -> None:
+        tmp_path.joinpath('_needs_a_dependency.py').write_text('import _a_dependency_not_installed\n')
+        monkeypatch.syspath_prepend(str(tmp_path))
+        monkeypatch.setitem(classic_registry.IMPLS, _registry.CLUSTER.name, '_needs_a_dependency:ClusterImpl')
+        with pytest.raises(ModuleNotFoundError):
+            resolve(_registry.CLUSTER, CouchbaseProtocol.CLASSIC)
 
     def test_a_key_its_protocol_did_not_register_raises(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delitem(classic_registry.IMPLS, _registry.CLUSTER.name)

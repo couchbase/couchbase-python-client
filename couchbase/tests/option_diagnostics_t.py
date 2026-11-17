@@ -30,8 +30,8 @@ from couchbase.common.options import (DeltaValue,
 from couchbase.common.protocol import CouchbaseProtocol
 from couchbase.common.warnings import CouchbaseApplicabilityWarning, CouchbaseDeprecationWarning
 
-# Classic declares it inert on ClusterOptions, and couchbase2 declares nothing.
-INERT_KEY = 'compression'
+# couchbase2 declares it inert on ClusterOptions, and classic does not.
+INERT_KEY = 'num_io_threads'
 
 
 def _applicability(protocol: CouchbaseProtocol | None) -> list[warnings.WarningMessage]:
@@ -43,14 +43,14 @@ def _applicability(protocol: CouchbaseProtocol | None) -> list[warnings.WarningM
 
 class OptionDiagnosticsUnitTests:
 
-    def test_the_key_is_inert_on_classic_alone(self) -> None:
-        assert BLOCKS['ClusterOptions'].keys[INERT_KEY].inert == frozenset({'classic'})
+    def test_the_key_is_inert_on_couchbase2_alone(self) -> None:
+        assert BLOCKS['ClusterOptions'].keys[INERT_KEY].inert == frozenset({'couchbase2'})
 
     def test_an_inert_key_is_reported_on_the_protocol_that_declares_it(self) -> None:
-        assert len(_applicability(CouchbaseProtocol.CLASSIC)) == 1
+        assert len(_applicability(CouchbaseProtocol.COUCHBASE2)) == 1
 
     def test_an_inert_key_is_not_reported_on_another_protocol(self) -> None:
-        assert _applicability(CouchbaseProtocol.COUCHBASE2) == []
+        assert _applicability(CouchbaseProtocol.CLASSIC) == []
 
     def test_no_protocol_judges_everything_but_applicability(self) -> None:
         assert _applicability(None) == []
@@ -58,7 +58,7 @@ class OptionDiagnosticsUnitTests:
     def test_strict_raises_on_the_protocol_that_declares_it(self) -> None:
         with pytest.raises(InvalidArgumentException):
             check_options('ClusterOptions', [INERT_KEY], OptionValidationMode.Strict,
-                          protocol=CouchbaseProtocol.CLASSIC)
+                          protocol=CouchbaseProtocol.COUCHBASE2)
 
     def test_a_block_enum_has_to_name_its_protocol(self) -> None:
         with pytest.raises(TypeError):

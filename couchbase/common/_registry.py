@@ -63,9 +63,13 @@ TX_CLUSTER: ImplKey[TxClusterInterface] = ImplKey('TxCluster')
 # Every protocol's impls raise `RuntimeError` with this text for an operation on a closed cluster.
 CLOSED_CLUSTER_MSG = 'Cannot perform operations on a closed cluster. Create a new cluster instance to reconnect.'
 
-# Each protocol's registration module holds `IMPLS`, mapping an `ImplKey`'s name to `module:Class`.
+_SDK_PACKAGES = frozenset({'couchbase', 'acouchbase', 'txcouchbase'})
+
+# Each protocol's registration module holds `IMPLS`, mapping an `ImplKey`'s name to `module:Class`, and
+# `NEEDS_DEPENDENCIES` when its impls import third-party packages, which the SDK installs with itself.
 _REGISTRATIONS: dict[CouchbaseProtocol, str] = {
     CouchbaseProtocol.CLASSIC: 'couchbase.protocol.classic._registry',
+    CouchbaseProtocol.COUCHBASE2: 'couchbase.protocol.couchbase2._registry',
 }
 
 
@@ -79,14 +83,26 @@ def resolve(key: ImplKey[T], protocol: CouchbaseProtocol) -> type[T]:
 
     Raises:
         :class:`~couchbase.exceptions.FeatureUnavailableException`: If `protocol` registered nothing,
-            or registered nothing against `key`.
+            registered nothing against `key`, or needs a dependency that is not installed.
     """
+    name = protocol.name.lower()
     registration = _REGISTRATIONS.get(protocol)
     if registration is None:
-        raise FeatureUnavailableException(f'The {protocol.name.lower()} protocol is not available.')
-    impls: dict[str, str] = import_module(registration).IMPLS
+        raise FeatureUnavailableException(f'The {name} protocol is not available.')
+    registered = import_module(registration)
+    impls: dict[str, str] = registered.IMPLS
     target = impls.get(key.name)
     if target is None:
-        raise FeatureUnavailableException(f'{key.name} is not available over the {protocol.name.lower()} protocol.')
-    module, _, name = target.partition(':')
-    return cast('type[T]', getattr(import_module(module), name))
+        raise FeatureUnavailableException(f'{key.name} is not available over the {name} protocol.')
+    module, _, cls = target.partition(':')
+    try:
+        impl_module = import_module(module)
+    except ModuleNotFoundError as ex:
+        needs_dependencies: bool = getattr(registered, 'NEEDS_DEPENDENCIES', False)
+        # A missing module of the SDK's own is a broken install or a bug, and is raised as it is.
+        if not needs_dependencies or ex.name is None or ex.name.split('.')[0] in _SDK_PACKAGES:
+            raise
+        raise FeatureUnavailableException(f'The {name} protocol needs {ex.name}, which is not installed. '
+                                          'It is a dependency of couchbase; reinstall couchbase to restore it.'
+                                          ) from ex
+    return cast('type[T]', getattr(impl_module, cls))

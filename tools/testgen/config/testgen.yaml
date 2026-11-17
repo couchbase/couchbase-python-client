@@ -273,6 +273,7 @@ not_generated:
     - couchbase/tests/couchbase2_channel_t.py
     - couchbase/tests/couchbase2_driver_t.py
     - couchbase/tests/couchbase2_error_mapping_t.py
+    - couchbase/tests/couchbase2_impl_t.py
     - couchbase/tests/couchbase2_request_context_t.py
     - couchbase/tests/collection_req_builder_t.py
     - couchbase/tests/diagnostics_t.py

@@ -37,8 +37,8 @@ from tests.test_features import TestProtocol
 # What is checked here is classic's map from an operation's options to what its binding reads.
 pytestmark = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
 
-# Classic declares it inert on ClusterOptions, and couchbase2 declares nothing.
-INERT_KEY = 'compression'
+# couchbase2 declares it inert on ClusterOptions, and classic does not.
+INERT_KEY = 'num_io_threads'
 
 CAS_BLOCKS = ['AppendOptions', 'MutateInOptions', 'PrependOptions', 'RemoveOptions', 'ReplaceOptions', 'UnlockOptions',
               'AppendMultiOptions', 'PrependMultiOptions', 'RemoveMultiOptions', 'ReplaceMultiOptions']
@@ -56,13 +56,13 @@ class _ClassicBlocks(OptionsBlock, protocol=CouchbaseProtocol.CLASSIC):
 class ClassicWireUnitTests:
 
     @pytest.mark.parametrize('block, reported', [
-        (_ClassicBlocks.Cluster, 1),
-        (_Couchbase2Blocks.Cluster, 0),
+        (_ClassicBlocks.Cluster, 0),
+        (_Couchbase2Blocks.Cluster, 1),
     ])
     def test_forwarding_reads_the_protocol_off_the_block(self, block: OptionsBlock, reported: int) -> None:
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter('always')
-            forward_args({INERT_KEY: True}, block=block, mode=OptionValidationMode.Warn)
+            forward_args({INERT_KEY: 4}, block=block, mode=OptionValidationMode.Warn)
         assert len([w for w in caught if issubclass(w.category, CouchbaseApplicabilityWarning)]) == reported
 
     # Regression guard (PYCBC-1957): the multi filter used to drop the lock time.
