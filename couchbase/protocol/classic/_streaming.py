@@ -184,7 +184,7 @@ class ClassicStream(Generic[RowT, FinalMetadataT]):
                 # the handler knows how to handle this legacy situation (essentially just ends the span)
                 self._obs_handler.process_core_span(None)
             elif hasattr(self._streamed_result, 'core_span'):
-                self._obs_handler.process_core_span(self._streamed_result.core_span, with_error=(exc is not None))
+                self._obs_handler.process_core_span(self._streamed_result.core_span, exc_val=exc)
 
     def cancel(self) -> None:
         """Unblock a read still waiting on the core, rather than wait for the whole server-side operation.

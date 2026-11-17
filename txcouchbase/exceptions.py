@@ -26,6 +26,7 @@ __all__ = [
     'AnalyticsLinkExistsException',
     'AnalyticsLinkNotFoundException',
     'AuthenticationException',
+    'AuthorizationFailureException',
     'BucketAlreadyExistsException',
     'BucketDoesNotExistException',
     'BucketNotFlushableException',
@@ -54,6 +55,7 @@ __all__ = [
     'DocumentNotFoundOnReplicaException',
     'DocumentNotJsonException',
     'DocumentNotLockedException',
+    'DocumentTooDeepException',
     'DocumentUnretrievableException',
     'DurabilityImpossibleException',
     'DurabilityInvalidLevelException',
@@ -149,6 +151,7 @@ from couchbase.common.exceptions import AnalyticsErrorContext  # noqa: F401
 from couchbase.common.exceptions import AnalyticsLinkExistsException  # noqa: F401
 from couchbase.common.exceptions import AnalyticsLinkNotFoundException  # noqa: F401
 from couchbase.common.exceptions import AuthenticationException  # noqa: F401
+from couchbase.common.exceptions import AuthorizationFailureException  # noqa: F401
 from couchbase.common.exceptions import BucketAlreadyExistsException  # noqa: F401
 from couchbase.common.exceptions import BucketDoesNotExistException  # noqa: F401
 from couchbase.common.exceptions import BucketNotFlushableException  # noqa: F401
@@ -177,6 +180,7 @@ from couchbase.common.exceptions import DocumentNotFoundException  # noqa: F401
 from couchbase.common.exceptions import DocumentNotFoundOnReplicaException  # noqa: F401
 from couchbase.common.exceptions import DocumentNotJsonException  # noqa: F401
 from couchbase.common.exceptions import DocumentNotLockedException  # noqa: F401
+from couchbase.common.exceptions import DocumentTooDeepException  # noqa: F401
 from couchbase.common.exceptions import DocumentUnretrievableException  # noqa: F401
 from couchbase.common.exceptions import DurabilityImpossibleException  # noqa: F401
 from couchbase.common.exceptions import DurabilityInvalidLevelException  # noqa: F401

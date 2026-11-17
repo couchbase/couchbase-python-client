@@ -292,7 +292,7 @@ class ThresholdLoggingSpan(RequestSpan):
     # Use __slots__ to elimiate per-instance __dict__, making attribute access
     # faster (C-level slot lookup) and reducing memory allocation.
     __slots__ = (
-        '_name', '_parent_span', '_start_time_ns', '_tracer',
+        '_name', '_is_dispatch', '_parent_span', '_start_time_ns', '_tracer',
         '_events', '_status', '_end_time_ns',
         '_service_type', '_local_id', '_operation_id',
         '_peer_address', '_peer_port', '_remote_address', '_remote_port',
@@ -318,6 +318,7 @@ class ThresholdLoggingSpan(RequestSpan):
         tracer: ThresholdLoggingTracer | None = None
     ) -> None:
         self._name = name
+        self._is_dispatch = name == _ATTR_DISPATCH_SPAN_NAME
         self._parent_span = parent_span
         self._start_time_ns = start_time if start_time is not None else now_ns()
         self._tracer = tracer
@@ -359,6 +360,10 @@ class ThresholdLoggingSpan(RequestSpan):
             port = self._remote_port or ''
             return f'{address}:{port}'
         return None
+
+    def mark_dispatch(self) -> None:
+        """Count this span as a dispatch whatever its name, as a couchbase2 span named for its RPC is."""
+        self._is_dispatch = True
 
     def _propagate_dispatch_duration(self, value: int) -> None:
         """Set dispatch duration on this span and propagate to parent (non-recursive)."""
@@ -457,7 +462,7 @@ class ThresholdLoggingSpan(RequestSpan):
         if self._name == _ATTR_ENCODING_SPAN_NAME:
             self._propagate_encode_duration(self._total_duration_ns)
             return
-        elif self._name == _ATTR_DISPATCH_SPAN_NAME:
+        elif self._is_dispatch:
             self._propagate_dispatch_duration(self._total_duration_ns)
             return
 

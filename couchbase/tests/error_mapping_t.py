@@ -780,10 +780,14 @@ class ErrorMappingUnitTests:
 
     @staticmethod
     def _error_tables(key_type: type) -> dict[str, dict[Any, Any]]:
-        """Every module-level dict in the couchbase package that maps key_type to an exception."""
+        """Every module-level dict in the couchbase package that maps key_type to an exception.
+
+        couchbase2's tables map gRPC detail types rather than server messages or core codes, and
+        couchbase2_error_mapping_t covers every entry in them.
+        """
         tables: dict[str, dict[Any, Any]] = {}
         for module_info in pkgutil.walk_packages(couchbase.__path__, 'couchbase.'):
-            if module_info.name.startswith('couchbase.tests'):
+            if module_info.name.startswith(('couchbase.tests', 'couchbase.protocol.couchbase2')):
                 continue
             try:
                 module = importlib.import_module(module_info.name)

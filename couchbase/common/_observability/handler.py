@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import sys
+import traceback
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from types import TracebackType
@@ -53,6 +54,10 @@ from couchbase.common._observability.observability_types import (_ATTR_BUCKET_NA
                                                                  _CPP_ATTR_CLUSTER_NAME,
                                                                  _CPP_ATTR_CLUSTER_UUID,
                                                                  _CPP_ATTR_RETRY_COUNT,
+                                                                 _EXC_EVENT,
+                                                                 _EXC_MESSAGE,
+                                                                 _EXC_STACKTRACE,
+                                                                 _EXC_TYPE,
                                                                  ExceptionName,
                                                                  LegacySpanProtocol,
                                                                  LegacyTracerProtocol,
@@ -255,8 +260,12 @@ class ObservableRequestHandler:
 
     def process_core_span(self,
                           core_span: CoreSpan | None = None,
-                          with_error: bool | None = False) -> None:
-        self._tracer_impl.process_core_span(core_span=core_span, with_error=with_error)
+                          exc_val: BaseException | None = None) -> None:
+        self._tracer_impl.process_core_span(core_span=core_span, exc_val=exc_val)
+
+    def record_retry(self) -> None:
+        """Count a retry, for a protocol that retries in Python rather than in the core."""
+        self._tracer_impl.record_retry()
 
     def process_meter_end(self, exc_val: BaseException | None = None) -> None:
         self._meter_impl.process_end(cluster_name=self._tracer_impl.cluster_name,
@@ -275,7 +284,12 @@ class ObservableRequestHandler:
         if start_time is None or end_time is None:
             return
 
-        req_duration_ns: int = end_time - start_time
+        self.record_sub_op(end_time - start_time, exc_val=exc_val)
+
+    def record_sub_op(self, req_duration_ns: int, exc_val: BaseException | None = None) -> None:
+        """Meter one key of a multi operation, for a protocol that times its keys in Python."""
+        if not self._with_metrics:
+            return
         self._meter_impl.process_multi_sub_op(req_duration_ns,
                                               cluster_name=self._tracer_impl.cluster_name,
                                               cluster_uuid=self._tracer_impl.cluster_uuid,
@@ -283,7 +297,7 @@ class ObservableRequestHandler:
 
     def reset(self, op: Op, exc_val: BaseException | None = None) -> None:
         self._op = op
-        self._tracer_impl.reset(op, with_error=(exc_val is not None))
+        self._tracer_impl.reset(op, exc_val=exc_val)
         self._meter_impl.reset(op,
                                cluster_name=self._tracer_impl.cluster_name,
                                cluster_uuid=self._tracer_impl.cluster_uuid,
@@ -351,7 +365,7 @@ class ObservableRequestHandler:
                  exc_type: type[BaseException] | None,
                  exc_val: BaseException | None,
                  exc_tb: TracebackType | None) -> Literal[False]:
-        self._tracer_impl.process_end(with_error=exc_type is not None)
+        self._tracer_impl.process_end(exc_val=exc_val)
         self._meter_impl.process_end(cluster_name=self._tracer_impl.cluster_name,
                                      cluster_uuid=self._tracer_impl.cluster_uuid,
                                      exc_val=exc_val)
@@ -458,15 +472,18 @@ class ObservableRequestHandlerNoOpTracerImpl:
     def maybe_create_encoding_span(self, encoding_fn: Callable[..., tuple[bytes, int]]) -> tuple[bytes, int]:
         return encoding_fn()
 
-    def process_end(self, with_error: bool | None = False) -> None:
+    def record_retry(self) -> None:
+        pass
+
+    def process_end(self, exc_val: BaseException | None = None) -> None:
         pass
 
     def process_core_span(self,
                           core_span: CoreSpan | None = None,
-                          with_error: bool | None = False) -> None:
+                          exc_val: BaseException | None = None) -> None:
         pass
 
-    def reset(self, op: Op, with_error: bool | None = False) -> None:
+    def reset(self, op: Op, exc_val: BaseException | None = None) -> None:
         pass
 
 
@@ -595,6 +612,7 @@ class ObservableRequestHandlerTracerImpl:
         self._is_streaming_op = op.kind is OpKind.Streaming
         self._wrapped_span: WrappedSpan | None = None
         self._end_time: int | None = None
+        self._retries = 0
 
     @property
     def cluster_name(self) -> str | None:
@@ -657,7 +675,7 @@ class ObservableRequestHandlerTracerImpl:
 
     def process_core_span(self,
                           core_span: CoreSpan | None = None,
-                          with_error: bool | None = False) -> None:
+                          exc_val: BaseException | None = None) -> None:
         if not self._wrapped_span:
             return
 
@@ -672,29 +690,30 @@ class ObservableRequestHandlerTracerImpl:
 
         # we don't use a context manager for streaming (e.g. query) requests
         if self._is_streaming_op:
-            self.process_end(with_error=with_error)
+            self.process_end(exc_val=exc_val)
 
-    def process_end(self, with_error: bool | None = False) -> None:
+    def record_retry(self) -> None:
+        self._retries += 1
+
+    def process_end(self, exc_val: BaseException | None = None) -> None:
         self._end_time = now_ns()
 
-        # we fall into this branch when we raise an error prior to going down into the bindings
-        if (self._wrapped_span
-            and not self._processed_core_span
-            and not self.is_legacy
-                and self._get_cluster_labels_fn):
-
-            cluster_labels = self._get_cluster_labels_fn()
-            self._wrapped_span.set_cluster_labels(cluster_name=cluster_labels.get('clusterName', None),
-                                                  cluster_uuid=cluster_labels.get('clusterUUID', None))
-            self._wrapped_span.set_retry_attribute(retry_count=0)
+        # Without a core span, either the request failed before reaching the bindings or its
+        # protocol has no core, and the retries are the ones counted here.
+        if self._wrapped_span and not self._processed_core_span and not self.is_legacy:
+            if self._get_cluster_labels_fn:
+                cluster_labels = self._get_cluster_labels_fn()
+                self._wrapped_span.set_cluster_labels(cluster_name=cluster_labels.get('clusterName', None),
+                                                      cluster_uuid=cluster_labels.get('clusterUUID', None))
+            self._wrapped_span.set_retry_attribute(retry_count=self._retries)
 
         if self._wrapped_span:
-            if with_error is True and not self.is_legacy:
-                self._wrapped_span.set_status(SpanStatusCode.ERROR)
+            if exc_val is not None and not self.is_legacy:
+                self._wrapped_span.record_exception(exc_val)
             self._wrapped_span.end(self._end_time)
 
-    def reset(self, op: Op, with_error: bool | None = False) -> None:
-        self.process_end(with_error=with_error)
+    def reset(self, op: Op, exc_val: BaseException | None = None) -> None:
+        self.process_end(exc_val=exc_val)
         self._start_time = now_ns()
         self._set_op(op)
 
@@ -906,6 +925,37 @@ class WrappedSpan:
     def set_status(self, status: SpanStatusCode) -> None:
         self._status = status
         self._request_span.set_status(status)
+
+    def record_exception(self, exc: BaseException) -> None:
+        """Mark the span failed, with an `exception` event describing `exc` as OpenTelemetry's own would."""
+        self.set_status(SpanStatusCode.ERROR)
+        if not self._is_recording:
+            return
+        exc_type = type(exc)
+        module = exc_type.__module__
+        self._request_span.add_event(_EXC_EVENT, {
+            _EXC_TYPE: exc_type.__qualname__ if module == 'builtins' else f'{module}.{exc_type.__qualname__}',
+            _EXC_MESSAGE: str(exc),
+            _EXC_STACKTRACE: ''.join(traceback.format_exception(exc_type, exc, exc.__traceback__)),
+        })
+
+    def start_dispatch_span(self, name: str) -> RequestSpanProtocol:
+        """A child span for one dispatch, for a protocol that dispatches in Python rather than in the core."""
+        span = self._create_request_span(name, parent_span=self._request_span)
+        mark_dispatch = getattr(span, 'mark_dispatch', None)
+        if mark_dispatch is not None:
+            mark_dispatch()
+        return span
+
+    def end_dispatch_span(self, span: RequestSpanProtocol, failed: bool) -> None:
+        if self._wrapped_tracer.is_legacy:
+            cast(LegacySpanProtocol, span).finish()
+            return
+        if failed:
+            span.set_status(SpanStatusCode.ERROR)
+        end_time = now_ns()
+        self.maybe_update_end_time_watermark(end_time)
+        span.end(end_time)
 
     def end(self, end_time: int) -> None:
         # For non-recording spans, still call end() for OTel context cleanup

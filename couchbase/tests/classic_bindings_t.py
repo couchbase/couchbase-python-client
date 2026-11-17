@@ -66,6 +66,9 @@ _KV_CALLS_BY_OP = {Op.Get: {'get_projected'}}
 # datastructure operation is the same, and is told by its kind instead.
 _COMPOSITES = frozenset({Op.QueryIndexWatchIndexes, Op.ViewIndexPublish, Op.WaitUntilReady})
 
+# Made only over couchbase2, so classic has no call for them.
+_COUCHBASE2_ONLY = frozenset({Op.QueryIndexWaitForIndexOnline})
+
 _REQUEST_MODULES = (_analytics_mgmt_types, _bucket_mgmt_types, _bucket_types, _cluster_types,
                     _collection_mgmt_types, _eventing_function_mgmt_types,
                     _query_index_mgmt_types, _search_index_mgmt_types, _user_mgmt_types,
@@ -105,7 +108,8 @@ def _binding_methods() -> list[tuple[str, str]]:
     return found
 
 
-_CALLED = [op for op in Op if op.kind is not OpKind.Datastructure and op not in _COMPOSITES]
+_CALLED = [op for op in Op
+           if op.kind is not OpKind.Datastructure and op not in _COMPOSITES | _COUCHBASE2_ONLY]
 
 
 class ClassicBindingsUnitTests:

@@ -49,6 +49,7 @@ class Row:
     span_name: str | None
     kind: str
     service: str | None
+    couchbase2_readonly: bool
     single: str | None
 
 
@@ -63,7 +64,7 @@ def snake(name: str) -> str:
     return re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
 
 
-_ROW_KEYS = {'span', 'single'}
+_ROW_KEYS = {'span', 'couchbase2_readonly', 'single'}
 _GROUP_KEYS = {'kind', 'service', 'span', 'ops'}
 
 
@@ -86,7 +87,7 @@ def _row(name: str, spec: dict, group: dict, kinds: dict, services: dict) -> Row
         raise OperationsError(f'{name}: no service {service}')
     if kind not in kinds:
         raise OperationsError(f'{name}: no kind {kind}')
-    return Row(name, snake(name), span, kind, service, single)
+    return Row(name, snake(name), span, kind, service, bool(spec.get('couchbase2_readonly', False)), single)
 
 
 def load(root: Path) -> Table:
@@ -117,6 +118,11 @@ def parse(data: dict) -> Table:
             raise OperationsError(f'{r.name}: single {r.single} is not a KeyValue row')
         if position[r.single] > position[r.name]:
             raise OperationsError(f'{r.name}: its single {r.single} has to come first in the table')
+        if r.couchbase2_readonly:
+            raise OperationsError(f'{r.name}: a multi row takes its couchbase2_readonly from its single')
+    rows = [Row(r.name, r.value, r.span_name, r.kind, r.service,
+                by_name[r.single].couchbase2_readonly if r.single else r.couchbase2_readonly,
+                r.single) for r in rows]
     return Table(kinds, services, rows)
 
 
@@ -125,7 +131,8 @@ def _member(row: Row) -> str:
     parts = [repr(row.value),
              repr(row.span_name),
              f'OpKind.{row.kind}',
-             f'ServiceType.{row.service}' if row.service else 'None']
+             f'ServiceType.{row.service}' if row.service else 'None',
+             repr(row.couchbase2_readonly)]
     if row.single is not None:
         parts.append(repr(row.single))
     head = f'    {row.name} = ('

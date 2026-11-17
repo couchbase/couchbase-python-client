@@ -75,6 +75,7 @@ General
 
    AmbiguousTimeoutException
    AuthenticationException
+   AuthorizationFailureException
    FeatureNotFoundException
    FeatureUnavailableException
    HTTPException
@@ -98,6 +99,9 @@ General
    :members:
 
 .. autoexception:: AuthenticationException
+   :members:
+
+.. autoexception:: AuthorizationFailureException
    :members:
 
 .. autoexception:: FeatureNotFoundException
@@ -250,6 +254,7 @@ Sub-document
 .. autosummary::
 
    DocumentNotJsonException
+   DocumentTooDeepException
    InvalidValueException
    NoChildrenException
    NumberTooBigException
@@ -269,6 +274,9 @@ Sub-document
    XattrUnknownVirtualAttributeException
 
 .. autoexception:: DocumentNotJsonException
+   :members:
+
+.. autoexception:: DocumentTooDeepException
    :members:
 
 .. autoexception:: InvalidValueException

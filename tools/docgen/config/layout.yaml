@@ -259,6 +259,7 @@ common:
         names:
           - AmbiguousTimeoutException
           - AuthenticationException
+          - AuthorizationFailureException
           - FeatureNotFoundException
           - FeatureUnavailableException
           - HTTPException
@@ -303,6 +304,7 @@ common:
       - title: Sub-document
         names:
           - DocumentNotJsonException
+          - DocumentTooDeepException
           - InvalidValueException
           - NoChildrenException
           - NumberTooBigException

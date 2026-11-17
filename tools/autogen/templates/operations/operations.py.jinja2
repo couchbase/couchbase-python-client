@@ -45,6 +45,9 @@ class Op(Enum):
     span_name: str | None
     kind: OpKind
     service: ServiceType | None
+    # Whether a couchbase2 request is read-only, so that its timeout is unambiguous and a retry
+    # strategy may treat it as idempotent.  Classic's core decides for itself and reads nothing here.
+    couchbase2_readonly: bool
     # On a KeyValueMulti member, the operation each key is; None on every other.
     single: Op | None
 
@@ -53,12 +56,14 @@ class Op(Enum):
                 span_name: str | None,
                 kind: OpKind,
                 service: ServiceType | None,
+                couchbase2_readonly: bool,
                 single: str | None = None) -> Op:
         member = object.__new__(cls)
         member._value_ = value
         member.span_name = span_name
         member.kind = kind
         member.service = service
+        member.couchbase2_readonly = couchbase2_readonly
         # The table defines a single before any multi naming it, so it is already a member here.
         member.single = cls[single] if single is not None else None
         return member

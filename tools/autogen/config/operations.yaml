@@ -12,7 +12,20 @@
 #   span      the span and metric operation name.  `name` on a group means each row's span is
 #             its `.value`; a group without it lists each row's span, and a row whose span is
 #             `null` is not traced or metered.
-#   single    on a KeyValueMulti row, the row each key's operation is.
+#   couchbase2_readonly
+#             true when a couchbase2 request is read-only.  Its timeout is then unambiguous,
+#             raising `UnAmbiguousTimeoutException` rather than `AmbiguousTimeoutException`, and it
+#             is what a retry strategy is told is idempotent, which is how RFC 49's list of
+#             idempotent operations reads.  classic reads nothing here; its core decides for
+#             itself.
+#
+#             `Query` and `AnalyticsQuery` are false, because a statement can mutate and only its
+#             `readonly` option, read per request, says it does not.  A datastructure operation
+#             is true only when every request it makes on an existing document is read-only; the
+#             insert that creates a missing one is not counted.  A Cluster row is true when it
+#             sends requests and none of them changes the cluster.
+#   single    on a KeyValueMulti row, the row each key's operation is.  A multi row's
+#             `couchbase2_readonly` is its single's.
 
 kinds:
   KeyValue: one key, one request
@@ -39,18 +52,18 @@ groups:
     ops:
       Append: {}
       Decrement: {}
-      Exists: {}
-      Get: {}
-      GetAllReplicas: {}
+      Exists: {couchbase2_readonly: true}
+      Get: {couchbase2_readonly: true}
+      GetAllReplicas: {couchbase2_readonly: true}
       GetAndLock: {}
       GetAndTouch: {}
-      GetAnyReplica: {}
-      GetReplica: {}
+      GetAnyReplica: {couchbase2_readonly: true}
+      GetReplica: {couchbase2_readonly: true}
       Increment: {}
       Insert: {}
-      LookupIn: {}
-      LookupInAllReplicas: {}
-      LookupInAnyReplica: {}
+      LookupIn: {couchbase2_readonly: true}
+      LookupInAllReplicas: {couchbase2_readonly: true}
+      LookupInAnyReplica: {couchbase2_readonly: true}
       MutateIn: {}
       Prepend: {}
       Remove: {}
@@ -85,38 +98,38 @@ groups:
     ops:
       ListAppend: {}
       ListClear: {}
-      ListGetAll: {}
-      ListGetAt: {}
-      ListIndexOf: {}
+      ListGetAll: {couchbase2_readonly: true}
+      ListGetAt: {couchbase2_readonly: true}
+      ListIndexOf: {couchbase2_readonly: true}
       ListPrepend: {}
       ListRemoveAt: {}
       ListSetAt: {}
-      ListSize: {}
+      ListSize: {couchbase2_readonly: true}
       MapAdd: {}
       MapClear: {}
-      MapExists: {}
-      MapGet: {}
-      MapGetAll: {}
-      MapItems: {}
-      MapKeys: {}
+      MapExists: {couchbase2_readonly: true}
+      MapGet: {couchbase2_readonly: true}
+      MapGetAll: {couchbase2_readonly: true}
+      MapItems: {couchbase2_readonly: true}
+      MapKeys: {couchbase2_readonly: true}
       MapRemove: {}
-      MapSize: {}
-      MapValues: {}
+      MapSize: {couchbase2_readonly: true}
+      MapValues: {couchbase2_readonly: true}
       QueueClear: {}
       QueuePop: {}
       QueuePush: {}
-      QueueSize: {}
+      QueueSize: {couchbase2_readonly: true}
       SetAdd: {}
       SetClear: {}
-      SetContains: {}
+      SetContains: {couchbase2_readonly: true}
       SetRemove: {}
-      SetSize: {}
-      SetValues: {}
+      SetSize: {couchbase2_readonly: true}
+      SetValues: {couchbase2_readonly: true}
 
   - kind: Streaming
     service: KeyValue
     ops:
-      RangeScan: {span: null}
+      RangeScan: {span: null, couchbase2_readonly: true}
 
   - kind: Streaming
     service: Analytics
@@ -134,60 +147,60 @@ groups:
     service: Search
     span: name
     ops:
-      SearchQuery: {}
+      SearchQuery: {couchbase2_readonly: true}
 
   - kind: Streaming
     service: Views
     span: name
     ops:
-      ViewQuery: {}
+      ViewQuery: {couchbase2_readonly: true}
 
   - kind: Management
     service: Analytics
     ops:
       AnalyticsDatasetCreate: {span: manager_analytics_create_dataset}
       AnalyticsDatasetDrop: {span: manager_analytics_drop_dataset}
-      AnalyticsDatasetGetAll: {span: manager_analytics_get_all_datasets}
+      AnalyticsDatasetGetAll: {span: manager_analytics_get_all_datasets, couchbase2_readonly: true}
       AnalyticsDataverseCreate: {span: manager_analytics_create_dataverse}
       AnalyticsDataverseDrop: {span: manager_analytics_drop_dataverse}
-      AnalyticsGetPendingMutations: {span: manager_analytics_get_pending_mutations}
+      AnalyticsGetPendingMutations: {span: manager_analytics_get_pending_mutations, couchbase2_readonly: true}
       AnalyticsIndexCreate: {span: manager_analytics_create_index}
       AnalyticsIndexDrop: {span: manager_analytics_drop_index}
-      AnalyticsIndexGetAll: {span: manager_analytics_get_all_indexes}
+      AnalyticsIndexGetAll: {span: manager_analytics_get_all_indexes, couchbase2_readonly: true}
       AnalyticsLinkConnect: {span: manager_analytics_connectlink}
       AnalyticsLinkCreate: {span: manager_analytics_create_link}
       AnalyticsLinkDisconnect: {span: manager_analytics_disconnect_link}
       AnalyticsLinkDrop: {span: manager_analytics_drop_link}
-      AnalyticsLinkGetAll: {span: manager_analytics_get_all_links}
+      AnalyticsLinkGetAll: {span: manager_analytics_get_all_links, couchbase2_readonly: true}
       AnalyticsLinkReplace: {span: manager_analytics_replace_link}
 
   - kind: Management
     service: Management
     ops:
       BucketCreate: {span: manager_buckets_create_bucket}
-      BucketDescribe: {span: manager_buckets_describe_bucket}
+      BucketDescribe: {span: manager_buckets_describe_bucket, couchbase2_readonly: true}
       BucketDrop: {span: manager_buckets_drop_bucket}
       BucketFlush: {span: manager_buckets_flush_bucket}
-      BucketGet: {span: manager_buckets_get_bucket}
-      BucketGetAll: {span: manager_buckets_get_all_buckets}
+      BucketGet: {span: manager_buckets_get_bucket, couchbase2_readonly: true}
+      BucketGetAll: {span: manager_buckets_get_all_buckets, couchbase2_readonly: true}
       BucketUpdate: {span: manager_buckets_update_bucket}
-      ClusterDescribe: {span: null}
+      ClusterDescribe: {span: null, couchbase2_readonly: true}
       ClusterDeveloperPreviewEnable: {span: null}
       CollectionCreate: {span: manager_collections_create_collection}
       CollectionDrop: {span: manager_collections_drop_collection}
       CollectionUpdate: {span: manager_collections_update_collection}
       ScopeCreate: {span: manager_collections_create_scope}
       ScopeDrop: {span: manager_collections_drop_scope}
-      ScopeGetAll: {span: manager_collections_get_all_scopes}
+      ScopeGetAll: {span: manager_collections_get_all_scopes, couchbase2_readonly: true}
       ChangePassword: {span: manager_users_change_password}
       GroupDrop: {span: manager_users_drop_group}
-      GroupGet: {span: manager_users_get_group}
-      GroupGetAll: {span: manager_users_get_all_groups}
+      GroupGet: {span: manager_users_get_group, couchbase2_readonly: true}
+      GroupGetAll: {span: manager_users_get_all_groups, couchbase2_readonly: true}
       GroupUpsert: {span: manager_users_upsert_group}
-      RoleGetAll: {span: manager_users_get_all_roles}
+      RoleGetAll: {span: manager_users_get_all_roles, couchbase2_readonly: true}
       UserDrop: {span: manager_users_drop_user}
-      UserGet: {span: manager_users_get_user}
-      UserGetAll: {span: manager_users_get_all_users}
+      UserGet: {span: manager_users_get_user, couchbase2_readonly: true}
+      UserGetAll: {span: manager_users_get_all_users, couchbase2_readonly: true}
       UserUpsert: {span: manager_users_upsert_user}
 
   - kind: Management
@@ -195,9 +208,9 @@ groups:
     ops:
       EventingDeployFunction: {span: manager_eventing_deploy_function}
       EventingDropFunction: {span: manager_eventing_drop_function}
-      EventingGetAllFunctions: {span: manager_eventing_get_all_functions}
-      EventingGetFunction: {span: manager_eventing_get_function}
-      EventingGetStatus: {span: manager_eventing_functions_status}
+      EventingGetAllFunctions: {span: manager_eventing_get_all_functions, couchbase2_readonly: true}
+      EventingGetFunction: {span: manager_eventing_get_function, couchbase2_readonly: true}
+      EventingGetStatus: {span: manager_eventing_functions_status, couchbase2_readonly: true}
       EventingPauseFunction: {span: manager_eventing_pause_function}
       EventingResumeFunction: {span: manager_eventing_resume_function}
       EventingUndeployFunction: {span: manager_eventing_undeploy_function}
@@ -210,23 +223,25 @@ groups:
       QueryIndexBuildDeferred: {span: manager_query_build_deferred_indexes}
       QueryIndexCreate: {span: manager_query_create_index}
       QueryIndexDrop: {span: manager_query_drop_index}
-      QueryIndexGetAll: {span: manager_query_get_all_indexes}
-      QueryIndexGetAllDeferred: {span: manager_query_get_all_deferred_indexes}
-      QueryIndexWatchIndexes: {span: manager_query_watch_indexes}
+      QueryIndexGetAll: {span: manager_query_get_all_indexes, couchbase2_readonly: true}
+      QueryIndexGetAllDeferred: {span: manager_query_get_all_deferred_indexes, couchbase2_readonly: true}
+      # couchbase2 only: one per index a watch waits on, under the watch's span.
+      QueryIndexWaitForIndexOnline: {span: manager_query_wait_for_index_online, couchbase2_readonly: true}
+      QueryIndexWatchIndexes: {span: manager_query_watch_indexes, couchbase2_readonly: true}
 
   - kind: Management
     service: Search
     ops:
-      SearchGetStats: {span: manager_search_get_stats}
+      SearchGetStats: {span: manager_search_get_stats, couchbase2_readonly: true}
       SearchIndexAllowQuerying: {span: manager_search_allow_querying}
-      SearchIndexAnalyzeDocument: {span: manager_search_analyze_document}
+      SearchIndexAnalyzeDocument: {span: manager_search_analyze_document, couchbase2_readonly: true}
       SearchIndexDisallowQuerying: {span: manager_search_disallow_querying}
       SearchIndexDrop: {span: manager_search_drop_index}
       SearchIndexFreezePlan: {span: manager_search_freeze_plan}
-      SearchIndexGet: {span: manager_search_get_index}
-      SearchIndexGetAll: {span: manager_search_get_all_indexes}
-      SearchIndexGetDocumentsCount: {span: manager_search_get_indexed_documents_count}
-      SearchIndexGetStats: {span: manager_search_get_index_stats}
+      SearchIndexGet: {span: manager_search_get_index, couchbase2_readonly: true}
+      SearchIndexGetAll: {span: manager_search_get_all_indexes, couchbase2_readonly: true}
+      SearchIndexGetDocumentsCount: {span: manager_search_get_indexed_documents_count, couchbase2_readonly: true}
+      SearchIndexGetStats: {span: manager_search_get_index_stats, couchbase2_readonly: true}
       SearchIndexPauseIngest: {span: manager_search_pause_ingest}
       SearchIndexResumeIngest: {span: manager_search_resume_ingest}
       SearchIndexUnfreezePlan: {span: manager_search_unfreeze_plan}
@@ -236,8 +251,8 @@ groups:
     service: Views
     ops:
       ViewIndexDrop: {span: manager_views_drop_design_document}
-      ViewIndexGet: {span: manager_views_get_design_document}
-      ViewIndexGetAll: {span: manager_views_get_all_design_documents}
+      ViewIndexGet: {span: manager_views_get_design_document, couchbase2_readonly: true}
+      ViewIndexGetAll: {span: manager_views_get_all_design_documents, couchbase2_readonly: true}
       ViewIndexPublish: {span: manager_views_publish_design_document}
       ViewIndexUpsert: {span: manager_views_upsert_design_document}
 
@@ -251,6 +266,6 @@ groups:
       GetConnectionInfo: {span: null}
       GetDefaultTimeouts: {span: null}
       OpenBucket: {span: null}
-      Ping: {span: null}
+      Ping: {span: null, couchbase2_readonly: true}
       UpdateCredentials: {span: null}
-      WaitUntilReady: {span: null}
+      WaitUntilReady: {span: null, couchbase2_readonly: true}

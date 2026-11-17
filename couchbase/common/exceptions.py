@@ -22,6 +22,7 @@ __all__ = [
     'AnalyticsLinkExistsException',
     'AnalyticsLinkNotFoundException',
     'AuthenticationException',
+    'AuthorizationFailureException',
     'BucketAlreadyExistsException',
     'BucketDoesNotExistException',
     'BucketNotFlushableException',
@@ -50,6 +51,7 @@ __all__ = [
     'DocumentNotFoundOnReplicaException',
     'DocumentNotJsonException',
     'DocumentNotLockedException',
+    'DocumentTooDeepException',
     'DocumentUnretrievableException',
     'DurabilityImpossibleException',
     'DurabilityInvalidLevelException',
@@ -702,6 +704,14 @@ class AuthenticationException(CouchbaseException):
     """Raised when the cluster cannot authenticate the user."""
 
 
+class AuthorizationFailureException(CouchbaseException):
+    """Indicates that the user authenticated but does not have permission to access the resource.
+
+    Only the couchbase2 protocol raises it.  The classic protocol reports a missing permission as
+    `AuthenticationException`.
+    """
+
+
 class CasMismatchException(CouchbaseException):
     """Raised when the CAS given to an operation does not match the document's.
 
@@ -873,6 +883,10 @@ class ReplicaIndexCurrentlyUnavailableException(CouchbaseException):
 
 class PathTooDeepException(CouchbaseException):
     """Raised when a sub-document path has too many levels to parse."""
+
+
+class DocumentTooDeepException(CouchbaseException):
+    """Raised when a sub-document operation meets a document with too many levels to parse."""
 
 
 class ValueTooDeepException(CouchbaseException):

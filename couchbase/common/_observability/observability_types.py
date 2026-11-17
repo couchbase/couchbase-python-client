@@ -202,11 +202,27 @@ _DISP_SERVER_DURATION = DispatchAttributeName.ServerDuration.value
 _DISP_SERVER_PORT = DispatchAttributeName.ServerPort.value
 
 
+class ExceptionEventName(Enum):
+    """The event a failed span records its exception as, and the event's attributes, as OpenTelemetry names them."""
+    Event = 'exception'
+    Message = 'exception.message'
+    Stacktrace = 'exception.stacktrace'
+    Type = 'exception.type'
+
+
+# ExceptionEventName cached values
+_EXC_EVENT = ExceptionEventName.Event.value
+_EXC_MESSAGE = ExceptionEventName.Message.value
+_EXC_STACKTRACE = ExceptionEventName.Stacktrace.value
+_EXC_TYPE = ExceptionEventName.Type.value
+
+
 class ExceptionName(Enum):
     AmbiguousTimeoutException = 'AmbiguousTimeout'
     AnalyticsLinkExistsException = 'LinkExists'
     AnalyticsLinkNotFoundException = 'LinkNotFound'
     AuthenticationException = 'AuthenticationFailure'
+    AuthorizationFailureException = 'AuthorizationFailure'
     BucketAlreadyExistsException = 'BucketExists'
     BucketDoesNotExistException = 'BucketNotFound'
     BucketNotFlushableException = 'BucketNotFlushable'
@@ -232,6 +248,7 @@ class ExceptionName(Enum):
     DocumentNotFoundOnReplicaException = 'DocumentNotFoundOnReplica'
     DocumentNotJsonException = 'DocumentNotJson'
     DocumentNotLockedException = 'DocumentNotLocked'
+    DocumentTooDeepException = 'DocumentTooDeep'
     DocumentUnretrievableException = 'DocumentUnretrievable'
     DurabilityImpossibleException = 'DurabilityImpossible'
     DurabilityInvalidLevelException = 'DurabilityLevelNotAvailable'

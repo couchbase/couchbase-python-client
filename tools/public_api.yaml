@@ -138,6 +138,7 @@ modules:
       - AnalyticsLinkExistsException
       - AnalyticsLinkNotFoundException
       - AuthenticationException
+      - AuthorizationFailureException
       - BucketAlreadyExistsException
       - BucketDoesNotExistException
       - BucketNotFlushableException
@@ -166,6 +167,7 @@ modules:
       - DocumentNotFoundOnReplicaException
       - DocumentNotJsonException
       - DocumentNotLockedException
+      - DocumentTooDeepException
       - DocumentUnretrievableException
       - DurabilityImpossibleException
       - DurabilityInvalidLevelException
@@ -978,6 +980,7 @@ modules:
       - AnalyticsLinkExistsException
       - AnalyticsLinkNotFoundException
       - AuthenticationException
+      - AuthorizationFailureException
       - BucketAlreadyExistsException
       - BucketDoesNotExistException
       - BucketNotFlushableException
@@ -1006,6 +1009,7 @@ modules:
       - DocumentNotFoundOnReplicaException
       - DocumentNotJsonException
       - DocumentNotLockedException
+      - DocumentTooDeepException
       - DocumentUnretrievableException
       - DurabilityImpossibleException
       - DurabilityInvalidLevelException
@@ -1805,6 +1809,7 @@ modules:
       - AnalyticsLinkExistsException
       - AnalyticsLinkNotFoundException
       - AuthenticationException
+      - AuthorizationFailureException
       - BucketAlreadyExistsException
       - BucketDoesNotExistException
       - BucketNotFlushableException
@@ -1833,6 +1838,7 @@ modules:
       - DocumentNotFoundOnReplicaException
       - DocumentNotJsonException
       - DocumentNotLockedException
+      - DocumentTooDeepException
       - DocumentUnretrievableException
       - DurabilityImpossibleException
       - DurabilityInvalidLevelException
@@ -2630,6 +2636,7 @@ modules:
       - AnalyticsLinkExistsException
       - AnalyticsLinkNotFoundException
       - AuthenticationException
+      - AuthorizationFailureException
       - BucketAlreadyExistsException
       - BucketDoesNotExistException
       - BucketNotFlushableException
@@ -2658,6 +2665,7 @@ modules:
       - DocumentNotFoundOnReplicaException
       - DocumentNotJsonException
       - DocumentNotLockedException
+      - DocumentTooDeepException
       - DocumentUnretrievableException
       - DurabilityImpossibleException
       - DurabilityInvalidLevelException

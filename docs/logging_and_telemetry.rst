@@ -187,6 +187,20 @@ operation's span the child of one of the application's own, pass that span as th
 :python_sdk_github:`The SDK's examples </tree/master/examples/observability>` export both to an OTLP
 collector, with Jaeger and Prometheus behind it.
 
+Over couchbase2
+---------------
+
+Over ``couchbase2://`` each attempt at an operation is one gRPC call to the gateway, and gets a span
+under the operation's, named for the call as the gateway names its own span for it, such as
+``couchbase.kv.v1.KvService/Get``.  With the OpenTelemetry tracer the call carries that span's trace
+context in a ``traceparent`` header, so the gateway's span for the call is a child of it.
+
+``opentelemetry-instrumentation-grpc`` does the same for every gRPC channel opened after it is enabled.
+When it was enabled before the cluster was created, the SDK leaves the call's span and its trace context
+to the instrumentation, and makes the operation's span current while each call starts, so the
+instrumentation's span sits under the operation's.  The instrumentation names its spans with a leading
+``/``.  The SDK does not install it.
+
 Another tracing or metrics library
 ==================================
 

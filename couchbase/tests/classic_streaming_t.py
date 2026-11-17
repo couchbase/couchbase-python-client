@@ -128,7 +128,7 @@ class _Handler:
     def __init__(self) -> None:
         self.http_spans: list[dict[str, Any]] = []
         self.meter_ends: list[BaseException | None] = []
-        self.core_spans: list[tuple[Any, bool | None]] = []
+        self.core_spans: list[tuple[Any, bool]] = []
         self.exits: list[tuple[type[BaseException] | None, BaseException | None]] = []
         self.is_legacy_tracer = False
         self.legacy_request_span = None
@@ -140,8 +140,8 @@ class _Handler:
     def process_meter_end(self, exc_val: BaseException | None = None) -> None:
         self.meter_ends.append(exc_val)
 
-    def process_core_span(self, core_span: Any, with_error: bool | None = False) -> None:
-        self.core_spans.append((core_span, with_error))
+    def process_core_span(self, core_span: Any, exc_val: BaseException | None = None) -> None:
+        self.core_spans.append((core_span, exc_val is not None))
 
     def __exit__(self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: Any) -> None:
         self.exits.append((exc_type, exc_val))

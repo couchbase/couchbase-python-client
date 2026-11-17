@@ -453,7 +453,8 @@ class ThresholdRecordingSpan(ThresholdLoggingSpan):
         parent = self._parent_span
         if self._name.startswith(PARENT_SPAN_PREFIX) or parent is None:
             return
-        ignored = (self._name in _IGNORED_MULTI_OP_SPAN_VALUES
+        ignored = (self._is_dispatch
+                   or self._name in _IGNORED_MULTI_OP_SPAN_VALUES
                    or self._name in _IGNORED_TEST_SPAN_VALUES
                    or parent.name in _IGNORED_MULTI_OP_SPAN_VALUES
                    or parent.name in _IGNORED_PARENT_SPAN_VALUES)

@@ -29,9 +29,9 @@ _BASE = {
     'services': {'KeyValue': 'kv', 'Search': 'search'},
     'groups': [
         {'kind': 'KeyValue', 'service': 'KeyValue', 'span': 'name',
-         'ops': {'Get': {}, 'Upsert': {}}},
+         'ops': {'Exists': {'couchbase2_readonly': True}, 'Get': {'couchbase2_readonly': True}, 'Upsert': {}}},
         {'kind': 'KeyValueMulti', 'service': 'KeyValue', 'span': 'name',
-         'ops': {'GetMulti': {'single': 'Get'}}},
+         'ops': {'ExistsMulti': {'single': 'Exists'}, 'GetMulti': {'single': 'Get'}}},
         {'kind': 'Management', 'service': 'Search',
          'ops': {'SearchIndexPauseIngest': {'span': 'manager_search_pause_ingest'}}},
     ],
@@ -55,10 +55,23 @@ def test_rows() -> None:
     assert rows['SearchIndexPauseIngest'].span_name == 'manager_search_pause_ingest'
 
 
+def test_couchbase2_readonly() -> None:
+    rows = {r.name: r for r in parse(_BASE).rows}
+    assert rows['Exists'].couchbase2_readonly is True
+    assert rows['Upsert'].couchbase2_readonly is False
+
+
+def test_a_multi_row_takes_its_singles_readonly() -> None:
+    rows = {r.name: r for r in parse(_BASE).rows}
+    assert rows['ExistsMulti'].couchbase2_readonly is True
+
+
 @pytest.mark.parametrize('data, message', [
     (_with(1, 'UpsertMulti', {}), 'exactly the KeyValueMulti rows'),
     (_with(0, 'Touch', {'single': 'Get'}), 'exactly the KeyValueMulti rows'),
     (_with(1, 'GetMulti', {'single': 'GetMulti'}), 'is not a KeyValue row'),
+    (_with(1, 'GetMulti', {'single': 'Get', 'couchbase2_readonly': True}),
+     'takes its couchbase2_readonly from its single'),
     (_with(2, 'SearchIndexResumeIngest', {}), 'no span'),
     (_with(2, 'SearchIndexResumeIngest', {'span': 'manager_search_pause_ingest'}), 'span name given twice'),
     (_with(2, 'Get', {'span': 'other'}), 'row given twice'),
