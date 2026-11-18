@@ -23,6 +23,7 @@ import pytest
 from google.protobuf import any_pb2
 from google.rpc import error_details_pb2, status_pb2
 
+from couchbase.common import _redaction
 from couchbase.common._operations import Op
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   CouchbaseException,
@@ -249,8 +250,50 @@ class OnFailureUnitTests:
             ctx.on_failure(_unavailable())
         record, = caplog.records
         assert record.levelno == logging.DEBUG
-        assert 'service_not_available' in record.getMessage()
-        assert 'attempt 1' in record.getMessage()
+        assert record.getMessage().endswith('for service_not_available, attempt 1, '
+                                            'after gRPC status UNAVAILABLE (gateway away)')
+
+    def test_the_retry_log_names_the_gateways_request(self, caplog: pytest.LogCaptureFixture) -> None:
+        detail = any_pb2.Any()
+        detail.Pack(error_details_pb2.RequestInfo(request_id='req-7'))
+        rich = status_pb2.Status(code=Code.UNAVAILABLE.value[0], message='gateway away', details=[detail])
+        with caplog.at_level(logging.DEBUG, logger='couchbase.couchbase2'):
+            _context().on_failure(map_status(Code.UNAVAILABLE, None, rich, readonly=False))
+        assert caplog.records[0].getMessage().endswith('(gateway away), gateway request id req-7')
+
+    def test_the_retry_log_tags_the_message_as_user_data(self,
+                                                         caplog: pytest.LogCaptureFixture,
+                                                         monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(_redaction, '_enabled', True)
+        with caplog.at_level(logging.DEBUG, logger='couchbase.couchbase2'):
+            _context().on_failure(_unavailable())
+        assert '(<ud>gateway away</ud>)' in caplog.records[0].getMessage()
+
+
+class UnrecognizedUnitTests:
+
+    def _unmapped(self) -> MappedError:
+        return map_status(Code.DATA_LOSS, 'lost', None, readonly=False)
+
+    def test_a_failure_reports_what_it_did_not_recognize(self) -> None:
+        told: list[str] = []
+        ctx = RequestContext(Op.Upsert, 2.5, unrecognized=told.append, clock=_Clock())
+        with pytest.raises(CouchbaseException):
+            ctx.on_failure(self._unmapped())
+        assert told == ['gRPC status DATA_LOSS']
+
+    def test_a_stream_failure_reports_it_too(self) -> None:
+        told: list[str] = []
+        ctx = RequestContext(Op.Query, 2.5, unrecognized=told.append, clock=_Clock())
+        with pytest.raises(CouchbaseException):
+            ctx.on_stream_failure(self._unmapped())
+        assert told == ['gRPC status DATA_LOSS']
+
+    def test_a_recognized_failure_reports_nothing(self) -> None:
+        told: list[str] = []
+        ctx = RequestContext(Op.Upsert, 2.5, unrecognized=told.append, clock=_Clock())
+        ctx.on_failure(_unavailable())
+        assert told == []
 
 
 class ClosedUnitTests:

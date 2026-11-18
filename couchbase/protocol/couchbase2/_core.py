@@ -23,9 +23,15 @@ async cluster each own their own kind.
 from __future__ import annotations
 
 import logging
+import platform
+import time
 from datetime import timedelta
 from typing import Any
 
+import grpc
+from google import protobuf
+
+from couchbase import PYCBC_VERSION
 from couchbase.common._cluster_settings import ClusterSettings
 from couchbase.common._observability import (LoggingMeter,
                                              ObservabilityInstruments,
@@ -34,6 +40,8 @@ from couchbase.common._observability import (LoggingMeter,
 from couchbase.common._operations import Op
 from couchbase.common._option_diagnostics import OptionsBlock, check_options
 from couchbase.common._redaction import enable as enable_log_redaction
+from couchbase.common._redaction import is_enabled as log_redaction_enabled
+from couchbase.common._redaction import system_data
 from couchbase.common._registry import CLOSED_CLUSTER_MSG
 from couchbase.common.auth import (CertificateAuthenticator,
                                    JwtAuthenticator,
@@ -42,6 +50,7 @@ from couchbase.common.exceptions import FeatureUnavailableException, InvalidArgu
 from couchbase.common.options import ClusterOptions
 from couchbase.protocol.couchbase2._channel import (ChannelConfig,
                                                     call_metadata,
+                                                    describe,
                                                     with_credentials)
 from couchbase.protocol.couchbase2._histogram import PercentileHistogram
 from couchbase.protocol.couchbase2._request_context import RequestContext
@@ -92,7 +101,16 @@ class ClusterCore:
         self.query_timeout = _seconds(timeouts.get('query_timeout'), QUERY_TIMEOUT)
         self.search_timeout = _seconds(timeouts.get('search_timeout'), SEARCH_TIMEOUT)
         self.management_timeout = _seconds(timeouts.get('management_timeout'), MANAGEMENT_TIMEOUT)
+        # When the most recent request began, on the monotonic clock.
+        self.last_request: float | None = None
+        self._unrecognized: set[str] = set()
         self.closed = False
+        # Shaped like the C++ core's "open cluster" line.
+        logger.info('couchbase2: open cluster, SDK version: "%s", grpcio version: "%s", protobuf version: "%s", '
+                    'Python version: "%s", gateway: "%s", %s, authentication: "%s", log redaction: %s',
+                    PYCBC_VERSION, grpc.__version__, protobuf.__version__, platform.python_version(),
+                    system_data(self.channel_config.endpoint.target), describe(self.channel_config),
+                    _auth_kind(self.settings.auth), str(log_redaction_enabled()).lower())
 
     @property
     def observability_instruments(self) -> ObservabilityInstruments:
@@ -122,6 +140,7 @@ class ClusterCore:
         self.settings.auth = auth
         self.channel_config = with_credentials(self.channel_config, auth)
         self.metadata = call_metadata(self.channel_config)
+        logger.info("couchbase2: updated the cluster's %s credentials", new)
 
     def validate_options(self, block: OptionsBlock, opts: dict[str, Any]) -> None:
         check_options(block, opts, self.settings.option_validation, protocol=block.protocol)
@@ -133,16 +152,27 @@ class ClusterCore:
                 obs_handler: ObservableRequestHandler | None,
                 readonly: bool | None = None) -> RequestContext:
         """A request's context, which cancels it if the cluster closes while it waits to retry."""
+        self.last_request = time.monotonic()
         return RequestContext(op,
                               timeout,
                               readonly=readonly,
                               obs_handler=obs_handler,
                               tracing=self.tracing,
-                              closed=lambda: self.closed)
+                              closed=lambda: self.closed,
+                              unrecognized=self._warn_unrecognized)
+
+    def _warn_unrecognized(self, value: str) -> None:
+        """Log `value` the first time this cluster meets it."""
+        if value in self._unrecognized:
+            return
+        self._unrecognized.add(value)
+        logger.warning('couchbase2: the gateway sent %s, which this SDK version does not recognize, so the '
+                       'exception raised for it may not describe the failure.  A newer SDK may map it.', value)
 
     def close(self) -> None:
         """Mark the cluster closed and stop the reporters; the caller closes its channel."""
         self.closed = True
+        logger.info('couchbase2: closed the cluster connected to %s', system_data(self.channel_config.endpoint.target))
         instruments = self.observability_instruments
         try:
             tracer = instruments.tracer.tracer

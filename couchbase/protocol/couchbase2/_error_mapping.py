@@ -145,6 +145,8 @@ class MappedError:
     status_code: int
     context: Mapping[str, Any] = field(default_factory=dict)
     retry_reason: RetryReason | None = None
+    # A value the gateway sent that the mapping does not know, named for the log.
+    unrecognized: str | None = None
 
     def exception(self, **context: Any) -> CouchbaseException:
         """The exception to raise, its context holding the details plus `context`, the request's own fields."""
@@ -203,7 +205,8 @@ def map_status(code: grpc.StatusCode,
                        (rich.message if rich is not None else '') or message or f'gRPC status {code.name}',
                        code.value[0],
                        context=context,
-                       retry_reason=_retry_reason(code, violation))
+                       retry_reason=_retry_reason(code, violation),
+                       unrecognized=_unrecognized(code, resource, violation, reason))
 
 
 def _exception_type(code: grpc.StatusCode,
@@ -229,6 +232,27 @@ def _exception_type(code: grpc.StatusCode,
         # A write that ran out of time may still have been applied; a read changed nothing either way.
         return UnAmbiguousTimeoutException if readonly else AmbiguousTimeoutException
     return BY_CODE.get(code, CouchbaseException)
+
+
+def _unrecognized(code: grpc.StatusCode,
+                  resource: error_details_pb2.ResourceInfo | None,
+                  violation: str | None,
+                  reason: str | None) -> str | None:
+    """The value `_exception_type` fell back on a default for, or None when it knew them all.
+
+    UNKNOWN is what gRPC itself reports for a failure with no status, so it says nothing about the gateway.
+    """
+    resource_type = resource.resource_type if resource is not None else ''
+    if code in (grpc.StatusCode.NOT_FOUND, grpc.StatusCode.ALREADY_EXISTS):
+        table = NOT_FOUND if code == grpc.StatusCode.NOT_FOUND else ALREADY_EXISTS
+        return None if resource_type in ('', *table) else f'{code.name} resource type "{resource_type}"'
+    if code == grpc.StatusCode.FAILED_PRECONDITION:
+        return None if violation in (None, *PRECONDITION_FAILED) else f'precondition violation "{violation}"'
+    if code == grpc.StatusCode.ABORTED:
+        return None if reason in (None, 'CAS_MISMATCH') else f'ABORTED reason "{reason}"'
+    if code in (grpc.StatusCode.PERMISSION_DENIED, grpc.StatusCode.DEADLINE_EXCEEDED, grpc.StatusCode.UNKNOWN):
+        return None
+    return None if code in BY_CODE else f'gRPC status {code.name}'
 
 
 def _retry_reason(code: grpc.StatusCode, violation: str | None) -> RetryReason | None:

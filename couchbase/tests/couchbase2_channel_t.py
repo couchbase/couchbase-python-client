@@ -37,10 +37,12 @@ from couchbase.common._cluster_settings import ClusterSettings
 from couchbase.exceptions import InvalidArgumentException
 from couchbase.options import ClusterOptions
 from couchbase.protocol.couchbase2._channel import (CAPELLA_ROOT_CA,
+                                                    CLIENT_IDLE_TIMEOUT_MS,
                                                     ChannelConfig,
                                                     call_metadata,
                                                     channel_arguments,
                                                     default_verify_roots,
+                                                    describe,
                                                     open_aio_channel,
                                                     open_channel,
                                                     root_certificates)
@@ -148,6 +150,28 @@ class ChannelConfigUnitTests:
     def test_mozilla_roots_can_be_left_out(self) -> None:
         config = _config('couchbase2://h?disable_mozilla_ca_certificates=true', _password())
         assert config.include_mozilla_roots is False
+
+
+class DescribeUnitTests:
+
+    @pytest.mark.parametrize('query, kwargs, roots', [
+        ('', {}, 'default, Capella and Mozilla roots'),
+        ('', {'disable_mozilla_ca_certificates': True}, 'default and Capella roots'),
+        ('', {'trust_store_path': '/ca.pem'}, 'trust store'),
+    ], ids=['default', 'capella', 'trust-store'])
+    def test_how_the_gateway_is_checked(self, query: str, kwargs: dict[str, Any], roots: str) -> None:
+        config = _config(f'couchbase2://gateway.local{query}', _password(), **kwargs)
+        assert describe(config) == f'tls verification: "{roots}", client certificate: false'
+
+    def test_a_client_certificate_is_named_but_not_shown(self) -> None:
+        config = _config('couchbase2://gateway.local',
+                         ClusterOptions(CertificateAuthenticator(cert_path='/c.pem', key_path='/k.pem')))
+        assert describe(config) == ('tls verification: "default, Capella and Mozilla roots", '
+                                    'client certificate: true')
+
+    def test_the_idle_timeout_is_set(self) -> None:
+        _, options = channel_arguments(_config('couchbase2://gateway.local', _password()))
+        assert ('grpc.client_idle_timeout_ms', CLIENT_IDLE_TIMEOUT_MS) in options
 
 
 class RootCertificatesUnitTests:

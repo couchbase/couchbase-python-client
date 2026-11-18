@@ -30,6 +30,7 @@ from couchbase.common._streaming import RowIterator
 from couchbase.protocol.couchbase2._bucket_impl import BucketImpl
 from couchbase.protocol.couchbase2._channel import open_channel
 from couchbase.protocol.couchbase2._cluster_req_builder import ClusterRequestBuilder
+from couchbase.protocol.couchbase2._connectivity import ConnectivityLog, watch
 from couchbase.protocol.couchbase2._core import ClusterCore, unsupported
 from couchbase.protocol.couchbase2._driver import call_stream
 from couchbase.protocol.couchbase2._generated.admin.bucket.v1 import bucket_pb2_grpc
@@ -82,6 +83,9 @@ class ClusterImpl:
         self._core = ClusterCore(connstr, *options, **kwargs)
         self._request_builder = ClusterRequestBuilder(self._core)
         self._channel: grpc.Channel = open_channel(self._core.channel_config)
+        self._unwatch = watch(self._channel,
+                              ConnectivityLog(self._core.channel_config.endpoint.target,
+                                              lambda: self._core.last_request))
         self._kv = kv_pb2_grpc.KvServiceStub(self._channel)
         self._query = query_pb2_grpc.QueryServiceStub(self._channel)
         self._search = search_pb2_grpc.SearchServiceStub(self._channel)
@@ -152,6 +156,7 @@ class ClusterImpl:
         if self._core.closed:
             return
         self._core.close()
+        self._unwatch()
         self._channel.close()
 
     def bucket(self, name: str) -> BucketImpl:

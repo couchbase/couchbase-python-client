@@ -42,6 +42,7 @@ from couchbase.common._operations import Op
 from couchbase.common._streaming import AsyncRowIterator
 from couchbase.protocol.couchbase2._channel import channel_arguments, open_aio_channel
 from couchbase.protocol.couchbase2._cluster_req_builder import ClusterRequestBuilder
+from couchbase.protocol.couchbase2._connectivity import ConnectivityLog, watch_async
 from couchbase.protocol.couchbase2._core import ClusterCore, unsupported
 from couchbase.protocol.couchbase2._driver import call_stream_async
 from couchbase.protocol.couchbase2._generated.admin.bucket.v1 import bucket_pb2_grpc
@@ -96,6 +97,7 @@ class _Stubs:
     query_admin: query_admin_pb2_grpc.QueryAdminServiceAsyncStub
     search_admin: search_admin_pb2_grpc.SearchAdminServiceAsyncStub
     health: grpc.aio.UnaryUnaryMultiCallable[Message, int]
+    watch: asyncio.Task[None]
 
 
 class AsyncClusterImpl:
@@ -198,7 +200,10 @@ class AsyncClusterImpl:
                                          query_admin_pb2_grpc.QueryAdminServiceStub(channel)),
                                     cast('search_admin_pb2_grpc.SearchAdminServiceAsyncStub',
                                          search_admin_pb2_grpc.SearchAdminServiceStub(channel)),
-                                    health_check_async(channel))
+                                    health_check_async(channel),
+                                    watch_async(channel,
+                                                ConnectivityLog(config.endpoint.target,
+                                                                lambda: self._core.last_request)))
                 open_stubs = self._open
                 self._core.tracing.channel_opened((open_stubs.kv,
                                                    open_stubs.query,
@@ -216,6 +221,7 @@ class AsyncClusterImpl:
         self._core.close()
         if self._open is not None:
             await self._open.channel.close()
+            await self._open.watch
 
     async def wait_until_connected(self) -> None:
         """Build the channel.  It connects on its first call, as the sync channel does."""

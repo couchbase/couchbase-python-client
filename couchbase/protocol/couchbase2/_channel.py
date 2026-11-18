@@ -49,6 +49,9 @@ KEEPALIVE_TIME_MS = 30_000
 KEEPALIVE_TIMEOUT_MS = 5_000
 # gRPC's default of 4 MiB is smaller than the largest document Couchbase serves.
 MAX_RECEIVE_MESSAGE_LENGTH = 25 * 1024 * 1024
+# gRPC's own default, set so that the connectivity log can tell a channel gone idle from one that
+# lost its connection.
+CLIENT_IDLE_TIMEOUT_MS = 30 * 60 * 1000
 
 CAPELLA_ROOT_CA = """-----BEGIN CERTIFICATE-----
 MIIDFTCCAf2gAwIBAgIRANLVkgOvtaXiQJi0V6qeNtswDQYJKoZIhvcNAQELBQAw
@@ -134,6 +137,17 @@ def call_metadata(config: ChannelConfig) -> tuple[tuple[str, str], ...]:
     return (('authorization', config.authorization),) if config.authorization else ()
 
 
+def describe(config: ChannelConfig) -> str:
+    """How the channel checks the gateway and identifies itself, as the cluster's opening log line puts it."""
+    if config.trust_store_path:
+        roots = 'trust store'
+    elif config.include_mozilla_roots:
+        roots = 'default, Capella and Mozilla roots'
+    else:
+        roots = 'default and Capella roots'
+    return f'tls verification: "{roots}", client certificate: {str(bool(config.client_cert_path)).lower()}'
+
+
 def _read_required(path: str, what: str) -> bytes:
     # A configured file that cannot be read is an error, never a fall back to the default roots,
     # which would trust more issuers than the configuration asked for.
@@ -185,6 +199,7 @@ def _channel_options(config: ChannelConfig) -> list[tuple[str, Any]]:
         ('grpc.keepalive_time_ms', KEEPALIVE_TIME_MS),
         ('grpc.keepalive_timeout_ms', KEEPALIVE_TIMEOUT_MS),
         ('grpc.keepalive_permit_without_calls', 1),
+        ('grpc.client_idle_timeout_ms', CLIENT_IDLE_TIMEOUT_MS),
         ('grpc.max_receive_message_length', MAX_RECEIVE_MESSAGE_LENGTH),
         ('grpc.primary_user_agent', config.user_agent),
     ]

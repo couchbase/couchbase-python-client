@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import warnings
 from collections.abc import (Callable,
                              Coroutine,
@@ -31,6 +32,7 @@ import pytest
 from acouchbase.protocol.couchbase2._cluster_impl import AsyncClusterImpl
 from acouchbase.protocol.couchbase2._collection_impl import AsyncCollectionImpl
 from acouchbase.protocol.couchbase2._streaming import buffered_rows
+from couchbase import PYCBC_VERSION
 from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
                             PasswordAuthenticator)
@@ -42,7 +44,8 @@ from couchbase.durability import (ClientDurability,
                                   DurabilityLevel,
                                   ReplicateTo,
                                   ServerDurability)
-from couchbase.exceptions import (DocumentNotFoundException,
+from couchbase.exceptions import (CouchbaseException,
+                                  DocumentNotFoundException,
                                   FeatureUnavailableException,
                                   InvalidArgumentException,
                                   UnAmbiguousTimeoutException)
@@ -490,6 +493,56 @@ class Couchbase2WaitUntilReadyUnitTests:
         with pytest.raises(InvalidArgumentException):
             cluster.wait_until_ready(timeout)
         assert gateway.calls == []
+
+
+def _info(caplog: pytest.LogCaptureFixture, level: int = logging.INFO) -> list[str]:
+    return [r.getMessage() for r in caplog.records if r.name == 'couchbase.couchbase2' and r.levelno == level]
+
+
+class Couchbase2LoggingUnitTests:
+
+    def test_opening_logs_how_the_cluster_connects(self, connect: Callable[..., tuple[str, ClusterOptions]],
+                                                   caplog: pytest.LogCaptureFixture) -> None:
+        connstr, options = connect()
+        with caplog.at_level(logging.INFO, logger='couchbase.couchbase2'):
+            impl = ClusterImpl(connstr, options)
+        impl.close_connection()
+        opened = _info(caplog)[0]
+        assert opened.startswith(f'couchbase2: open cluster, SDK version: "{PYCBC_VERSION}", '
+                                 f'grpcio version: "{grpc.__version__}", ')
+        assert (f'gateway: "{connstr.removeprefix("couchbase2://")}", tls verification: "trust store", '
+                'client certificate: false, authentication: "password", log redaction: ') in opened
+        assert 'password"' not in opened.replace('authentication: "password"', '')
+
+    def test_new_credentials_and_closing_are_logged(self, cluster: ClusterImpl,
+                                                    caplog: pytest.LogCaptureFixture) -> None:
+        with caplog.at_level(logging.INFO, logger='couchbase.couchbase2'):
+            cluster.update_credentials(PasswordAuthenticator('user', 'secret'))
+            cluster.close_connection()
+            cluster.close_connection()
+        assert _info(caplog) == ["couchbase2: updated the cluster's password credentials",
+                                 f'couchbase2: closed the cluster connected to '
+                                 f'{cluster.core.channel_config.endpoint.target}']
+
+    def test_an_unrecognized_value_warns_once_per_cluster(self, connect: Callable[..., tuple[str, ClusterOptions]],
+                                                          gateway: FakeGateway,
+                                                          caplog: pytest.LogCaptureFixture) -> None:
+        def get_twice() -> None:
+            impl = ClusterImpl(*connect())
+            try:
+                for _ in range(2):
+                    gateway.failures['Get'] = [Fail(grpc.StatusCode.NOT_FOUND, resource_type='vbucket')]
+                    with pytest.raises(CouchbaseException):
+                        _collection(impl).get(KEY[3])
+            finally:
+                impl.close_connection()
+
+        with caplog.at_level(logging.WARNING, logger='couchbase.couchbase2'):
+            get_twice()
+            get_twice()
+        assert _info(caplog, logging.WARNING) == [
+            'couchbase2: the gateway sent NOT_FOUND resource type "vbucket", which this SDK version does not '
+            'recognize, so the exception raised for it may not describe the failure.  A newer SDK may map it.'] * 2
 
 
 def _run(coroutine: Callable[[], Coroutine[Any, Any, Any]]) -> Any:

@@ -47,6 +47,7 @@ import grpc
 
 from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._operations import Op
+from couchbase.common._redaction import user_data
 from couchbase.common.exceptions import (AmbiguousTimeoutException,
                                          CouchbaseException,
                                          DocumentLockedException,
@@ -71,6 +72,12 @@ def _code_name(error: MappedError) -> str | int:
     return _CODE_NAMES.get(error.status_code, error.status_code)
 
 
+def _request_id(error: MappedError) -> str:
+    """The gateway's id for the failed request, for matching the retry log to the gateway's own."""
+    request_id = error.context.get('request_info', {}).get('request_id')
+    return f', gateway request id {request_id}' if request_id else ''
+
+
 class RequestContext:
     """Everything about one request that changes from one attempt to the next."""
 
@@ -83,8 +90,11 @@ class RequestContext:
                  tracing: GrpcTracing | None = None,
                  strategy: RetryStrategy | None = None,
                  closed: Callable[[], bool] = lambda: False,
+                 unrecognized: Callable[[str], None] | None = None,
                  clock: Callable[[], float] = time.monotonic) -> None:
         """`timeout` is in seconds.  `closed` says whether the cluster has been closed since.
+
+        `unrecognized` is told each value from the gateway that the error mapping does not know.
 
         `readonly` is the operation's own answer unless given; a query's `read_only` option decides its own.
         `obs_handler` is the operation's, which each attempt is traced under and each retry is counted on.
@@ -102,6 +112,7 @@ class RequestContext:
         self._tracing = tracing
         self._strategy = strategy if strategy is not None else BestEffortRetryStrategy()
         self._closed = closed
+        self._unrecognized = unrecognized
         self._clock = clock
         self.deadline = clock() + timeout
 
@@ -150,6 +161,7 @@ class RequestContext:
 
     def on_failure(self, error: MappedError) -> float:
         """The seconds to wait before retrying after `error`, or raise when the request gives up."""
+        self._note_unrecognized(error)
         reason = error.retry_reason
         if reason is None:
             raise self._exception(error)
@@ -168,8 +180,9 @@ class RequestContext:
             self._retry_reasons.append(reason)
         self.last_exception = (f'{error.exception_type.__name__}({error.message}), '
                                f'caused by gRPC status {_code_name(error)}')
-        logger.debug('Retrying %s request %s for %s, attempt %d',
-                     self.op.value, self.identifier, reason.value, self.retry_attempts)
+        logger.debug('Retrying %s request %s for %s, attempt %d, after gRPC status %s (%s)%s',
+                     self.op.value, self.identifier, reason.value, self.retry_attempts,
+                     _code_name(error), user_data(error.message), _request_id(error))
         if self._closed():
             raise self._fail(RequestCanceledException, 'the cluster was closed')
         # A delay past the deadline is cut to it, so the next `check` answers with a timeout that
@@ -182,11 +195,16 @@ class RequestContext:
         Retrying would replay what the caller has already read, so a failure that would otherwise
         retry cancels the request instead.  Any other is raised as it maps.
         """
+        self._note_unrecognized(error)
         if error.retry_reason is None:
             raise self._exception(error)
         raise self._fail(RequestCanceledException,
                          (f'{self.op.value} failed with gRPC status {_code_name(error)} after its stream began, '
                           'and a stream is not retried once it has returned a message'))
+
+    def _note_unrecognized(self, error: MappedError) -> None:
+        if error.unrecognized is not None and self._unrecognized is not None:
+            self._unrecognized(error.unrecognized)
 
     def _history(self) -> dict[str, Any]:
         history: dict[str, Any] = {'retry_attempts': self.retry_attempts,

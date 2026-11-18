@@ -413,3 +413,33 @@ class RaisedByGrpcUnitTests:
 
         with _server() as target:
             self._check(run_on_own_loop(call(target)))
+
+
+class UnrecognizedUnitTests:
+
+    @pytest.mark.parametrize('code, details, named', [
+        (Code.NOT_FOUND, (_resource('vbucket'),), 'NOT_FOUND resource type "vbucket"'),
+        (Code.ALREADY_EXISTS, (_resource('vbucket'),), 'ALREADY_EXISTS resource type "vbucket"'),
+        (Code.FAILED_PRECONDITION, (_violation('POISONED_CAS'),), 'precondition violation "POISONED_CAS"'),
+        (Code.ABORTED, (_error_info('CONFLICT'),), 'ABORTED reason "CONFLICT"'),
+        (Code.DATA_LOSS, (), 'gRPC status DATA_LOSS'),
+    ], ids=['not-found', 'already-exists', 'precondition', 'aborted', 'status'])
+    def test_a_value_with_no_mapping_is_named(self, code: Code, details: tuple[Message, ...], named: str) -> None:
+        assert _map(code, *details).unrecognized == named
+
+    @pytest.mark.parametrize('code, details', [
+        (Code.NOT_FOUND, (_resource('document'),)),
+        (Code.NOT_FOUND, ()),
+        (Code.ALREADY_EXISTS, (_resource('searchindex'),)),
+        (Code.FAILED_PRECONDITION, (_violation('LOCKED'),)),
+        (Code.FAILED_PRECONDITION, ()),
+        (Code.ABORTED, (_error_info('CAS_MISMATCH'),)),
+        (Code.ABORTED, ()),
+        (Code.PERMISSION_DENIED, (_resource('bucket'),)),
+        (Code.DEADLINE_EXCEEDED, ()),
+        (Code.UNKNOWN, ()),
+        (Code.UNAVAILABLE, ()),
+    ], ids=['resource', 'no-resource', 'search-index', 'violation', 'no-violation', 'cas-mismatch',
+            'no-reason', 'permission', 'deadline', 'unknown', 'by-code'])
+    def test_a_mapped_value_is_not(self, code: Code, details: tuple[Message, ...]) -> None:
+        assert _map(code, *details).unrecognized is None
