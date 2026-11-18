@@ -277,6 +277,7 @@ not_generated:
     - couchbase/tests/couchbase2_kv_t.py
     - couchbase/tests/couchbase2_query_t.py
     - couchbase/tests/couchbase2_request_context_t.py
+    - couchbase/tests/couchbase2_search_t.py
     - couchbase/tests/couchbase2_tracing_t.py
     - couchbase/tests/collection_req_builder_t.py
     - couchbase/tests/diagnostics_t.py

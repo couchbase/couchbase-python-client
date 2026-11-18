@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import json
+import re
 import warnings
 from collections.abc import Callable
 from datetime import timedelta
@@ -36,6 +37,7 @@ from couchbase.exceptions import (FeatureUnavailableException,
 from couchbase.mutation_state import MutationState
 from couchbase.options import SearchOptions, VectorSearchOptions
 from couchbase.protocol.classic._search import SearchQueryBuilder
+from couchbase.protocol.couchbase2 import _search as couchbase2_search
 from couchbase.result import MutationToken
 from couchbase.search import (HighlightStyle,
                               MatchOperator,
@@ -878,12 +880,21 @@ def _json(obj: Any) -> Any:
     return obj.as_encodable() if isinstance(obj, search.Sort) else obj.encodable
 
 
-# Each encoder the SDK has, with the shapes it cannot send: a class, or a class and one of its
-# fields, mapped to the reason.  The JSON encoding sends everything.  A protocol that encodes some
-# other way adds its row, and its encoder raises FeatureUnavailableException for exactly what it
-# lists.
-_ENCODERS: list[tuple[str, Callable[[Any], Any], dict[tuple[type, str | None], str]]] = [
-    ('json', _json, {}),
+def _couchbase2(obj: Any) -> Any:
+    if isinstance(obj, search.Sort):
+        return couchbase2_search.encode_sort(obj)
+    if isinstance(obj, search.Facet):
+        return couchbase2_search.encode_facet(obj)
+    return couchbase2_search.encode_query(obj)
+
+
+# Each encoder the SDK has, with what says why it cannot send a shape, or None when it can.  The
+# JSON encoding sends everything.  A protocol that encodes some other way adds its row, reading its
+# own table of what it cannot send, and its encoder raises FeatureUnavailableException for exactly
+# what that table lists.
+_ENCODERS: list[tuple[str, Callable[[Any], Any], Callable[[Any], str | None]]] = [
+    ('json', _json, lambda obj: None),
+    ('couchbase2', _couchbase2, couchbase2_search.unsendable),
 ]
 
 
@@ -910,16 +921,15 @@ class SearchQueryShapeUnitTests:
                  if getattr(q, name) is None}
         assert unset == set()
 
-    @pytest.mark.parametrize('name, encode, unsupported', _ENCODERS, ids=[e[0] for e in _ENCODERS])
+    @pytest.mark.parametrize('name, encode, unsendable', _ENCODERS, ids=[e[0] for e in _ENCODERS])
     def test_every_shape_encodes_or_is_listed(self,
                                               name: str,
                                               encode: Callable[[Any], Any],
-                                              unsupported: dict[tuple[type, str | None], str]) -> None:
+                                              unsendable: Callable[[Any], str | None]) -> None:
         for q in _SHAPES:
-            listed = [key for key in unsupported
-                      if key[0] is type(q) and (key[1] is None or getattr(q, key[1]) is not None)]
-            if listed:
-                with pytest.raises(FeatureUnavailableException):
+            reason = unsendable(q)
+            if reason is not None:
+                with pytest.raises(FeatureUnavailableException, match=re.escape(reason)):
                     encode(q)
             else:
                 encode(q)

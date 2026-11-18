@@ -35,8 +35,9 @@ from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._operations import Op
 from couchbase.protocol.couchbase2._core import unsupported
 from couchbase.protocol.couchbase2._health import wait_until_serving_async
+from couchbase.protocol.couchbase2._search import SearchRows
 from couchbase.protocol.couchbase2._streaming import QueryRows
-from couchbase.result import QueryResult
+from couchbase.result import QueryResult, SearchResult
 from txcouchbase.protocol.couchbase2._bucket_impl import TxBucketImpl
 from txcouchbase.protocol.couchbase2._deferred import defer
 
@@ -52,11 +53,14 @@ if TYPE_CHECKING:
                                           DiagnosticsOptions,
                                           PingOptions,
                                           QueryOptions,
+                                          SearchOptions,
                                           WaitUntilReadyOptions)
     from couchbase.common.result import (ClusterInfoResult,
                                          DiagnosticsResult,
                                          PingResult)
-    from couchbase.protocol.couchbase2._cluster_types import QueryRequest
+    from couchbase.common.search_queries import SearchQuery
+    from couchbase.common.search_request import SearchRequest
+    from couchbase.protocol.couchbase2._cluster_types import QueryRequest, SearchQueryRequest
     from couchbase.result import AnalyticsResult
 
 
@@ -147,3 +151,39 @@ class TxClusterImpl(AsyncClusterImpl):
                                  *options: AnalyticsOptions | JSONType,
                                  **kwargs: Any) -> Deferred[AnalyticsResult]:
         raise unsupported('analytics_query')
+
+    def search_query_deferred(self,
+                              index: str,
+                              query: SearchQuery,
+                              options: SearchOptions | None = None,
+                              **kwargs: Any) -> Deferred[SearchResult]:
+        def build() -> SearchQueryRequest:
+            self.core.ensure_open()
+            return self._request_builder.build_search_query_request(index, query, options, **kwargs)
+
+        return self.search_deferred_from(build)
+
+    def search_deferred(self,
+                        index: str,
+                        request: SearchRequest | SearchQuery,
+                        options: SearchOptions | None = None,
+                        **kwargs: Any) -> Deferred[SearchResult]:
+        def build() -> SearchQueryRequest:
+            self.core.ensure_open()
+            return self._request_builder.build_search_request(index, request, options, **kwargs)
+
+        return self.search_deferred_from(build)
+
+    def search_deferred_from(self, build: Callable[[], SearchQueryRequest]) -> Deferred[SearchResult]:
+        """**INTERNAL** A search the cluster or a scope builds at the call, read whole before its Deferred fires."""
+        obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
+
+        async def read(req: SearchQueryRequest) -> SearchResult:
+            return SearchResult(await buffered_rows(lambda: self.open_search(req, obs_handler), SearchRows(req)))
+
+        def start() -> Coroutine[Any, Any, SearchResult]:
+            req = build()
+            obs_handler.create_http_span(**req.span_attributes)
+            return read(req)
+
+        return defer(self.loop, obs_handler, start)

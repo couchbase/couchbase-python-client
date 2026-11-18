@@ -34,7 +34,9 @@ if TYPE_CHECKING:
     from couchbase.common.search_request import SearchRequest
     from couchbase.protocol.couchbase2._bucket_impl import BucketImpl
     from couchbase.protocol.couchbase2._cluster_impl import ClusterImpl
-    from couchbase.result import AnalyticsResult, QueryResult
+    from couchbase.result import (AnalyticsResult,
+                                  QueryResult,
+                                  SearchResult)
 
 
 class ScopeImpl:
@@ -79,15 +81,19 @@ class ScopeImpl:
                      index: str,
                      query: SearchQuery,
                      options: SearchOptions | None = None,
-                     **kwargs: Any) -> NoReturn:
-        raise unsupported('search_query')
+                     **kwargs: Any) -> SearchResult:
+        self._cluster_impl.core.ensure_open()
+        return self._cluster_impl.run_search(
+            self._request_builder.build_search_query_request(index, query, options, **kwargs))
 
     def search(self,
                index: str,
                request: SearchRequest | SearchQuery,
                options: SearchOptions | None = None,
-               **kwargs: Any) -> NoReturn:
-        raise unsupported('search')
+               **kwargs: Any) -> SearchResult:
+        self._cluster_impl.core.ensure_open()
+        return self._cluster_impl.run_search(
+            self._request_builder.build_search_request(index, request, options, **kwargs))
 
     def search_index_mgmt(self) -> NoReturn:
         raise unsupported('Search index management')

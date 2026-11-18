@@ -25,8 +25,14 @@ if TYPE_CHECKING:
     from twisted.internet.defer import Deferred
 
     from couchbase.common._utils import JSONType
-    from couchbase.common.options import AnalyticsOptions, QueryOptions
-    from couchbase.result import AnalyticsResult, QueryResult
+    from couchbase.common.options import (AnalyticsOptions,
+                                          QueryOptions,
+                                          SearchOptions)
+    from couchbase.common.search_queries import SearchQuery
+    from couchbase.common.search_request import SearchRequest
+    from couchbase.result import (AnalyticsResult,
+                                  QueryResult,
+                                  SearchResult)
     from txcouchbase.protocol.couchbase2._bucket_impl import TxBucketImpl
     from txcouchbase.protocol.couchbase2._cluster_impl import TxClusterImpl
 
@@ -57,3 +63,18 @@ class TxScopeImpl(AsyncScopeImpl):
                                  *options: AnalyticsOptions | JSONType,
                                  **kwargs: Any) -> Deferred[AnalyticsResult]:
         raise unsupported('analytics_query')
+
+    def search_query_deferred(self,
+                              index: str,
+                              query: SearchQuery,
+                              options: SearchOptions | None = None,
+                              **kwargs: Any) -> Deferred[SearchResult]:
+        return self._tx_cluster_impl.search_deferred_from(
+            lambda: self.prepare_search_query(index, query, options, kwargs))
+
+    def search_deferred(self,
+                        index: str,
+                        request: SearchRequest | SearchQuery,
+                        options: SearchOptions | None = None,
+                        **kwargs: Any) -> Deferred[SearchResult]:
+        return self._tx_cluster_impl.search_deferred_from(lambda: self.prepare_search(index, request, options, kwargs))

@@ -40,8 +40,9 @@ from couchbase.protocol.couchbase2._generated.kv.v1 import kv_pb2_grpc
 from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2_grpc
 from couchbase.protocol.couchbase2._generated.search.v1 import search_pb2_grpc
 from couchbase.protocol.couchbase2._health import health_check, wait_until_serving
+from couchbase.protocol.couchbase2._search import SearchRows
 from couchbase.protocol.couchbase2._streaming import QueryRows, StreamExecutor
-from couchbase.result import QueryResult
+from couchbase.result import QueryResult, SearchResult
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -65,8 +66,9 @@ if TYPE_CHECKING:
                                          PingResult)
     from couchbase.common.search_queries import SearchQuery
     from couchbase.common.search_request import SearchRequest
-    from couchbase.protocol.couchbase2._cluster_types import QueryRequest
+    from couchbase.protocol.couchbase2._cluster_types import QueryRequest, SearchQueryRequest
     from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2
+    from couchbase.protocol.couchbase2._generated.search.v1 import search_pb2
     from couchbase.result import AnalyticsResult
     from couchbase.transactions import Transactions
 
@@ -207,15 +209,30 @@ class ClusterImpl:
                      index: str,
                      query: SearchQuery,
                      options: SearchOptions | None = None,
-                     **kwargs: Any) -> NoReturn:
-        raise unsupported('search_query')
+                     **kwargs: Any) -> SearchResult:
+        self._core.ensure_open()
+        return self.run_search(self._request_builder.build_search_query_request(index, query, options, **kwargs))
 
     def search(self,
                index: str,
                request: SearchRequest | SearchQuery,
                options: SearchOptions | None = None,
-               **kwargs: Any) -> NoReturn:
-        raise unsupported('search')
+               **kwargs: Any) -> SearchResult:
+        self._core.ensure_open()
+        return self.run_search(self._request_builder.build_search_request(index, request, options, **kwargs))
+
+    def run_search(self, req: SearchQueryRequest) -> SearchResult:
+        """**INTERNAL** A search the cluster or a scope built, sent once its rows are first read."""
+        obs_handler = ObservableRequestHandler(Op.SearchQuery, self.observability_instruments)
+
+        def open_stream() -> Iterator[search_pb2.SearchQueryResponse]:
+            ctx = self._core.context(Op.SearchQuery, req.timeout, obs_handler=obs_handler)
+            return call_stream(self._search.SearchQuery, req.message, ctx, self._core.metadata)
+
+        return SearchResult(RowIterator(StreamExecutor(open_stream,
+                                                       SearchRows(req),
+                                                       obs_handler=obs_handler,
+                                                       span_attributes=req.span_attributes)))
 
     def bucket_mgmt(self) -> NoReturn:
         raise unsupported('Bucket management')

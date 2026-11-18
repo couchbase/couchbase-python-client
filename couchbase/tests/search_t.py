@@ -66,7 +66,9 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 
 class SearchCollectionTestSuite(SuiteRequirements):
@@ -421,6 +423,8 @@ class SearchTestSuite(SuiteRequirements):
         assert all(isinstance(ft, SearchNumericRangeFacet) for ft in result_facet.numeric_ranges)
         assert len(result_facet.numeric_ranges) <= facet_limit
 
+    # couchbase2 cannot send consistent_with: the gateway's search request carries no mutation state.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     def test_cluster_search_ryow(self, cb_env: SyncTestEnvironment) -> None:
         EnvironmentFeatures.check_if_feature_supported(ServerFeatures.SearchConsistentWith,
                                                        cb_env.server_context)
@@ -476,6 +480,8 @@ class SearchTestSuite(SuiteRequirements):
         assert all(isinstance(ft, SearchTermFacet) for ft in result_facet.terms)
         assert len(result_facet.terms) <= facet_limit
 
+    # couchbase2 cannot send REQUEST_PLUS: the gateway reads a search index as it is.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     def test_cluster_search_scan_consistency(self, cb_env: SyncTestEnvironment) -> None:
         idx = SearchEnvironment.index_name(SearchTestSuite.COLLECTION_STRATEGY)
         q = search.TermQuery('auto')
@@ -492,6 +498,9 @@ class SearchTestSuite(SuiteRequirements):
             cb_env.cluster.search_query(
                 idx, q, SearchOptions(limit=10, scan_consistency=search.SearchScanConsistency.AT_PLUS))
 
+    @pytest.mark.known_issue(TestProtocol.COUCHBASE2,
+                             ticket='ING-2777',
+                             note='the gateway leaves out a facet with no buckets')
     def test_cluster_search_top_level_facets(self, cb_env: SyncTestEnvironment) -> None:
         # With the facet limit omitted the server returns the facet without its details, so
         # terms, numeric_ranges and date_ranges all come back None.
@@ -515,6 +524,9 @@ class SearchTestSuite(SuiteRequirements):
         SearchEnvironment.assert_rows_at_least(res, 1)
         self._assert_facet_without_details(res, facet_name)
 
+    @pytest.mark.known_issue(TestProtocol.COUCHBASE2,
+                             ticket='ING-2777',
+                             note='the gateway leaves out a facet with no buckets')
     def test_cluster_search_top_level_facets_kwargs(self, cb_env: SyncTestEnvironment) -> None:
         # Same as test_cluster_search_top_level_facets, with the facets passed as a kwarg
         # alongside a SearchOptions rather than inside it.
@@ -770,6 +782,9 @@ class SearchTestSuite(SuiteRequirements):
         assert len(results) == 1
         assert results[0] is True
 
+    # couchbase2 cannot send a RawQuery: a raw query is JSON, and the gateway takes a query only as
+    # its fields.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     def test_search_raw_query(self, cb_env: SyncTestEnvironment) -> None:
         idx = SearchEnvironment.index_name(SearchTestSuite.COLLECTION_STRATEGY)
         query_args = {'match': 'auto deal', 'fuzziness': 2, 'operator': 'and'}

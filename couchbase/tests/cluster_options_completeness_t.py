@@ -37,6 +37,7 @@ import pytest
 import couchbase
 from couchbase import USER_AGENT_EXTRA
 from couchbase.auth import PasswordAuthenticator
+from couchbase.common import _redaction
 from couchbase.common._observability import NoOpMeter, NoOpTracer
 from couchbase.common._option_spec import BLOCKS
 from couchbase.common.option_enums import IpProtocol, TLSVerifyMode
@@ -183,7 +184,13 @@ class ClusterOptionsCompletenessUnitTests:
         assert {'enable_tls', 'timeout_options.key_value_timeout', 'num_io_threads'} <= reads
 
     @pytest.mark.parametrize('block, key', _cases())
-    def test_every_key_reaches_something_or_is_inert(self, block: str, key: str) -> None:
+    def test_every_key_reaches_something_or_is_inert(self,
+                                                     block: str,
+                                                     key: str,
+                                                     monkeypatch: pytest.MonkeyPatch) -> None:
+        reads = _binding_reads()
+        # Settling `log_redaction` turns on the process-wide redaction flag; restore it afterwards.
+        monkeypatch.setattr(_redaction, '_enabled', _redaction.is_enabled())
         spec = BLOCKS[block].keys[key]
         transform = getattr(wire_of(block, key).transform, '__name__', '')
         samples = SAMPLES_BY_KEY.get(key) or SAMPLES_BY_TRANSFORM.get(transform)
@@ -192,7 +199,6 @@ class ClusterOptionsCompletenessUnitTests:
         sent_first, held_first = _settled(block, key, samples[0], samples)
         sent_second, held_second = _settled(block, key, samples[1], samples)
         sent, held = _differ(sent_first, sent_second), _differ(held_first, held_second)
-        reads = _binding_reads()
         if 'classic' in spec.inert:
             assert [name for name in sent if name in reads] == [], f'{block}.{key} is declared inert and is read'
             return

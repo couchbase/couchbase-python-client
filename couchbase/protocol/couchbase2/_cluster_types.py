@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -25,12 +26,15 @@ from couchbase.common.protocol import CouchbaseProtocol
 
 if TYPE_CHECKING:
     from couchbase.common._observability.handler import OpAttributeOptions
+    from couchbase.common.search import Facet
     from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2
+    from couchbase.protocol.couchbase2._generated.search.v1 import search_pb2
     from couchbase.serializer import Serializer
 
 
 class ClusterOptionsBlock(OptionsBlock, protocol=CouchbaseProtocol.COUCHBASE2):
     Query = 'QueryOptions'
+    Search = 'SearchOptions'
     WaitUntilReady = 'WaitUntilReadyOptions'
 
 
@@ -41,6 +45,20 @@ class QueryRequest:
     timeout: float
     readonly: bool
     span_attributes: OpAttributeOptions
+
+
+@dataclass(frozen=True)
+class SearchQueryRequest:
+    message: search_pb2.SearchQueryRequest
+    serializer: Serializer
+    timeout: float
+    span_attributes: OpAttributeOptions
+    # The facets as the caller gave them, by name, which the answer's are read against.
+    facets: Mapping[str, Facet]
+    # Whether the request asked for fragments, and for locations, which the gateway sends regardless.
+    fragments: bool
+    locations: bool
+    log_response: bool
 
 
 @dataclass(frozen=True)

@@ -16,9 +16,9 @@
 """An in-process stand-in for the gateway, so the couchbase2 impls can be run with no cluster.
 
 It serves TLS, as the gateway does, on a certificate signed by a CA made for the run, and answers
-KV `Get` and `Upsert` from a dict, `Query` from a script, and the health check from a list of
-statuses.  Each call is recorded with its metadata and deadline, so a test can read what an impl
-sent.
+KV `Get` and `Upsert` from a dict, `Query` and `SearchQuery` each from a script, and the health check
+from a list of statuses.  Each call is recorded with its metadata and deadline, so a test can read
+what an impl sent.
 """
 
 from __future__ import annotations
@@ -43,6 +43,8 @@ from google.rpc import error_details_pb2, status_pb2
 from couchbase.protocol.couchbase2._error_mapping import STATUS_DETAILS_KEY
 from couchbase.protocol.couchbase2._generated.kv.v1 import kv_pb2, kv_pb2_grpc
 from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2, query_pb2_grpc
+from couchbase.protocol.couchbase2._generated.search.v1 import search_pb2 as search_query_pb2
+from couchbase.protocol.couchbase2._generated.search.v1 import search_pb2_grpc as search_query_pb2_grpc
 from couchbase.protocol.couchbase2._health import (SERVING,
                                                    HealthCheckRequest,
                                                    HealthCheckResponse)
@@ -116,7 +118,8 @@ class Fail:
 
 @dataclass
 class FakeGateway(kv_pb2_grpc.KvServiceServicer,
-                  query_pb2_grpc.QueryServiceServicer):
+                  query_pb2_grpc.QueryServiceServicer,
+                  search_query_pb2_grpc.SearchServiceServicer):
     documents: dict[tuple[str, str, str, str], Document] = field(default_factory=dict)
     calls: list[Call] = field(default_factory=list)
     # Failures each method answers with, in order, before it answers normally.
@@ -128,6 +131,9 @@ class FakeGateway(kv_pb2_grpc.KvServiceServicer,
     query_cancelled: threading.Event = field(default_factory=threading.Event)
     # How long a query waits after each message it sends.
     query_pause: float = 0.0
+    # The messages a search streams, then how it ends: OK when None.
+    search_messages: Sequence[search_query_pb2.SearchQueryResponse] = ()
+    search_end: Fail | None = None
     # The serving statuses the health check answers with, in order, before it answers serving.
     health_statuses: list[int] = field(default_factory=list)
     _cas: int = 1000
@@ -176,6 +182,13 @@ class FakeGateway(kv_pb2_grpc.KvServiceServicer,
         if self.query_end is not None:
             _abort(context, self.query_end)
 
+    def SearchQuery(self, request: search_query_pb2.SearchQueryRequest, context: grpc.ServicerContext
+                    ) -> Iterator[search_query_pb2.SearchQueryResponse]:
+        self._record('SearchQuery', request, context)
+        yield from self.search_messages
+        if self.search_end is not None:
+            _abort(context, self.search_end)
+
     def Check(self, request: Any, context: grpc.ServicerContext) -> int:
         self._record('Check', request, context)
         return self.health_statuses.pop(0) if self.health_statuses else SERVING
@@ -210,6 +223,7 @@ def serving(gateway: FakeGateway, certificates: Certificates) -> Iterator[int]:
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     kv_pb2_grpc.add_KvServiceServicer_to_server(gateway, server)
     query_pb2_grpc.add_QueryServiceServicer_to_server(gateway, server)
+    search_query_pb2_grpc.add_SearchServiceServicer_to_server(gateway, server)
     check: grpc.RpcMethodHandler[Any, int] = grpc.unary_unary_rpc_method_handler(
         gateway.Check,
         request_deserializer=HealthCheckRequest.FromString,

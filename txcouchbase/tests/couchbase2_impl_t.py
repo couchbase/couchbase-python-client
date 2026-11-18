@@ -25,13 +25,16 @@ import grpc
 import pytest
 from twisted.internet.defer import Deferred, inlineCallbacks
 
+import couchbase.search as search
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import (DocumentNotFoundException,
                                   FeatureUnavailableException,
-                                  InvalidArgumentException)
+                                  InvalidArgumentException,
+                                  QueryIndexNotFoundException)
 from couchbase.options import ClusterOptions
 from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2
-from couchbase.result import QueryResult
+from couchbase.protocol.couchbase2._generated.search.v1 import search_pb2
+from couchbase.result import QueryResult, SearchResult
 from tests.couchbase2_gateway import (Certificates,
                                       Fail,
                                       FakeGateway,
@@ -43,6 +46,7 @@ from txcouchbase.protocol.couchbase2._cluster_impl import TxClusterImpl
 from txcouchbase.protocol.couchbase2._collection_impl import TxCollectionImpl
 
 MetaData = query_pb2.QueryResponse.MetaData
+SearchResponse = search_pb2.SearchQueryResponse
 
 
 @pytest.fixture(scope='module')
@@ -126,6 +130,34 @@ class Couchbase2TwistedUnitTests:
         gateway.query_end = Fail(grpc.StatusCode.INVALID_ARGUMENT)
         with pytest.raises(InvalidArgumentException):
             run_in_reactor_thread(lambda: cluster.query_deferred('SELEC 1'))
+
+    def test_a_search_fires_once_its_rows_are_read(self, cluster: TxClusterImpl, gateway: FakeGateway) -> None:
+        gateway.search_messages = [SearchResponse(hits=[SearchResponse.SearchQueryRow(id='a'),
+                                                        SearchResponse.SearchQueryRow(id='b')]),
+                                   SearchResponse(meta_data=SearchResponse.MetaData(
+                                       metrics=SearchResponse.SearchMetrics(total_rows=2)))]
+
+        def run() -> Deferred[SearchResult]:
+            return cluster.bucket('travel').scope('inventory').search_deferred(
+                'ix', search.SearchRequest(search.MatchAllQuery()))
+
+        result: SearchResult = run_in_reactor_thread(run)
+        assert [row.id for row in result.rows()] == ['a', 'b']
+        metadata = result.metadata()
+        metrics = None if metadata is None else metadata.metrics()
+        assert metrics is not None and metrics.total_rows() == 2
+        assert gateway.calls[0].request.index_name == 'travel.inventory.ix'
+
+    def test_a_search_on_a_missing_index_fails_the_deferred(self, cluster: TxClusterImpl,
+                                                            gateway: FakeGateway) -> None:
+        gateway.failures['SearchQuery'] = [Fail(grpc.StatusCode.NOT_FOUND, 'searchindex')]
+        with pytest.raises(QueryIndexNotFoundException):
+            run_in_reactor_thread(lambda: cluster.search_query_deferred('missing', search.MatchAllQuery()))
+
+    def test_a_search_argument_is_refused_at_the_call(self, cluster: TxClusterImpl, gateway: FakeGateway) -> None:
+        with pytest.raises(FeatureUnavailableException):
+            run_in_reactor_thread(lambda: cluster.search_query_deferred('ix', search.RawQuery({'term': 'a'})))
+        assert gateway.calls == []
 
     @pytest.mark.parametrize('call', [lambda c: c.ping_deferred(),
                                       lambda c: c.analytics_query_deferred('SELECT 1'),

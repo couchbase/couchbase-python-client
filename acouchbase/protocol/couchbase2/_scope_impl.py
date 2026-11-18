@@ -28,14 +28,16 @@ from couchbase.protocol.couchbase2._scope_req_builder import ScopeRequestBuilder
 if TYPE_CHECKING:
     from acouchbase.protocol.couchbase2._bucket_impl import AsyncBucketImpl
     from acouchbase.protocol.couchbase2._cluster_impl import AsyncClusterImpl
-    from acouchbase.result import AsyncAnalyticsResult, AsyncQueryResult
+    from acouchbase.result import (AsyncAnalyticsResult,
+                                   AsyncQueryResult,
+                                   AsyncSearchResult)
     from couchbase.common._utils import JSONType
     from couchbase.common.options import (AnalyticsOptions,
                                           QueryOptions,
                                           SearchOptions)
     from couchbase.common.search_queries import SearchQuery
     from couchbase.common.search_request import SearchRequest
-    from couchbase.protocol.couchbase2._cluster_types import QueryRequest
+    from couchbase.protocol.couchbase2._cluster_types import QueryRequest, SearchQueryRequest
 
 
 class AsyncScopeImpl:
@@ -88,15 +90,33 @@ class AsyncScopeImpl:
                      index: str,
                      query: SearchQuery,
                      options: SearchOptions | None = None,
-                     **kwargs: Any) -> NoReturn:
-        raise unsupported('search_query')
+                     **kwargs: Any) -> AsyncSearchResult:
+        return self._cluster_impl.run_search(self.prepare_search_query(index, query, options, kwargs))
+
+    def prepare_search_query(self,
+                             index: str,
+                             query: SearchQuery,
+                             options: SearchOptions | None,
+                             kwargs: dict[str, Any]) -> SearchQueryRequest:
+        """**INTERNAL**"""
+        self._cluster_impl.core.ensure_open()
+        return self._request_builder.build_search_query_request(index, query, options, **kwargs)
 
     def search(self,
                index: str,
                request: SearchRequest | SearchQuery,
                options: SearchOptions | None = None,
-               **kwargs: Any) -> NoReturn:
-        raise unsupported('search')
+               **kwargs: Any) -> AsyncSearchResult:
+        return self._cluster_impl.run_search(self.prepare_search(index, request, options, kwargs))
+
+    def prepare_search(self,
+                       index: str,
+                       request: SearchRequest | SearchQuery,
+                       options: SearchOptions | None,
+                       kwargs: dict[str, Any]) -> SearchQueryRequest:
+        """**INTERNAL**"""
+        self._cluster_impl.core.ensure_open()
+        return self._request_builder.build_search_request(index, request, options, **kwargs)
 
     def search_index_mgmt(self) -> NoReturn:
         raise unsupported('Search index management')

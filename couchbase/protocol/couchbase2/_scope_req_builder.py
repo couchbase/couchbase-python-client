@@ -17,11 +17,19 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from couchbase.common._search_args import (check_search_query_argument,
+                                           search_args,
+                                           search_argument)
 from couchbase.common.options import QueryOptions
 from couchbase.protocol.couchbase2._query import create_query_request
+from couchbase.protocol.couchbase2._search import create_search_request
 
 if TYPE_CHECKING:
-    from couchbase.protocol.couchbase2._cluster_types import QueryRequest
+    from couchbase.common.options import SearchOptions
+    from couchbase.common.search_queries import SearchQuery
+    from couchbase.common.search_request import SearchRequest
+    from couchbase.common.vector_search import VectorSearch
+    from couchbase.protocol.couchbase2._cluster_types import QueryRequest, SearchQueryRequest
     from couchbase.protocol.couchbase2._core import ClusterCore
 
 
@@ -38,3 +46,28 @@ class ScopeRequestBuilder:
         if not (stated or 'query_context' in kwargs):
             kwargs['query_context'] = f'`{self._bucket_name}`.`{self._scope_name}`'
         return create_query_request(self._core, statement, *options, **kwargs)
+
+    def build_search_request(self,
+                             index: str,
+                             request: SearchRequest | SearchQuery,
+                             options: SearchOptions | None = None,
+                             **kwargs: Any) -> SearchQueryRequest:
+        query, vector_search = search_argument(request)
+        return self._search(index, query, vector_search, search_args(options, **kwargs))
+
+    def build_search_query_request(self,
+                                   index: str,
+                                   query: SearchQuery,
+                                   options: SearchOptions | None = None,
+                                   **kwargs: Any) -> SearchQueryRequest:
+        check_search_query_argument(query)
+        return self._search(index, query, None, search_args(options, **kwargs))
+
+    def _search(self,
+                index: str,
+                query: SearchQuery,
+                vector_search: VectorSearch | None,
+                args: dict[str, Any]) -> SearchQueryRequest:
+        """A search of this scope's index, or of the scope the deprecated `scope_name` names."""
+        location = (self._bucket_name, args.get('scope_name') or self._scope_name)
+        return create_search_request(self._core, index, query, vector_search, args, location=location)
