@@ -47,7 +47,6 @@ from tests.environments.managers import (TwistedTestEnvironmentAnalyticsIndexMan
                                          TwistedTestEnvironmentUserManager,
                                          TwistedTestEnvironmentViewIndexManager)
 from tests.environments.metrics_environment import MeterType, MetricsEnvironment
-from tests.environments.test_environment import TestProtocol
 from tests.environments.twisted_environment import (CollectionStrategy,
                                                     ConnectionStrategy,
                                                     SuiteRequirements,
@@ -58,7 +57,7 @@ from tests.environments.twisted_query_index_mgmt_environment import TwistedQuery
 from tests.manifest import validate_test_manifest
 from tests.metrics_validators import HttpMeterValidator
 from tests.search_index_defs import INDEX_VISIBLE_DELAY, INDEX_VISIBLE_ROUNDS
-from tests.test_features import ServerFeatures
+from tests.test_features import ServerFeatures, TestProtocol
 from txcouchbase.management.buckets import CreateBucketSettings
 from txcouchbase.management.collections import UpdateCollectionSettings
 from txcouchbase.management.search import SearchIndex
@@ -104,8 +103,6 @@ class ManagementMetricsSuiteBase(SuiteRequirements):
     # arguments are checked, so these tests expect a recorder with `ErrorType` set rather than
     # an empty meter.  That is the one place the http and key-value paths genuinely disagree.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A meter is a cluster option, so each suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     COLLECTION_STRATEGY = CollectionStrategy.DEFAULT
@@ -465,7 +462,11 @@ class QueryIndexManagementMetricsTestSuite(ManagementMetricsSuiteBase):
         qixm.watch_indexes(bucket_name, index_names, WatchQueryIndexOptions(timeout=self.WATCH_TIMEOUT))
         # watch_indexes polls with get_all_indexes, so what the meter holds is the poll, and
         # asserting on the watch itself would be asserting on an operation that records nothing.
-        http_validator.validate_http_op(Op.QueryIndexGetAll)
+        # Over couchbase2 the watch waits on each index with WaitForIndexOnline instead, and the
+        # meter holds those waits.
+        poll_op = (Op.QueryIndexWaitForIndexOnline if cb_env.protocol == TestProtocol.COUCHBASE2
+                   else Op.QueryIndexGetAll)
+        http_validator.validate_http_op(poll_op)
 
     # ------------------------------------------------------------------
     # Refused by the client, and still measured

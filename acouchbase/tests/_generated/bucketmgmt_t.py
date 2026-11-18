@@ -107,6 +107,9 @@ class BucketManagementTestSuite(TopologySuite):
         await cb_env.drop_bucket()
 
     @pytest.mark.asyncio
+    @pytest.mark.known_issue(TestProtocol.COUCHBASE2,
+                             ticket='ING-2775',
+                             note='the gateway creates a bucket given no storage backend as couchstore')
     @pytest.mark.usefixtures('check_bucket_storage_backend_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')
@@ -263,6 +266,9 @@ class BucketManagementTestSuite(TopologySuite):
         assert bucket.replica_index is True
 
     @pytest.mark.asyncio
+    @pytest.mark.known_issue(TestProtocol.COUCHBASE2,
+                             ticket='ING-2774',
+                             note='the gateway drops a num_replicas of 0')
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('drop_bucket')
     async def test_bucket_create_zero_replicas(self, cb_env: AsyncTestEnvironment) -> None:
@@ -409,8 +415,13 @@ class BucketManagementTestSuite(TopologySuite):
         bucket = await bm.get_bucket(bucket_name)
         assert bucket is not None
         assert bucket.history_retention_collection_default is None
-        assert bucket.history_retention_bytes is None
-        assert bucket.history_retention_duration is None
+        if cb_env.protocol == TestProtocol.COUCHBASE2:
+            # The gateway reports a couchstore bucket's history limits as zero where classic leaves them out.
+            assert bucket.history_retention_bytes == 0
+            assert bucket.history_retention_duration == timedelta(0)
+        else:
+            assert bucket.history_retention_bytes is None
+            assert bucket.history_retention_duration is None
 
         with pytest.raises(InvalidArgumentException):
             await bm.update_bucket(
@@ -425,10 +436,7 @@ class BucketManagementTestSuite(TopologySuite):
                 )
             )
 
-    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
-    # error mapping raises.
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     async def test_bucket_drop_fail(self, cb_env: AsyncTestEnvironment) -> None:
@@ -463,7 +471,6 @@ class BucketManagementTestSuite(TopologySuite):
         await AsyncTestEnvironment.try_n_times(10, 3, bm.flush_bucket, bucket.name)
 
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_bucket_mgmt_supported')
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('drop_bucket')

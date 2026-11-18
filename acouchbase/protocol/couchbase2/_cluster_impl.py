@@ -32,6 +32,7 @@ from typing import (TYPE_CHECKING,
                     cast)
 
 from acouchbase.protocol.couchbase2._bucket_impl import AsyncBucketImpl
+from acouchbase.protocol.couchbase2._management._bucket_mgmt_impl import AsyncBucketMgmtImpl
 from acouchbase.protocol.couchbase2._streaming import AsyncStreamExecutor
 from acouchbase.result import AsyncQueryResult, AsyncSearchResult
 from couchbase.common._observability import ObservabilityInstruments, ObservableRequestHandler
@@ -318,8 +319,9 @@ class AsyncClusterImpl:
         ctx = self._core.context(Op.SearchQuery, req.timeout, obs_handler=obs_handler)
         return call_stream_async(service.SearchQuery, req.message, ctx, self._core.metadata)
 
-    def bucket_mgmt(self) -> NoReturn:
-        raise unsupported('Bucket management')
+    def bucket_mgmt(self) -> AsyncBucketMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncBucketMgmtImpl(self)
 
     def user_mgmt(self) -> NoReturn:
         raise unsupported('User management')

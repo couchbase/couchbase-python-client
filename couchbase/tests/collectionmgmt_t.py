@@ -55,7 +55,9 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
 from tests.skips import CouchbaseTestEnvironmentException
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 
 class CollectionManagementTestSuite(SuiteRequirements):
@@ -438,6 +440,9 @@ class CollectionManagementTestSuite(SuiteRequirements):
         assert coll is not None
         assert coll.history
 
+    @pytest.mark.known_issue(TestProtocol.COUCHBASE2,
+                             ticket='ING-2776',
+                             note='the gateway answers a refusal of history on couchstore with UNKNOWN')
     @pytest.mark.usefixtures('check_non_deduped_history_supported')
     @pytest.mark.usefixtures('drop_bucket')
     def test_create_collection_history_retention_unsupported(self, cb_env: SyncTestEnvironment) -> None:
@@ -490,10 +495,12 @@ class CollectionManagementTestSuite(SuiteRequirements):
         cb_env.create_bucket(bucket_name, storage_backend=StorageBackend.COUCHSTORE)
         mgr.create_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name)
         cb_env.consistency.wait_until_collection_present(bucket_name, self.DEFAULT_SCOPE, collection_name)
+        # The gateway leaves a couchstore collection's history out, where classic reports False.
+        no_history = None if cb_env.protocol == TestProtocol.COUCHBASE2 else False
 
         coll = mgr.get_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name)
         assert coll is not None
-        assert coll.history is False
+        assert coll.history is no_history
 
         with pytest.raises(FeatureUnavailableException):
             mgr.update_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name,
@@ -502,7 +509,7 @@ class CollectionManagementTestSuite(SuiteRequirements):
         # The rejected update left the setting where it was, rather than half-applying it.
         coll = mgr.get_collection_in_bucket(bucket_name, self.DEFAULT_SCOPE, collection_name)
         assert coll is not None
-        assert coll.history is False
+        assert coll.history is no_history
 
     # --- update_collection: max_expiry ---
 
@@ -524,6 +531,9 @@ class CollectionManagementTestSuite(SuiteRequirements):
         cb_assert_eq(coll.max_expiry, timedelta(seconds=2), what='updated collection max_expiry')
         self._assert_doc_expires(cb_env, collection_name)
 
+    # The gateway's collection update cannot ask for the bucket's maximum expiry, so couchbase2
+    # refuses it.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_update_collection_supported')
     @pytest.mark.usefixtures('check_update_collection_max_expiry_supported')
     @pytest.mark.usefixtures('check_negative_collection_max_expiry_supported')

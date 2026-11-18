@@ -40,6 +40,7 @@ from couchbase.protocol.couchbase2._generated.kv.v1 import kv_pb2_grpc
 from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2_grpc
 from couchbase.protocol.couchbase2._generated.search.v1 import search_pb2_grpc
 from couchbase.protocol.couchbase2._health import health_check, wait_until_serving
+from couchbase.protocol.couchbase2._management._bucket_mgmt_impl import BucketMgmtImpl
 from couchbase.protocol.couchbase2._search import SearchRows
 from couchbase.protocol.couchbase2._streaming import QueryRows, StreamExecutor
 from couchbase.result import QueryResult, SearchResult
@@ -234,8 +235,9 @@ class ClusterImpl:
                                                        obs_handler=obs_handler,
                                                        span_attributes=req.span_attributes)))
 
-    def bucket_mgmt(self) -> NoReturn:
-        raise unsupported('Bucket management')
+    def bucket_mgmt(self) -> BucketMgmtImpl:
+        """**INTERNAL**"""
+        return BucketMgmtImpl(self)
 
     def user_mgmt(self) -> NoReturn:
         raise unsupported('User management')

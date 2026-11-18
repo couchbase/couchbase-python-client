@@ -60,11 +60,10 @@ from tests.environments.managers import (AsyncTestEnvironmentAnalyticsIndexManag
                                          AsyncTestEnvironmentSearchIndexManager,
                                          AsyncTestEnvironmentUserManager,
                                          AsyncTestEnvironmentViewIndexManager)
-from tests.environments.test_environment import TestProtocol
 from tests.environments.tracing_environment import TracingEnvironment, TracingType
 from tests.manifest import validate_test_manifest
 from tests.search_index_defs import INDEX_VISIBLE_DELAY, INDEX_VISIBLE_ROUNDS
-from tests.test_features import ServerFeatures
+from tests.test_features import ServerFeatures, TestProtocol
 from tests.tracing_validators import HttpSpanValidator
 
 # The empty name every client-side-refusal test hands its manager.  A manager rejects it before
@@ -111,8 +110,6 @@ class ManagementTracingSuiteBase(SuiteRequirements):
     # through the same code in the observability handler, so each manager's cheapest read
     # carries one.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A tracer is a cluster option, so each suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     COLLECTION_STRATEGY = CollectionStrategy.DEFAULT
@@ -532,19 +529,24 @@ class QueryIndexManagementTracingTestSuite(ManagementTracingSuiteBase):
         # two inner requests without their parent span, so their dispatch spans are dropped or
         # land on the tracer as roots.  The failure is held until the watch below has run, so
         # that step is still checked where this one is broken.
+        #
+        # Over couchbase2 the build is a single BuildDeferredIndexes request, with nothing beneath
+        # its span.
+        build_nested = [] if cb_env.protocol == TestProtocol.COUCHBASE2 else [Op.QueryIndexGetAllDeferred]
         build_deferred_failure: AssertionError | None = None
         try:
-            http_validator.validate_http_op(Op.QueryIndexBuildDeferred,
-                                            nested_ops=[Op.QueryIndexGetAllDeferred])
+            http_validator.validate_http_op(Op.QueryIndexBuildDeferred, nested_ops=build_nested)
         except AssertionError as ex:
             build_deferred_failure = ex
 
         http_validator.reset()
         await qixm.watch_indexes(bucket_name, index_names, WatchQueryIndexOptions(timeout=self.WATCH_TIMEOUT))
         # watch_indexes polls with get_all_indexes, and the poll is a span underneath the
-        # watch's own rather than a span in its place.
-        http_validator.validate_http_op(Op.QueryIndexWatchIndexes,
-                                        nested_ops=[Op.QueryIndexGetAll])
+        # watch's own rather than a span in its place.  Over couchbase2 the watch waits on each
+        # index with WaitForIndexOnline instead, so the spans underneath are those waits.
+        poll_op = (Op.QueryIndexWaitForIndexOnline if cb_env.protocol == TestProtocol.COUCHBASE2
+                   else Op.QueryIndexGetAll)
+        http_validator.validate_http_op(Op.QueryIndexWatchIndexes, nested_ops=[poll_op])
 
         if build_deferred_failure is not None:
             pytest.xfail(f'CXXCBC-1053: build_deferred_indexes span tree. {build_deferred_failure}')

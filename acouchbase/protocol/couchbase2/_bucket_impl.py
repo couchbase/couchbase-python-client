@@ -21,6 +21,7 @@ from typing import (TYPE_CHECKING,
                     Any,
                     NoReturn)
 
+from acouchbase.protocol.couchbase2._management._collection_mgmt_impl import AsyncCollectionMgmtImpl
 from acouchbase.protocol.couchbase2._scope_impl import AsyncScopeImpl
 from couchbase.protocol.couchbase2._core import unsupported
 
@@ -66,8 +67,9 @@ class AsyncBucketImpl:
                    **kwargs: Any) -> AsyncViewResult:
         raise unsupported('view_query')
 
-    def collection_mgmt(self) -> NoReturn:
-        raise unsupported('Collection management')
+    def collection_mgmt(self) -> AsyncCollectionMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncCollectionMgmtImpl(self._bucket_name, self._cluster_impl)
 
     def view_index_mgmt(self) -> NoReturn:
         raise unsupported('View index management')

@@ -40,6 +40,7 @@ from couchbase.protocol.couchbase2._streaming import QueryRows
 from couchbase.result import QueryResult, SearchResult
 from txcouchbase.protocol.couchbase2._bucket_impl import TxBucketImpl
 from txcouchbase.protocol.couchbase2._deferred import defer
+from txcouchbase.protocol.couchbase2._management._bucket_mgmt_impl import TxBucketMgmtImpl
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -87,6 +88,10 @@ class TxClusterImpl(AsyncClusterImpl):
         """**INTERNAL**"""
         self._core.ensure_open()
         return TxBucketImpl(name, self)
+
+    def bucket_mgmt(self) -> TxBucketMgmtImpl:
+        """**INTERNAL**"""
+        return TxBucketMgmtImpl(self)
 
     def close_connection_deferred(self) -> Deferred[None]:
         return Deferred.fromFuture(asyncio.ensure_future(self.close_connection(), loop=self.loop))

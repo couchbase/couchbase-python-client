@@ -270,7 +270,9 @@ not_generated:
     - couchbase/tests/cluster_options_completeness_t.py
     - couchbase/tests/cluster_req_builder_t.py
     - couchbase/tests/cluster_result_types_t.py
+    - couchbase/tests/couchbase2_bucket_mgmt_t.py
     - couchbase/tests/couchbase2_channel_t.py
+    - couchbase/tests/couchbase2_collection_mgmt_t.py
     - couchbase/tests/couchbase2_driver_t.py
     - couchbase/tests/couchbase2_error_mapping_t.py
     - couchbase/tests/couchbase2_impl_t.py

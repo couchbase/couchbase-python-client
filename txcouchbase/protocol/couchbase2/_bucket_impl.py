@@ -21,6 +21,7 @@ from twisted.internet.defer import Deferred, succeed
 
 from acouchbase.protocol.couchbase2._bucket_impl import AsyncBucketImpl
 from couchbase.protocol.couchbase2._core import unsupported
+from txcouchbase.protocol.couchbase2._management._collection_mgmt_impl import TxCollectionMgmtImpl
 from txcouchbase.protocol.couchbase2._scope_impl import TxScopeImpl
 
 if TYPE_CHECKING:
@@ -44,6 +45,10 @@ class TxBucketImpl(AsyncBucketImpl):
     def scope(self, name: str) -> TxScopeImpl:
         """**INTERNAL**"""
         return TxScopeImpl(name, self)
+
+    def collection_mgmt(self) -> TxCollectionMgmtImpl:
+        """**INTERNAL**"""
+        return TxCollectionMgmtImpl(self._bucket_name, self._tx_cluster_impl)
 
     def close_bucket_deferred(self) -> Deferred[None]:
         return succeed(None)

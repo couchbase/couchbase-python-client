@@ -22,6 +22,7 @@ from typing import (TYPE_CHECKING,
                     NoReturn)
 
 from couchbase.protocol.couchbase2._core import unsupported
+from couchbase.protocol.couchbase2._management._collection_mgmt_impl import CollectionMgmtImpl
 from couchbase.protocol.couchbase2._scope_impl import ScopeImpl
 
 if TYPE_CHECKING:
@@ -63,8 +64,9 @@ class BucketImpl:
                    **kwargs: Any) -> ViewResult:
         raise unsupported('view_query')
 
-    def collection_mgmt(self) -> NoReturn:
-        raise unsupported('Collection management')
+    def collection_mgmt(self) -> CollectionMgmtImpl:
+        """**INTERNAL**"""
+        return CollectionMgmtImpl(self._bucket_name, self._cluster_impl)
 
     def view_index_mgmt(self) -> NoReturn:
         raise unsupported('View index management')
