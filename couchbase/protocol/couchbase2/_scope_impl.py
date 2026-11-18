@@ -23,6 +23,7 @@ from typing import (TYPE_CHECKING,
 
 from couchbase.protocol.couchbase2._collection_impl import CollectionImpl
 from couchbase.protocol.couchbase2._core import unsupported
+from couchbase.protocol.couchbase2._management._search_index_mgmt_impl import SearchIndexMgmtImpl
 from couchbase.protocol.couchbase2._scope_req_builder import ScopeRequestBuilder
 
 if TYPE_CHECKING:
@@ -95,8 +96,9 @@ class ScopeImpl:
         return self._cluster_impl.run_search(
             self._request_builder.build_search_request(index, request, options, **kwargs))
 
-    def search_index_mgmt(self) -> NoReturn:
-        raise unsupported('Search index management')
+    def search_index_mgmt(self) -> SearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return SearchIndexMgmtImpl(self._cluster_impl, (self._bucket_name, self._scope_name))
 
     def eventing_function_mgmt(self) -> NoReturn:
         raise unsupported('Eventing function management')

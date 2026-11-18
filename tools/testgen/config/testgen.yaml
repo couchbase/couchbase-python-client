@@ -277,8 +277,10 @@ not_generated:
     - couchbase/tests/couchbase2_error_mapping_t.py
     - couchbase/tests/couchbase2_impl_t.py
     - couchbase/tests/couchbase2_kv_t.py
+    - couchbase/tests/couchbase2_query_index_mgmt_t.py
     - couchbase/tests/couchbase2_query_t.py
     - couchbase/tests/couchbase2_request_context_t.py
+    - couchbase/tests/couchbase2_search_index_mgmt_t.py
     - couchbase/tests/couchbase2_search_t.py
     - couchbase/tests/couchbase2_tracing_t.py
     - couchbase/tests/collection_req_builder_t.py

@@ -17,9 +17,9 @@
 
 It serves TLS, as the gateway does, on a certificate signed by a CA made for the run, and answers
 KV `Get` and `Upsert` from a dict, `Query` and `SearchQuery` each from a script, the collection admin
-service from a manifest, the bucket admin service from a dict of buckets, and the health check from
-a list of statuses.  Each call is recorded with its metadata and deadline, so a test can read what
-an impl sent.
+service from a manifest, the bucket admin service from a dict of buckets, the query and search admin
+services each from a dict of indexes, and the health check from a list of statuses.  Each call is
+recorded with its metadata and deadline, so a test can read what an impl sent.
 """
 
 from __future__ import annotations
@@ -30,6 +30,7 @@ import socket
 import subprocess  # nosec
 import threading
 import time
+import uuid
 from collections.abc import Iterator, Sequence
 from concurrent import futures
 from contextlib import contextmanager
@@ -44,6 +45,9 @@ from google.rpc import error_details_pb2, status_pb2
 from couchbase.protocol.couchbase2._error_mapping import STATUS_DETAILS_KEY
 from couchbase.protocol.couchbase2._generated.admin.bucket.v1 import bucket_pb2, bucket_pb2_grpc
 from couchbase.protocol.couchbase2._generated.admin.collection.v1 import collection_pb2, collection_pb2_grpc
+from couchbase.protocol.couchbase2._generated.admin.query.v1 import query_pb2 as query_admin_pb2
+from couchbase.protocol.couchbase2._generated.admin.query.v1 import query_pb2_grpc as query_admin_pb2_grpc
+from couchbase.protocol.couchbase2._generated.admin.search.v1 import search_pb2, search_pb2_grpc
 from couchbase.protocol.couchbase2._generated.kv.v1 import kv_pb2, kv_pb2_grpc
 from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2, query_pb2_grpc
 from couchbase.protocol.couchbase2._generated.search.v1 import search_pb2 as search_query_pb2
@@ -146,7 +150,15 @@ class FakeGateway(kv_pb2_grpc.KvServiceServicer,
     buckets: dict[str, bucket_pb2.ListBucketsResponse.Bucket] = field(default_factory=dict)
     # The serving statuses the health check answers with, in order, before it answers serving.
     health_statuses: list[int] = field(default_factory=list)
+    # The query admin service, which records its calls here.
+    query_admin: FakeQueryAdmin = field(init=False)
+    # The search admin service, which records its calls here.
+    search_admin: FakeSearchAdmin = field(init=False)
     _cas: int = 1000
+
+    def __post_init__(self) -> None:
+        self.query_admin = cast('type[FakeQueryAdmin]', FakeQueryAdmin)(self)
+        self.search_admin = cast('type[FakeSearchAdmin]', FakeSearchAdmin)(self)
 
     def _record(self, method: str, request: Any, context: grpc.ServicerContext) -> None:
         remaining = context.time_remaining()
@@ -317,6 +329,238 @@ class FakeGateway(kv_pb2_grpc.KvServiceServicer,
         return collections[collection_name]
 
 
+Index = query_admin_pb2.GetAllIndexesResponse.Index
+
+
+@dataclass
+class FakeQueryAdmin(query_admin_pb2_grpc.QueryAdminServiceServicer):
+    """The query admin service, apart from `FakeGateway` because the search admin service has a
+    `CreateIndex` of its own.
+
+    An index without a scope or collection is on the default collection, as the gateway reads it.
+    `BuildDeferredIndexes` leaves each index it builds building, and the listing or wait after brings
+    it online.
+    """
+
+    gateway: FakeGateway
+    # The indexes by bucket, scope, collection and name.
+    indexes: dict[tuple[str, str, str, str], Index] = field(default_factory=dict)
+
+    def GetAllIndexes(self, request: query_admin_pb2.GetAllIndexesRequest, context: grpc.ServicerContext
+                      ) -> query_admin_pb2.GetAllIndexesResponse:
+        self.gateway._record('GetAllIndexes', request, context)
+        listed = [index for key, index in self.indexes.items() if _in_keyspace(key, request)]
+        response = query_admin_pb2.GetAllIndexesResponse(indexes=listed)
+        for index in listed:
+            if index.state == query_admin_pb2.INDEX_STATE_BUILDING:
+                index.state = query_admin_pb2.INDEX_STATE_ONLINE
+        return response
+
+    def WaitForIndexOnline(self, request: query_admin_pb2.WaitForIndexOnlineRequest, context: grpc.ServicerContext
+                           ) -> query_admin_pb2.WaitForIndexOnlineResponse:
+        """Refuses a deferred index, as the gateway does, rather than waiting for it to be built."""
+        self.gateway._record('WaitForIndexOnline', request, context)
+        key = (request.bucket_name, request.scope_name or '_default', request.collection_name or '_default',
+               request.name)
+        index = self.indexes.get(key)
+        if index is None:
+            _abort(context, Fail(grpc.StatusCode.NOT_FOUND, 'queryindex'))
+        elif index.state == query_admin_pb2.INDEX_STATE_DEFERRED:
+            _abort(context, Fail(grpc.StatusCode.FAILED_PRECONDITION, violation='NOT_BUILDING'))
+        else:
+            index.state = query_admin_pb2.INDEX_STATE_ONLINE
+        return query_admin_pb2.WaitForIndexOnlineResponse()
+
+    def CreateIndex(self, request: query_admin_pb2.CreateIndexRequest, context: grpc.ServicerContext
+                    ) -> query_admin_pb2.CreateIndexResponse:
+        self.gateway._record('CreateIndex', request, context)
+        self._create(request, request.name, Index(fields=request.fields), context)
+        return query_admin_pb2.CreateIndexResponse()
+
+    def CreatePrimaryIndex(self, request: query_admin_pb2.CreatePrimaryIndexRequest, context: grpc.ServicerContext
+                           ) -> query_admin_pb2.CreatePrimaryIndexResponse:
+        self.gateway._record('CreatePrimaryIndex', request, context)
+        name = request.name if request.HasField('name') else '#primary'
+        self._create(request, name, Index(is_primary=True), context)
+        return query_admin_pb2.CreatePrimaryIndexResponse()
+
+    def DropIndex(self, request: query_admin_pb2.DropIndexRequest, context: grpc.ServicerContext
+                  ) -> query_admin_pb2.DropIndexResponse:
+        self.gateway._record('DropIndex', request, context)
+        self._drop(request, request.name, context)
+        return query_admin_pb2.DropIndexResponse()
+
+    def DropPrimaryIndex(self, request: query_admin_pb2.DropPrimaryIndexRequest, context: grpc.ServicerContext
+                         ) -> query_admin_pb2.DropPrimaryIndexResponse:
+        self.gateway._record('DropPrimaryIndex', request, context)
+        self._drop(request, request.name if request.HasField('name') else '#primary', context)
+        return query_admin_pb2.DropPrimaryIndexResponse()
+
+    def BuildDeferredIndexes(self, request: query_admin_pb2.BuildDeferredIndexesRequest,
+                             context: grpc.ServicerContext) -> query_admin_pb2.BuildDeferredIndexesResponse:
+        self.gateway._record('BuildDeferredIndexes', request, context)
+        built = []
+        for key, index in self.indexes.items():
+            if _in_keyspace(key, request) and index.state == query_admin_pb2.INDEX_STATE_DEFERRED:
+                index.state = query_admin_pb2.INDEX_STATE_BUILDING
+                built.append(query_admin_pb2.BuildDeferredIndexesResponse.Index(name=index.name))
+        return query_admin_pb2.BuildDeferredIndexesResponse(indexes=built)
+
+    def _create(self, request: Any, name: str, index: Index, context: grpc.ServicerContext) -> None:
+        key = (request.bucket_name, *_keyspace(request), name)
+        if key in self.indexes:
+            if request.ignore_if_exists:
+                return
+            _abort(context, Fail(grpc.StatusCode.ALREADY_EXISTS, 'queryindex'))
+        index.bucket_name, index.scope_name, index.collection_name, index.name = key
+        index.type = query_admin_pb2.INDEX_TYPE_GSI
+        index.state = query_admin_pb2.INDEX_STATE_DEFERRED if request.deferred else query_admin_pb2.INDEX_STATE_ONLINE
+        self.indexes[key] = index
+
+    def _drop(self, request: Any, name: str, context: grpc.ServicerContext) -> None:
+        key = (request.bucket_name, *_keyspace(request), name)
+        if key not in self.indexes:
+            if request.ignore_if_missing:
+                return
+            _abort(context, Fail(grpc.StatusCode.NOT_FOUND, 'queryindex'))
+        del self.indexes[key]
+
+
+@dataclass
+class FakeSearchAdmin(search_pb2_grpc.SearchAdminServiceServicer):
+    """The search admin service.  An index without a bucket and scope is the cluster's own.
+
+    Each index is held as the gateway sends it, so a test can plant a definition the SDK cannot read.
+    The count and the analysis are canned, and the analysis reports no status.
+    """
+
+    gateway: FakeGateway
+    # The indexes by bucket, scope and name.
+    indexes: dict[tuple[str, str, str], search_pb2.Index] = field(default_factory=dict)
+    # The switches each control call has flipped, by index key: `ingest`, `querying` and `plan`.
+    controls: dict[tuple[str, str, str], dict[str, bool]] = field(default_factory=dict)
+
+    def CreateIndex(self, request: search_pb2.CreateIndexRequest, context: grpc.ServicerContext
+                    ) -> search_pb2.CreateIndexResponse:
+        self.gateway._record('CreateIndex', request, context)
+        key = (request.bucket_name, request.scope_name, request.name)
+        if key in self.indexes:
+            _abort(context, Fail(grpc.StatusCode.ALREADY_EXISTS, 'searchindex'))
+        index = search_pb2.Index(uuid=uuid.uuid4().hex)
+        for descriptor, value in request.ListFields():
+            if descriptor.name in ('params', 'plan_params', 'source_params'):
+                getattr(index, descriptor.name).update(value)
+            elif descriptor.name not in ('bucket_name', 'scope_name', 'prev_index_uuid'):
+                setattr(index, descriptor.name, value)
+        self.indexes[key] = index
+        return search_pb2.CreateIndexResponse()
+
+    def UpdateIndex(self, request: search_pb2.UpdateIndexRequest, context: grpc.ServicerContext
+                    ) -> search_pb2.UpdateIndexResponse:
+        self.gateway._record('UpdateIndex', request, context)
+        key = (request.bucket_name, request.scope_name, request.index.name)
+        if not request.index.uuid:
+            _abort(context, Fail(grpc.StatusCode.INVALID_ARGUMENT))
+        if self._index(key, context).uuid != request.index.uuid:
+            _abort(context, Fail(grpc.StatusCode.ABORTED))
+        updated = search_pb2.Index()
+        updated.CopyFrom(request.index)
+        updated.uuid = uuid.uuid4().hex
+        self.indexes[key] = updated
+        return search_pb2.UpdateIndexResponse()
+
+    def GetIndex(self, request: search_pb2.GetIndexRequest, context: grpc.ServicerContext
+                 ) -> search_pb2.GetIndexResponse:
+        self.gateway._record('GetIndex', request, context)
+        return search_pb2.GetIndexResponse(index=self._index(_search_key(request), context))
+
+    def ListIndexes(self, request: search_pb2.ListIndexesRequest, context: grpc.ServicerContext
+                    ) -> search_pb2.ListIndexesResponse:
+        self.gateway._record('ListIndexes', request, context)
+        listed = [index for (bucket_name, scope_name, _), index in self.indexes.items()
+                  if (bucket_name, scope_name) == (request.bucket_name, request.scope_name)]
+        return search_pb2.ListIndexesResponse(indexes=listed)
+
+    def DeleteIndex(self, request: search_pb2.DeleteIndexRequest, context: grpc.ServicerContext
+                    ) -> search_pb2.DeleteIndexResponse:
+        self.gateway._record('DeleteIndex', request, context)
+        self._index(_search_key(request), context)
+        del self.indexes[_search_key(request)]
+        return search_pb2.DeleteIndexResponse()
+
+    def AnalyzeDocument(self, request: search_pb2.AnalyzeDocumentRequest, context: grpc.ServicerContext
+                        ) -> search_pb2.AnalyzeDocumentResponse:
+        self.gateway._record('AnalyzeDocument', request, context)
+        self._index(_search_key(request), context)
+        return search_pb2.AnalyzeDocumentResponse(analyzed=b'[{"doc": ' + request.doc + b'}]')
+
+    def GetIndexedDocumentsCount(self, request: search_pb2.GetIndexedDocumentsCountRequest,
+                                 context: grpc.ServicerContext) -> search_pb2.GetIndexedDocumentsCountResponse:
+        self.gateway._record('GetIndexedDocumentsCount', request, context)
+        self._index(_search_key(request), context)
+        return search_pb2.GetIndexedDocumentsCountResponse(count=7)
+
+    def PauseIndexIngest(self, request: search_pb2.PauseIndexIngestRequest, context: grpc.ServicerContext
+                         ) -> search_pb2.PauseIndexIngestResponse:
+        self._control('PauseIndexIngest', request, context, 'ingest', False)
+        return search_pb2.PauseIndexIngestResponse()
+
+    def ResumeIndexIngest(self, request: search_pb2.ResumeIndexIngestRequest, context: grpc.ServicerContext
+                          ) -> search_pb2.ResumeIndexIngestResponse:
+        self._control('ResumeIndexIngest', request, context, 'ingest', True)
+        return search_pb2.ResumeIndexIngestResponse()
+
+    def AllowIndexQuerying(self, request: search_pb2.AllowIndexQueryingRequest, context: grpc.ServicerContext
+                           ) -> search_pb2.AllowIndexQueryingResponse:
+        self._control('AllowIndexQuerying', request, context, 'querying', True)
+        return search_pb2.AllowIndexQueryingResponse()
+
+    def DisallowIndexQuerying(self, request: search_pb2.DisallowIndexQueryingRequest, context: grpc.ServicerContext
+                              ) -> search_pb2.DisallowIndexQueryingResponse:
+        self._control('DisallowIndexQuerying', request, context, 'querying', False)
+        return search_pb2.DisallowIndexQueryingResponse()
+
+    def FreezeIndexPlan(self, request: search_pb2.FreezeIndexPlanRequest, context: grpc.ServicerContext
+                        ) -> search_pb2.FreezeIndexPlanResponse:
+        self._control('FreezeIndexPlan', request, context, 'plan', False)
+        return search_pb2.FreezeIndexPlanResponse()
+
+    def UnfreezeIndexPlan(self, request: search_pb2.UnfreezeIndexPlanRequest, context: grpc.ServicerContext
+                          ) -> search_pb2.UnfreezeIndexPlanResponse:
+        self._control('UnfreezeIndexPlan', request, context, 'plan', True)
+        return search_pb2.UnfreezeIndexPlanResponse()
+
+    def _control(self, method: str, request: Any, context: grpc.ServicerContext, switch: str, on: bool) -> None:
+        self.gateway._record(method, request, context)
+        key = _search_key(request)
+        self._index(key, context)
+        self.controls.setdefault(key, {})[switch] = on
+
+    def _index(self, key: tuple[str, str, str], context: grpc.ServicerContext) -> search_pb2.Index:
+        if key not in self.indexes:
+            _abort(context, Fail(grpc.StatusCode.NOT_FOUND, 'searchindex'))
+        return self.indexes[key]
+
+
+def _search_key(request: Any) -> tuple[str, str, str]:
+    return request.bucket_name, request.scope_name, request.name
+
+
+def _keyspace(request: Any) -> tuple[str, str]:
+    return (request.scope_name if request.HasField('scope_name') else '_default',
+            request.collection_name if request.HasField('collection_name') else '_default')
+
+
+def _in_keyspace(key: tuple[str, str, str, str], request: Any) -> bool:
+    bucket_name, scope_name, collection_name, _ = key
+    # Only the listing may leave its bucket out, and it then lists every bucket.
+    if request.bucket_name and request.bucket_name != bucket_name:
+        return False
+    if request.HasField('scope_name') and request.scope_name != scope_name:
+        return False
+    return not request.HasField('collection_name') or request.collection_name == collection_name
+
+
 def new_gateway() -> FakeGateway:
     """A gateway holding no documents and scripting no failures.
 
@@ -356,6 +600,8 @@ def serving(gateway: FakeGateway, certificates: Certificates) -> Iterator[int]:
     search_query_pb2_grpc.add_SearchServiceServicer_to_server(gateway, server)
     collection_pb2_grpc.add_CollectionAdminServiceServicer_to_server(gateway, server)
     bucket_pb2_grpc.add_BucketAdminServiceServicer_to_server(gateway, server)
+    query_admin_pb2_grpc.add_QueryAdminServiceServicer_to_server(gateway.query_admin, server)
+    search_pb2_grpc.add_SearchAdminServiceServicer_to_server(gateway.search_admin, server)
     check: grpc.RpcMethodHandler[Any, int] = grpc.unary_unary_rpc_method_handler(
         gateway.Check,
         request_deserializer=HealthCheckRequest.FromString,

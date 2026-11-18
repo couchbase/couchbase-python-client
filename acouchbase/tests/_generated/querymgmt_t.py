@@ -53,7 +53,9 @@ from tests.environments.async_query_index_mgmt_environment import (AsyncCollecti
 from tests.environments.managers import (AsyncTestEnvironmentCollectionQueryIndexManager,
                                          AsyncTestEnvironmentQueryIndexManager)
 from tests.manifest import validate_test_manifest
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 # The name the server gives a primary index created without one.
 DEFAULT_PRIMARY_INDEX_NAME = '#primary'
@@ -278,7 +280,10 @@ class CollectionQueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
         result = cb_env.cluster.query(n1ql)
         await cb_env.drain_rows(result)
 
+    # The gateway's create-index request has no condition, so couchbase2 refuses a query index with
+    # one.
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('clear_all_indexes')
     async def test_create_secondary_indexes_condition(self, cb_env: AsyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(AsyncTestEnvironmentCollectionQueryIndexManager)
@@ -623,7 +628,10 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
         result = cb_env.cluster.query(n1ql)
         await cb_env.drain_rows(result)
 
+    # The gateway's create-index request has no condition, so couchbase2 refuses a query index with
+    # one.
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('clear_all_indexes')
     async def test_create_secondary_indexes_condition(self, cb_env: AsyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)
@@ -999,7 +1007,10 @@ class QueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
         result = cb_env.cluster.query(n1ql)
         await cb_env.drain_rows(result)
 
+    # The gateway's create-index request has no condition, so couchbase2 refuses a query index with
+    # one.
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('clear_all_indexes')
     async def test_create_secondary_indexes_condition(self, cb_env: AsyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(AsyncTestEnvironmentQueryIndexManager)

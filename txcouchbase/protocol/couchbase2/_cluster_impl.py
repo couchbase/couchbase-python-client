@@ -41,6 +41,8 @@ from couchbase.result import QueryResult, SearchResult
 from txcouchbase.protocol.couchbase2._bucket_impl import TxBucketImpl
 from txcouchbase.protocol.couchbase2._deferred import defer
 from txcouchbase.protocol.couchbase2._management._bucket_mgmt_impl import TxBucketMgmtImpl
+from txcouchbase.protocol.couchbase2._management._query_index_mgmt_impl import TxQueryIndexMgmtImpl
+from txcouchbase.protocol.couchbase2._management._search_index_mgmt_impl import TxSearchIndexMgmtImpl
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -92,6 +94,14 @@ class TxClusterImpl(AsyncClusterImpl):
     def bucket_mgmt(self) -> TxBucketMgmtImpl:
         """**INTERNAL**"""
         return TxBucketMgmtImpl(self)
+
+    def query_index_mgmt(self) -> TxQueryIndexMgmtImpl:
+        """**INTERNAL**"""
+        return TxQueryIndexMgmtImpl(self)
+
+    def search_index_mgmt(self) -> TxSearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return TxSearchIndexMgmtImpl(self)
 
     def close_connection_deferred(self) -> Deferred[None]:
         return Deferred.fromFuture(asyncio.ensure_future(self.close_connection(), loop=self.loop))

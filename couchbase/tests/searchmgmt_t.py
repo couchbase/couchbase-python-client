@@ -54,7 +54,9 @@ from tests.search_index_defs import (INDEX_VISIBLE_DELAY,
                                      mgmt_secondary_index_name,
                                      ui_index_definition,
                                      ui_index_name)
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 
 class SearchIndexManagementSuiteBase(SuiteRequirements):
@@ -249,6 +251,8 @@ class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         with pytest.raises(SearchIndexNotFoundException):
             sixm.drop_index(test_idx.name)
 
+    # The gateway has no search index stats.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
     def test_get_all_index_stats(self, cb_env: SyncTestEnvironment) -> None:
@@ -323,6 +327,8 @@ class SearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         with pytest.raises(InvalidArgumentException):
             sixm.get_index(no_name)
 
+    # The gateway has no search index stats.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
     def test_get_index_stats(self,
@@ -515,6 +521,8 @@ class ScopeSearchIndexManagementTestSuite(SearchIndexManagementSuiteBase):
         with pytest.raises(SearchIndexNotFoundException):
             sixm.drop_index(test_idx.name)
 
+    # The gateway has no search index stats.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('create_test_index')
     @pytest.mark.usefixtures('drop_test_index')
     def test_get_all_index_stats(self, cb_env: SyncTestEnvironment) -> None:

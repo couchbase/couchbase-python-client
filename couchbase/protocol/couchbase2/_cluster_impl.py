@@ -41,6 +41,8 @@ from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2_grpc
 from couchbase.protocol.couchbase2._generated.search.v1 import search_pb2_grpc
 from couchbase.protocol.couchbase2._health import health_check, wait_until_serving
 from couchbase.protocol.couchbase2._management._bucket_mgmt_impl import BucketMgmtImpl
+from couchbase.protocol.couchbase2._management._query_index_mgmt_impl import QueryIndexMgmtImpl
+from couchbase.protocol.couchbase2._management._search_index_mgmt_impl import SearchIndexMgmtImpl
 from couchbase.protocol.couchbase2._search import SearchRows
 from couchbase.protocol.couchbase2._streaming import QueryRows, StreamExecutor
 from couchbase.result import QueryResult, SearchResult
@@ -242,14 +244,16 @@ class ClusterImpl:
     def user_mgmt(self) -> NoReturn:
         raise unsupported('User management')
 
-    def query_index_mgmt(self) -> NoReturn:
-        raise unsupported('Query index management')
+    def query_index_mgmt(self) -> QueryIndexMgmtImpl:
+        """**INTERNAL**"""
+        return QueryIndexMgmtImpl(self)
 
     def analytics_mgmt(self) -> NoReturn:
         raise unsupported('Analytics management')
 
-    def search_index_mgmt(self) -> NoReturn:
-        raise unsupported('Search index management')
+    def search_index_mgmt(self) -> SearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return SearchIndexMgmtImpl(self)
 
     def eventing_function_mgmt(self) -> NoReturn:
         raise unsupported('Eventing function management')

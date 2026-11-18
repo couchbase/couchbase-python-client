@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any
 from acouchbase.protocol.couchbase2._scope_impl import AsyncScopeImpl
 from couchbase.protocol.couchbase2._core import unsupported
 from txcouchbase.protocol.couchbase2._collection_impl import TxCollectionImpl
+from txcouchbase.protocol.couchbase2._management._search_index_mgmt_impl import TxSearchIndexMgmtImpl
 
 if TYPE_CHECKING:
     from twisted.internet.defer import Deferred
@@ -51,6 +52,10 @@ class TxScopeImpl(AsyncScopeImpl):
     def collection(self, name: str) -> TxCollectionImpl:
         """**INTERNAL**"""
         return TxCollectionImpl(name, self)
+
+    def search_index_mgmt(self) -> TxSearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return TxSearchIndexMgmtImpl(self._tx_cluster_impl, (self._bucket_name, self._scope_name))
 
     def query_deferred(self,
                        statement: str,

@@ -21,10 +21,9 @@ Each operation is prepared, then sent, so Twisted can prepare at the call and se
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import (TYPE_CHECKING,
-                    Any,
-                    NoReturn)
+from typing import TYPE_CHECKING, Any
 
+from acouchbase.protocol.couchbase2._management._query_index_mgmt_impl import AsyncQueryIndexMgmtImpl
 from couchbase.common._observability import (KeyspaceDetails,
                                              ObservabilityInstruments,
                                              ObservableRequestHandler)
@@ -556,5 +555,6 @@ class AsyncCollectionImpl:
         response = await call_unary_async(kv.Prepend, req.message, ctx, core.metadata)
         return MutationResult(mutation_record(response), key=key)
 
-    def query_index_mgmt(self) -> NoReturn:
-        raise unsupported('Query index management')
+    def query_index_mgmt(self) -> AsyncQueryIndexMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncQueryIndexMgmtImpl(self._cluster_impl, collection_context=(self.name, self.scope_name))

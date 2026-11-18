@@ -33,6 +33,8 @@ from typing import (TYPE_CHECKING,
 
 from acouchbase.protocol.couchbase2._bucket_impl import AsyncBucketImpl
 from acouchbase.protocol.couchbase2._management._bucket_mgmt_impl import AsyncBucketMgmtImpl
+from acouchbase.protocol.couchbase2._management._query_index_mgmt_impl import AsyncQueryIndexMgmtImpl
+from acouchbase.protocol.couchbase2._management._search_index_mgmt_impl import AsyncSearchIndexMgmtImpl
 from acouchbase.protocol.couchbase2._streaming import AsyncStreamExecutor
 from acouchbase.result import AsyncQueryResult, AsyncSearchResult
 from couchbase.common._observability import ObservabilityInstruments, ObservableRequestHandler
@@ -326,14 +328,16 @@ class AsyncClusterImpl:
     def user_mgmt(self) -> NoReturn:
         raise unsupported('User management')
 
-    def query_index_mgmt(self) -> NoReturn:
-        raise unsupported('Query index management')
+    def query_index_mgmt(self) -> AsyncQueryIndexMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncQueryIndexMgmtImpl(self)
 
     def analytics_mgmt(self) -> NoReturn:
         raise unsupported('Analytics management')
 
-    def search_index_mgmt(self) -> NoReturn:
-        raise unsupported('Search index management')
+    def search_index_mgmt(self) -> AsyncSearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncSearchIndexMgmtImpl(self)
 
     def eventing_function_mgmt(self) -> NoReturn:
         raise unsupported('Eventing function management')

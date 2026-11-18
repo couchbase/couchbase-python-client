@@ -48,7 +48,9 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
-from tests.test_features import EnvironmentFeatures, ServerFeatures
+from tests.test_features import (EnvironmentFeatures,
+                                 ServerFeatures,
+                                 TestProtocol)
 
 # The name the server gives a primary index created without one.
 DEFAULT_PRIMARY_INDEX_NAME = '#primary'
@@ -266,6 +268,9 @@ class CollectionQueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
         result = cb_env.cluster.query(n1ql)
         cb_env.drain_rows(result)
 
+    # The gateway's create-index request has no condition, so couchbase2 refuses a query index with
+    # one.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_condition(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentCollectionQueryIndexManager)
@@ -593,6 +598,9 @@ class QueryIndexManagementCollectionTestSuite(QueryIndexManagementSuiteBase):
         result = cb_env.cluster.query(n1ql)
         cb_env.drain_rows(result)
 
+    # The gateway's create-index request has no condition, so couchbase2 refuses a query index with
+    # one.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_condition(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)
@@ -951,6 +959,9 @@ class QueryIndexManagementTestSuite(QueryIndexManagementSuiteBase):
         result = cb_env.cluster.query(n1ql)
         cb_env.drain_rows(result)
 
+    # The gateway's create-index request has no condition, so couchbase2 refuses a query index with
+    # one.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('clear_all_indexes')
     def test_create_secondary_indexes_condition(self, cb_env: SyncTestEnvironment) -> None:
         qixm = cb_env.get_manager(TestEnvironmentQueryIndexManager)

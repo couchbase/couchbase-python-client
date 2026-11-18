@@ -22,6 +22,7 @@ import types
 from collections.abc import (Callable,
                              Coroutine,
                              Iterator)
+from datetime import timedelta
 from typing import Any, cast
 
 import grpc
@@ -216,6 +217,26 @@ class Couchbase2TracingUnitTests:
         assert set(event.attributes) == {'exception.type', 'exception.message', 'exception.stacktrace'}
         assert str(event.attributes['exception.type']).endswith('.DocumentNotFoundException')
         assert 'Traceback' in str(event.attributes['exception.stacktrace'])
+
+    def test_a_watch_waits_on_each_index_under_its_own_span(self,
+                                                            connect: Callable[..., tuple[str, ClusterOptions]],
+                                                            provider: TracerProvider,
+                                                            exporter: InMemorySpanExporter) -> None:
+        cluster = ClusterImpl(*connect(tracer=get_otel_tracer(provider)))
+        try:
+            manager = cluster.query_index_mgmt()
+            manager.create_primary_index(KEY[0])
+            manager.create_index(KEY[0], 'ix', ['name'])
+            manager.watch_indexes(KEY[0], ['ix'], timeout=timedelta(seconds=5), watch_primary=True)
+        finally:
+            cluster.close_connection()
+        [watch] = _named(exporter, 'manager_query_watch_indexes')
+        waits = _named(exporter, 'manager_query_wait_for_index_online')
+        calls = _named(exporter, WAIT_RPC)
+        assert len(waits) == len(calls) == 2
+        assert all(wait.parent is not None and wait.parent.span_id == _context(watch).span_id for wait in waits)
+        assert ({call.parent.span_id for call in calls if call.parent is not None}
+                == {_context(wait).span_id for wait in waits})
 
     def test_each_key_of_a_multi_operation_is_traced_under_it(self,
                                                               connect: Callable[..., tuple[str, ClusterOptions]],

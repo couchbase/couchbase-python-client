@@ -22,7 +22,6 @@ from collections.abc import (Callable,
                              Mapping)
 from typing import (TYPE_CHECKING,
                     Any,
-                    NoReturn,
                     Protocol,
                     TypeVar)
 
@@ -55,6 +54,7 @@ from couchbase.protocol.couchbase2._collection_types import (CollectionOptionsBl
                                                              mutation_record)
 from couchbase.protocol.couchbase2._core import unsupported
 from couchbase.protocol.couchbase2._driver import call_unary
+from couchbase.protocol.couchbase2._management._query_index_mgmt_impl import QueryIndexMgmtImpl
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -618,5 +618,6 @@ class CollectionImpl:
                 counter_record(self._send(Op.Decrement, kv.Decrement, req, obs)), key=key))
         return MultiCounterResult(results, all_ok)
 
-    def query_index_mgmt(self) -> NoReturn:
-        raise unsupported('Query index management')
+    def query_index_mgmt(self) -> QueryIndexMgmtImpl:
+        """**INTERNAL**"""
+        return QueryIndexMgmtImpl(self._cluster_impl, collection_context=(self.name, self.scope_name))

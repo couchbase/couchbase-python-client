@@ -22,6 +22,7 @@ from typing import (TYPE_CHECKING,
                     NoReturn)
 
 from acouchbase.protocol.couchbase2._collection_impl import AsyncCollectionImpl
+from acouchbase.protocol.couchbase2._management._search_index_mgmt_impl import AsyncSearchIndexMgmtImpl
 from couchbase.protocol.couchbase2._core import unsupported
 from couchbase.protocol.couchbase2._scope_req_builder import ScopeRequestBuilder
 
@@ -118,8 +119,9 @@ class AsyncScopeImpl:
         self._cluster_impl.core.ensure_open()
         return self._request_builder.build_search_request(index, request, options, **kwargs)
 
-    def search_index_mgmt(self) -> NoReturn:
-        raise unsupported('Search index management')
+    def search_index_mgmt(self) -> AsyncSearchIndexMgmtImpl:
+        """**INTERNAL**"""
+        return AsyncSearchIndexMgmtImpl(self._cluster_impl, (self._bucket_name, self._scope_name))
 
     def eventing_function_mgmt(self) -> NoReturn:
         raise unsupported('Eventing function management')
