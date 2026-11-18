@@ -574,6 +574,22 @@ class ConnectionStringUnitTests:
 
         assert settings.timeout_options == {}
 
+    @pytest.mark.parametrize('value, expected', [('true', True), ('yes', True), ('on', True),
+                                                 ('false', False), ('no', False), ('off', False),
+                                                 ('TRUE', True), ('Yes', True), ('ON', True),
+                                                 ('False', False), ('NO', False), ('Off', False)])
+    def test_connection_string_bool(self, value: str, expected: bool) -> None:
+        settings = _settings(f'couchbase://10.0.0.1?enable_tcp_keep_alive={value}&enable_compression={value}',
+                             authenticator=self.AUTH)
+        assert settings.cluster_options['enable_tcp_keep_alive'] is expected
+        assert settings.cluster_options['enable_compression'] is expected
+
+    # The core accepts only these words, so a number or another word is refused here too.
+    @pytest.mark.parametrize('value', ['1', '0', 'y', 'n', 'enabled', 'truthy', '2'])
+    def test_connection_string_value_that_is_not_a_bool(self, value: str) -> None:
+        with pytest.raises(InvalidArgumentException, match=f'enable_tcp_keep_alive={value} .* not a boolean'):
+            _settings(f'couchbase://10.0.0.1?enable_tcp_keep_alive={value}', authenticator=self.AUTH)
+
 
 @pytest.mark.testgen_exclude('txcouchbase',
                              reason='txcouchbase.Cluster has no connect() classmethod')

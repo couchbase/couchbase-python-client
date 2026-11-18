@@ -74,6 +74,10 @@ CONNSTR_DURATION_KEYS = frozenset(key for key, spec in BLOCKS['ClusterOptions'].
 _DURATION_PART = r'(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)'
 _DURATION_MS = {'ns': 1e-6, 'us': 1e-3, 'µs': 1e-3, 'ms': 1, 's': 1e3, 'm': 6e4, 'h': 3.6e6}
 
+# The ClusterOptions keys that take a bool, spelled in the connection string as the core spells them.
+CONNSTR_BOOL_KEYS = frozenset(key for key, spec in BLOCKS['ClusterOptions'].keys.items() if spec.boolean)
+_BOOL_WORDS = {'true': True, 'yes': True, 'on': True, 'false': False, 'no': False, 'off': False}
+
 
 def parse_connection_string_duration(key: str, value: object) -> timedelta:
     """A duration from the connection string: a whole number of milliseconds, or one or more
@@ -96,6 +100,30 @@ def parse_connection_string_duration(key: str, value: object) -> timedelta:
     except OverflowError:
         raise InvalidArgumentException(message=(f'{key}={value} in the connection string is longer than '
                                                 'a duration can be.')) from None
+
+
+def parse_connection_string_bool(key: str, value: object) -> bool:
+    """A bool from the connection string: ``true``, ``yes`` or ``on``, or ``false``, ``no`` or
+    ``off``, in any case.
+
+    Raises:
+        :class:`~couchbase.exceptions.InvalidArgumentException`: If the value is none of these.
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.lower() in _BOOL_WORDS:
+        return _BOOL_WORDS[value.lower()]
+    raise InvalidArgumentException(message=(f'{key}={value} in the connection string is not a boolean. '
+                                            'Expected true, yes, on, false, no or off.'))
+
+
+def parse_connection_string_value(key: str, value: object) -> object:
+    """The value of a ClusterOptions key from the connection string, as the key's type."""
+    if key in CONNSTR_DURATION_KEYS:
+        return parse_connection_string_duration(key, value)
+    if key in CONNSTR_BOOL_KEYS:
+        return parse_connection_string_bool(key, value)
+    return value
 
 
 def parse_connection_string(connection_str: str) -> tuple[str, dict[str, Any], dict[str, Any]]:
@@ -393,8 +421,7 @@ class ClusterSettings:
         # parse query string prior to parsing ClusterOptions
         connection_str, query_opts, legacy_opts = parse_connection_string(connstr)
 
-        kwargs.update({key: parse_connection_string_duration(key, value) if key in CONNSTR_DURATION_KEYS else value
-                       for key, value in query_opts.items()})
+        kwargs.update({key: parse_connection_string_value(key, value) for key, value in query_opts.items()})
         cluster_opts = accepted_args(ClusterOptions, kwargs, *options,
                                      protocol=CouchbaseProtocol.from_connstr(connstr))
         # add legacy options after parsing ClusterOptions to keep logic separate
