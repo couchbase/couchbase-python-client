@@ -70,7 +70,8 @@ from couchbase.protocol.couchbase2._histogram import PercentileHistogram
 from couchbase.protocol.couchbase2._streaming import QueryRows
 from couchbase.result import QueryResult
 from couchbase.transcoder import JSONTranscoder
-from tests.couchbase2_gateway import (Certificates,
+from tests.couchbase2_gateway import (CLOCK_TICK,
+                                      Certificates,
                                       Document,
                                       Fail,
                                       FakeGateway,
@@ -181,12 +182,12 @@ class Couchbase2CollectionUnitTests:
                                                                gateway: FakeGateway) -> None:
         _stored(gateway)
         _collection(cluster).get(KEY[3])
-        assert 2.0 < _remaining(gateway) <= 2.5
+        assert 2.0 < _remaining(gateway) <= 2.5 + CLOCK_TICK
 
     def test_an_operations_timeout_wins(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
         _stored(gateway)
         _collection(cluster).get(KEY[3], timeout=timedelta(seconds=20))
-        assert 19.0 < _remaining(gateway) <= 20.0
+        assert 19.0 < _remaining(gateway) <= 20.0 + CLOCK_TICK
 
     def test_the_clusters_kv_timeout(self, connect: Callable[..., tuple[str, ClusterOptions]],
                                      gateway: FakeGateway) -> None:
@@ -196,12 +197,12 @@ class Couchbase2CollectionUnitTests:
             _collection(impl).get(KEY[3])
         finally:
             impl.close_connection()
-        assert 6.0 < _remaining(gateway) <= 7.0
+        assert 6.0 < _remaining(gateway) <= 7.0 + CLOCK_TICK
 
     def test_a_durable_upsert_takes_the_durable_timeout(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
         _collection(cluster).upsert(KEY[3], {}, durability=ServerDurability(DurabilityLevel.MAJORITY))
         assert gateway.calls[0].request.durability_level == kv_pb2.DURABILITY_LEVEL_MAJORITY
-        assert 9.0 < _remaining(gateway) <= 10.0
+        assert 9.0 < _remaining(gateway) <= 10.0 + CLOCK_TICK
 
     def test_unavailable_is_retried(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
         _stored(gateway)
@@ -314,7 +315,7 @@ class Couchbase2QueryUnitTests:
     def test_the_query_timeout_defaults_to_seventy_five_seconds(self, cluster: ClusterImpl,
                                                                 gateway: FakeGateway) -> None:
         cluster.query('SELECT 1').execute()
-        assert 74.0 < _remaining(gateway) <= 75.0
+        assert 74.0 < _remaining(gateway) <= 75.0 + CLOCK_TICK
 
     def test_a_query_error_is_raised_from_the_rows(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
         gateway.query_end = Fail(grpc.StatusCode.INVALID_ARGUMENT)

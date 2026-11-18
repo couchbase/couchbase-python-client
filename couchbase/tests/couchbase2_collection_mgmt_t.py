@@ -45,7 +45,8 @@ from couchbase.protocol.couchbase2._generated.admin.collection.v1 import collect
 from couchbase.protocol.couchbase2._management._collection_mgmt_impl import CollectionMgmtImpl
 from couchbase.protocol.couchbase2._management._collection_mgmt_req_builder import CollectionMgmtRequestBuilder
 from couchbase.protocol.couchbase2._management._collection_mgmt_types import history_unavailable, scope_specs
-from tests.couchbase2_gateway import (Certificates,
+from tests.couchbase2_gateway import (CLOCK_TICK,
+                                      Certificates,
                                       FakeGateway,
                                       make_certificates,
                                       new_gateway,
@@ -249,7 +250,7 @@ class CollectionMgmtImplUnitTests:
     def test_the_timeout_defaults_to_seventy_five_seconds(self, manager: CollectionMgmtImpl,
                                                           gateway: FakeGateway) -> None:
         manager.get_all_scopes()
-        assert 74.0 < gateway.calls[-1].remaining <= 75.0
+        assert 74.0 < gateway.calls[-1].remaining <= 75.0 + CLOCK_TICK
 
     @pytest.mark.parametrize('call, exception', [
         (lambda m: m.create_scope('_default'), ScopeAlreadyExistsException),

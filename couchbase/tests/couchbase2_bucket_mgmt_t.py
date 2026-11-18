@@ -47,7 +47,8 @@ from couchbase.protocol.couchbase2._management._bucket_mgmt_req_builder import B
 from couchbase.protocol.couchbase2._management._bucket_mgmt_types import (bucket_mgmt_errors,
                                                                           bucket_settings,
                                                                           named_bucket_settings)
-from tests.couchbase2_gateway import (Certificates,
+from tests.couchbase2_gateway import (CLOCK_TICK,
+                                      Certificates,
                                       FakeGateway,
                                       make_certificates,
                                       new_gateway,
@@ -315,7 +316,7 @@ class BucketMgmtImplUnitTests:
     def test_the_timeout_defaults_to_seventy_five_seconds(self, manager: BucketMgmtImpl,
                                                           gateway: FakeGateway) -> None:
         manager.get_all_buckets()
-        assert 74.0 < gateway.calls[-1].remaining <= 75.0
+        assert 74.0 < gateway.calls[-1].remaining <= 75.0 + CLOCK_TICK
 
     def test_a_bucket_that_exists(self, manager: BucketMgmtImpl) -> None:
         manager.create_bucket(CreateBucketSettings(name='travel'))

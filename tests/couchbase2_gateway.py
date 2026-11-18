@@ -90,14 +90,19 @@ def make_certificates(directory: pathlib.Path) -> Certificates | None:
     return Certificates(directory / 'ca.crt', directory / 'localhost.crt', directory / 'localhost.key')
 
 
+# Before Python 3.13, `time.time()` on Windows advances every 15.6 ms and lags the precise clock gRPC
+# sets a deadline by, so a call's `remaining` can read up to one tick over its timeout.  15.625 ms is
+# Windows' longest tick, so this is a bound, not a tuned value.
+CLOCK_TICK = 0.016
+
+
 @dataclass
 class Call:
     method: str
     request: Any
     metadata: dict[str, Any]
-    # The seconds left before the call's deadline when it arrived, by gRPC's own clock.  A bound on
-    # the time a call was given reads this alone: before Python 3.13 `time.monotonic()` ticks every
-    # 15.6 ms on Windows, so a bound read across the two clocks can overshoot.
+    # The seconds left before the call's deadline when it arrived: gRPC's deadline less `time.time()`.
+    # It can exceed the timeout sent by up to `CLOCK_TICK`, so an upper bound on it allows that.
     remaining: float
     # When the call arrived, by `time.monotonic()`.
     arrived: float

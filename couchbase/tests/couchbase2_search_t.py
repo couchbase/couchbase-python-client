@@ -62,7 +62,8 @@ from couchbase.result import SearchResult
 from couchbase.search_scoring import ReciprocalRankFusion, ScoringNone
 from couchbase.serializer import DefaultJsonSerializer
 from couchbase.vector_search import VectorQuery, VectorSearch
-from tests.couchbase2_gateway import (Certificates,
+from tests.couchbase2_gateway import (CLOCK_TICK,
+                                      Certificates,
                                       Fail,
                                       FakeGateway,
                                       make_certificates,
@@ -606,7 +607,7 @@ class SearchImplUnitTests:
     def test_the_search_timeout_defaults_to_seventy_five_seconds(self, cluster: ClusterImpl,
                                                                  gateway: FakeGateway) -> None:
         list(cluster.search_query('ix', search.MatchAllQuery()).rows())
-        assert 74.0 < gateway.calls[-1].remaining <= 75.0
+        assert 74.0 < gateway.calls[-1].remaining <= 75.0 + CLOCK_TICK
 
     def test_an_error_ends_the_rows(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
         gateway.search_messages = [Response(hits=[_hit('a')])]
