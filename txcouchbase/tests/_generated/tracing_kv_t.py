@@ -53,7 +53,6 @@ from couchbase.options import (ExistsOptions,
 from couchbase.replica_reads import GetReplicaStrategy, ReplicaIndex
 from couchbase.transcoder import Transcoder
 from tests.environments.managers import TwistedTestEnvironmentBucketManager
-from tests.environments.test_environment import TestProtocol
 from tests.environments.tracing_environment import TracingEnvironment, TracingType
 from tests.environments.twisted_environment import (ConnectionStrategy,
                                                     TwistedTestEnvironment,
@@ -144,8 +143,6 @@ class KeyValueTracingTestSuite(TopologySuite):
     # gated on the server feature at the class as well, where an inline `is_feature_supported`
     # per test would put the same condition in eight places.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A tracer is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # Read by the topology fixtures the durability tests are gated on.

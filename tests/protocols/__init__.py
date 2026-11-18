@@ -31,10 +31,12 @@ from typing import (TYPE_CHECKING,
                     Protocol)
 
 from tests.protocols.classic import ClassicClusterView
+from tests.protocols.couchbase2 import Couchbase2ClusterView
 from tests.test_features import TestProtocol
 
 if TYPE_CHECKING:
     from couchbase.common._observability import MeterProtocol, TracerProtocol
+    from tests.couchbase_config import CouchbaseConfig
 
 
 class ClusterView(Protocol):
@@ -44,12 +46,17 @@ class ClusterView(Protocol):
         ...
 
     @property
-    def reports_topology(self) -> bool:
-        """Whether this protocol can see the cluster's node count and KV endpoints.
+    def reports_node_count(self) -> bool:
+        """Whether this view knows the cluster's node count.
 
         False means unknown by design, and the topology fixtures skip.  True with no answer
         means the environment is broken.
         """
+        ...
+
+    @property
+    def reports_kv_endpoints(self) -> bool:
+        """Whether the protocol can ping the bucket for its KV endpoints; False skips as above."""
         ...
 
     @property
@@ -74,14 +81,17 @@ class ClusterView(Protocol):
     def tracer(self) -> TracerProtocol: ...
 
 
-_VIEWS: dict[TestProtocol, Callable[[Any], ClusterView]] = {
-    TestProtocol.CLASSIC: ClassicClusterView,
+_VIEWS: dict[TestProtocol, Callable[[Any, CouchbaseConfig], ClusterView]] = {
+    TestProtocol.CLASSIC: lambda cluster, _: ClassicClusterView(cluster),
+    TestProtocol.COUCHBASE2: lambda cluster, config: Couchbase2ClusterView(cluster,
+                                                                           config.server_version,
+                                                                           config.num_nodes),
 }
 
 
-def view_of(cluster: Any, protocol: TestProtocol) -> ClusterView:
-    """`cluster` seen through `protocol`'s view, for any of the three api styles' clusters."""
-    view = _VIEWS.get(protocol)
+def view_of(cluster: Any, config: CouchbaseConfig) -> ClusterView:
+    """`cluster` seen through the run's protocol's view, for any of the three api styles' clusters."""
+    view = _VIEWS.get(config.protocol)
     if view is None:
-        raise NotImplementedError(f'no cluster view for the {protocol.value} protocol')
-    return view(cluster)
+        raise NotImplementedError(f'no cluster view for the {config.protocol.value} protocol')
+    return view(cluster, config)

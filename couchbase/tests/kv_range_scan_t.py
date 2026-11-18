@@ -286,11 +286,12 @@ class RangeScanTestSuite(SuiteRequirements):
                                             test_id: str,
                                             test_mutation_state: MutationState) -> None:
         scan_type = RangeScan(ScanTerm(f'{test_id}-1'), ScanTerm(f'{test_id}-2'))
-        res = cb_env.collection.scan(scan_type,
-                                     ScanOptions(timeout=timedelta(seconds=10),
-                                                 consistent_with=test_mutation_state))
-        # scan() itself succeeds; the server's rejection surfaces on iteration.
+        # Over classic scan() succeeds and the server's rejection surfaces on iteration; couchbase2
+        # refuses at the call.
         with pytest.raises(FeatureUnavailableException):
+            res = cb_env.collection.scan(scan_type,
+                                         ScanOptions(timeout=timedelta(seconds=10),
+                                                     consistent_with=test_mutation_state))
             self._validate_result(res)
 
     @pytest.mark.usefixtures('check_range_scan_supported')

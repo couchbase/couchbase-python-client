@@ -47,7 +47,7 @@ from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   build_async_environment,
                                                   teardown_async_environment)
 from tests.manifest import validate_test_manifest
-from tests.test_features import ServerFeatures
+from tests.test_features import ServerFeatures, TestProtocol
 
 
 class ClusterDiagnosticsTestSuite(SuiteRequirements):
@@ -264,6 +264,40 @@ class ClusterDiagnosticsTestSuite(SuiteRequirements):
         cb_assert_eq(returned, allowed & deployed, what='pinged services')
 
 
+@pytest.mark.testgen_exclude('txcouchbase',
+                             reason='txcouchbase.Cluster has no connect() classmethod')
+class ClusterWaitUntilReadyTestSuite(SuiteRequirements):
+    # Query rather than any readiness feature: an unrestricted wait waits on every service the
+    # cluster runs, and the mock serves key-value alone.
+    #
+    # The wait runs on a cluster of its own because an unrestricted wait reports on every
+    # endpoint the cluster has opened.  Over classic, a cluster that opened a bucket since
+    # dropped keeps that bucket's key-value endpoints connecting and never reaches online, and
+    # `cb_env.cluster` is shared with the bucket management tests on the same worker.
+
+    NUM_DOCS = 0
+    REQUIRED_FEATURES = [ServerFeatures.Query]
+
+    TEST_MANIFEST = [
+        'test_wait_until_ready',
+    ]
+
+    @staticmethod
+    async def _connect(cb_env: AsyncTestEnvironment) -> Cluster:
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        return await Cluster.connect(conn_string, ClusterOptions(PasswordAuthenticator(username, pw)))
+
+    @pytest.mark.asyncio
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    async def test_wait_until_ready(self, cb_env: AsyncTestEnvironment) -> None:
+        cluster: Cluster = await self._connect(cb_env)
+        try:
+            await cluster.wait_until_ready(timedelta(seconds=10))
+        finally:
+            await cluster.close()
+
+
 # Every test in this class opens a cluster of its own with `Cluster.connect(...)`, a
 # classmethod `txcouchbase.cluster.Cluster` does not have, so the class is excluded whole.
 @pytest.mark.testgen_exclude('txcouchbase',
@@ -286,6 +320,18 @@ class ClusterCloseTestSuite(SuiteRequirements):
     ]
 
     CLOSED_CLUSTER_MSG = 'Cannot perform operations on a closed cluster'
+    # couchbase2 refuses these before it looks at the cluster, closed or not.
+    NOT_OVER_COUCHBASE2 = frozenset({'analytics_indexes',
+                                     'analytics_query',
+                                     'diagnostics',
+                                     'eventing_functions',
+                                     'ping',
+                                     'users',
+                                     'view_indexes',
+                                     'view_query'})
+
+    def _offered(self, cb_env: AsyncTestEnvironment, name: str) -> bool:
+        return cb_env.protocol != TestProtocol.COUCHBASE2 or name not in self.NOT_OVER_COUCHBASE2
 
     @staticmethod
     async def _connect(cb_env: AsyncTestEnvironment) -> Cluster:
@@ -308,26 +354,30 @@ class ClusterCloseTestSuite(SuiteRequirements):
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             await cluster.buckets().get_all_buckets()
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            await cluster.users().get_all_users()
+        if self._offered(cb_env, 'users'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                await cluster.users().get_all_users()
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             await cluster.query_indexes().get_all_indexes(bucket_name)
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            await cluster.analytics_indexes().get_all_datasets()
+        if self._offered(cb_env, 'analytics_indexes'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                await cluster.analytics_indexes().get_all_datasets()
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             await cluster.search_indexes().get_all_indexes()
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            await cluster.eventing_functions().get_all_functions()
+        if self._offered(cb_env, 'eventing_functions'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                await cluster.eventing_functions().get_all_functions()
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             await bucket.collections().get_all_scopes()
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            await bucket.view_indexes().get_all_design_documents(DesignDocumentNamespace.DEVELOPMENT)
+        if self._offered(cb_env, 'view_indexes'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                await bucket.view_indexes().get_all_design_documents(DesignDocumentNamespace.DEVELOPMENT)
 
     @pytest.mark.asyncio
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
@@ -343,11 +393,13 @@ class ClusterCloseTestSuite(SuiteRequirements):
         cluster: Cluster = await self._connect(cb_env)
         await cluster.close()
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            await cluster.ping()
+        if self._offered(cb_env, 'ping'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                await cluster.ping()
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            await cluster.diagnostics()
+        if self._offered(cb_env, 'diagnostics'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                await cluster.diagnostics()
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             cluster.bucket(cb_env.bucket.name)
@@ -364,15 +416,17 @@ class ClusterCloseTestSuite(SuiteRequirements):
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             cluster.query('SELECT 1=1')
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            cluster.analytics_query('SELECT 1=1')
+        if self._offered(cb_env, 'analytics_query'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                cluster.analytics_query('SELECT 1=1')
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             cluster.search_query('dummy-index', MatchQuery('test'))
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            bucket = cluster.bucket(cb_env.bucket.name)
-            bucket.view_query('dummy-design', 'dummy-view')
+        if self._offered(cb_env, 'view_query'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                bucket = cluster.bucket(cb_env.bucket.name)
+                bucket.view_query('dummy-design', 'dummy-view')
 
     @pytest.mark.asyncio
     async def test_await_on_close_cluster(self, cb_env: AsyncTestEnvironment) -> None:
@@ -396,6 +450,23 @@ class ClusterDiagnosticsTests(ClusterDiagnosticsTestSuite):
         env = await build_async_environment(acb_base_env, ClusterDiagnosticsTestSuite)
         yield env
         await teardown_async_environment(env, ClusterDiagnosticsTestSuite)
+
+
+@pytest.mark.testgen_exclude('txcouchbase',
+                             reason='txcouchbase.Cluster has no connect() classmethod')
+class ClusterWaitUntilReadyTests(ClusterWaitUntilReadyTestSuite):
+
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(ClusterWaitUntilReadyTestSuite, self.__class__)
+
+    @pytest_asyncio.fixture(scope='class', name='cb_env')
+    async def couchbase_test_environment(self,
+                                         acb_base_env: AsyncTestEnvironment
+                                         ) -> AsyncGenerator[AsyncTestEnvironment, None]:
+        env = await build_async_environment(acb_base_env, ClusterWaitUntilReadyTestSuite)
+        yield env
+        await teardown_async_environment(env, ClusterWaitUntilReadyTestSuite)
 
 
 # The concrete class needs the marker too, not only the suite class above.  Without it the

@@ -227,8 +227,8 @@ class CollectionMultiTestSuite(TopologySuite):
                 assert isinstance(replica.is_replica, bool)
                 assert replica.content_as[dict] == keys_and_docs[k]
 
-    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
-    # error mapping raises.
+    # The tests marked couchbase2-unsupported here send a read preference, and the gateway's replica
+    # read has no field for one.
     @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replicas_online')
     @pytest.mark.usefixtures('check_server_groups_supported')
@@ -244,7 +244,6 @@ class CollectionMultiTestSuite(TopologySuite):
         assert all(map(lambda r: isinstance(r, DocumentUnretrievableException), res.exceptions.values())) is True
         assert len(res.results) == 0
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replicas_online')
     def test_multi_get_any_replica_fail(self, cb_env: SyncTestEnvironment) -> None:
         keys = list(self.FAKE_DOCS.keys())

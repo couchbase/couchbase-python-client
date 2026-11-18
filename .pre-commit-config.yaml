@@ -80,6 +80,7 @@ repos:
           - pytest-asyncio~=1.1
           - Twisted~=24.7
           - opentelemetry-api~=1.22
+          - opentelemetry-sdk~=1.22
   - repo: local
     hooks:
       - id: mypy-fit-performer

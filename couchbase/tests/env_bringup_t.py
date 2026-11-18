@@ -20,15 +20,17 @@ from typing import Any
 
 import pytest
 
-from couchbase.exceptions import UnAmbiguousTimeoutException
+from couchbase.exceptions import FeatureUnavailableException, UnAmbiguousTimeoutException
 from tests import couchbase_config
 from tests.couchbase_config import CouchbaseConfig
 from tests.environments import CouchbaseTestEnvironmentException
 from tests.environments import test_environment as sync_environment
 from tests.environments.test_environment import TestEnvironment, TopologyFacts
 from tests.mock_server import MockServerType
+from tests.protocols import view_of
 from tests.suite_fixtures import TopologySuite
-from tests.test_features import TestProtocol
+from tests.test_features import ServerFeatures, TestProtocol
+from tests.test_utils import RetryHelper
 
 _TOPOLOGY = r'\[topology\]'
 
@@ -41,7 +43,9 @@ def _real_server(monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path, couchb
     monkeypatch.setenv('PYCBC_COUCHBASE2', 'true' if couchbase2 else 'false')
     monkeypatch.setenv('PYCBC_HOST', 'gateway.local')
     monkeypatch.setenv('PYCBC_PORT', '443')
+    monkeypatch.setenv('PYCBC_SERVER_VERSION', '8.0.0')
     monkeypatch.delenv('PYCBC_CONNSTR_PARAMS', raising=False)
+    monkeypatch.delenv('PYCBC_NUM_NODES', raising=False)
 
 
 class ConnectionStringUnitTests:
@@ -85,6 +89,81 @@ class ConnectionStringUnitTests:
                 == 'couchbase2://gateway.local:443?tls_verify=none&timeout=5s')
 
 
+class _GatewayCluster:
+    """All a cluster view reads off a couchbase2 cluster is its impl."""
+
+    _impl = object()
+
+
+class DeclaredVersionUnitTests:
+
+    def test_a_couchbase2_run_needs_one(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+        _real_server(monkeypatch, tmp_path, couchbase2=True)
+        monkeypatch.delenv('PYCBC_SERVER_VERSION')
+        with pytest.raises(CouchbaseTestEnvironmentException, match=r'\$PYCBC_SERVER_VERSION'):
+            CouchbaseConfig.load_config()
+
+    def test_it_must_be_a_server_version(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+        _real_server(monkeypatch, tmp_path, couchbase2=True)
+        monkeypatch.setenv('PYCBC_SERVER_VERSION', '8.0')
+        with pytest.raises(CouchbaseTestEnvironmentException, match=r"'8\.0' is not major\.minor\.patch"):
+            CouchbaseConfig.load_config()
+
+    def test_a_classic_run_ignores_it(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+        _real_server(monkeypatch, tmp_path, couchbase2=False)
+        monkeypatch.delenv('PYCBC_SERVER_VERSION')
+        assert CouchbaseConfig.load_config().server_version is None
+
+    def test_the_couchbase2_view_answers_with_it(self,
+                                                 monkeypatch: pytest.MonkeyPatch,
+                                                 tmp_path: pathlib.Path) -> None:
+        _real_server(monkeypatch, tmp_path, couchbase2=True)
+        monkeypatch.setenv('PYCBC_SERVER_VERSION', '7.6.2-3721')
+        view = view_of(_GatewayCluster(), CouchbaseConfig.load_config())
+        assert view.server_version == '7.6.2-3721'
+        assert view.server_version_full == '7.6.2-3721'
+        assert view.server_version_short == 7.6
+
+
+class DeclaredNodeCountUnitTests:
+
+    def test_unset_the_couchbase2_view_cannot_see_the_nodes(self,
+                                                            monkeypatch: pytest.MonkeyPatch,
+                                                            tmp_path: pathlib.Path) -> None:
+        _real_server(monkeypatch, tmp_path, couchbase2=True)
+        view = view_of(_GatewayCluster(), CouchbaseConfig.load_config())
+        assert view.reports_node_count is False
+        assert view.node_count is None
+
+    def test_the_couchbase2_view_answers_with_it(self,
+                                                 monkeypatch: pytest.MonkeyPatch,
+                                                 tmp_path: pathlib.Path) -> None:
+        _real_server(monkeypatch, tmp_path, couchbase2=True)
+        monkeypatch.setenv('PYCBC_NUM_NODES', '3')
+        view = view_of(_GatewayCluster(), CouchbaseConfig.load_config())
+        assert view.reports_node_count is True
+        assert view.node_count == 3
+        assert view.reports_kv_endpoints is False
+
+    def test_the_ini_supplies_it(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+        _real_server(monkeypatch, tmp_path, couchbase2=True)
+        ini = tmp_path / 'test_config.ini'
+        ini.write_text('[realserver]\nnum_nodes = 2\n')
+        monkeypatch.setattr(couchbase_config, 'CONFIG_FILE', str(ini))
+        assert CouchbaseConfig.load_config().num_nodes == 2
+
+    def test_it_must_be_at_least_one(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+        _real_server(monkeypatch, tmp_path, couchbase2=True)
+        monkeypatch.setenv('PYCBC_NUM_NODES', '0')
+        with pytest.raises(CouchbaseTestEnvironmentException, match='at least 1; got 0'):
+            CouchbaseConfig.load_config()
+
+    def test_a_classic_run_ignores_it(self, monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path) -> None:
+        _real_server(monkeypatch, tmp_path, couchbase2=False)
+        monkeypatch.setenv('PYCBC_NUM_NODES', '3')
+        assert CouchbaseConfig.load_config().num_nodes is None
+
+
 class _RaisingCluster:
     def __init__(self, error: Exception) -> None:
         self.error = error
@@ -121,6 +200,10 @@ class _FakeEnv:
         self.protocol = TestProtocol.COUCHBASE2
         self.is_mock_server = False
         self.mock_server_type: MockServerType | None = None
+        self.unavailable: FeatureUnavailableException | None = None
+
+    def unavailable_manager(self, feature: ServerFeatures) -> FeatureUnavailableException | None:
+        return self.unavailable if feature is ServerFeatures.BasicBucketManagement else None
 
 
 class UnknownNodesUnitTests(TopologySuite):
@@ -144,3 +227,47 @@ class UnknownEndpointsUnitTests(TopologySuite):
     def test_unknown_kv_endpoints_skip(self, request: pytest.FixtureRequest) -> None:
         with pytest.raises(pytest.skip.Exception, match=_TOPOLOGY + r'.*kv_endpoints=unknown'):
             request.getfixturevalue('check_replicas_online')
+
+
+class UnavailableBucketManagerUnitTests(TopologySuite):
+
+    @pytest.fixture(scope='class')
+    def cb_env(self) -> _FakeEnv:
+        env = _FakeEnv(TopologyFacts(num_nodes=None, test_bucket_replicas=None, test_bucket_kv_endpoints=None))
+        env.unavailable = FeatureUnavailableException('Bucket management is not available here.')
+        return env
+
+    def test_num_replicas_raises_what_the_manager_raised(self, request: pytest.FixtureRequest) -> None:
+        with pytest.raises(FeatureUnavailableException, match='Bucket management'):
+            request.getfixturevalue('num_replicas')
+
+
+class _Counted:
+    def __init__(self, exc: Exception) -> None:
+        self.exc = exc
+        self.calls = 0
+
+    def __call__(self) -> None:
+        self.calls += 1
+        raise self.exc
+
+
+class FeatureUnavailableIsNotRetriedUnitTests:
+
+    def test_try_n_times_raises_it_at_once(self) -> None:
+        op = _Counted(FeatureUnavailableException('scan is not available here.'))
+        with pytest.raises(FeatureUnavailableException):
+            RetryHelper.try_n_times(5, 0, op)
+        assert op.calls == 1
+
+    def test_wait_until_raises_it_at_once(self) -> None:
+        op = _Counted(FeatureUnavailableException('scan is not available here.'))
+        with pytest.raises(FeatureUnavailableException):
+            RetryHelper.wait_until(op, condition='never', timeout=5, interval=0)
+        assert op.calls == 1
+
+    def test_anything_else_is_still_retried(self) -> None:
+        op = _Counted(ValueError('not yet'))
+        with pytest.raises(ValueError):
+            RetryHelper.try_n_times(3, 0, op)
+        assert op.calls == 3

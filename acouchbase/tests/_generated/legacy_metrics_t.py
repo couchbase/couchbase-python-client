@@ -31,7 +31,6 @@ from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   build_async_environment,
                                                   teardown_async_environment)
 from tests.environments.metrics_environment import MetricsEnvironment
-from tests.environments.test_environment import TestProtocol
 from tests.manifest import validate_test_manifest
 from tests.observability_ops import span_name
 from tests.observability_test_impls import LegacyRecordingMeter
@@ -49,8 +48,6 @@ class LegacyMetricsTestSuite(SuiteRequirements):
     # canary driving only `upsert` could not tell a meter that stopped being called from a
     # label that stopped being set.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A meter is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     NUM_DOCS = 10

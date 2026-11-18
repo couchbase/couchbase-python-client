@@ -45,6 +45,7 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
+from tests.test_features import TestProtocol
 
 
 class DatastructuresTestSuite(SuiteRequirements):
@@ -268,6 +269,8 @@ class LegacyDatastructuresTestSuite(SuiteRequirements):
     # silenced here.  When the removal lands this class and its concrete subclass are deleted
     # alongside them.
 
+    # Only classic carries the deprecated methods.
+    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     NUM_DOCS = 0
 
     TEST_MANIFEST = [

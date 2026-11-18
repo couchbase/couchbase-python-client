@@ -28,7 +28,10 @@ analytics service.  Version answers "is the software recent enough", deployment 
 "was this service asked for at all", and the two are not derivable from each other.  It is
 checked last, so a cluster failing both still reports the version.
 
-All four facts travel together as a ServerContext, which every entry point takes as its
+Protocol is a fourth, FEATURES_NOT_IN_PROTOCOL, and it is checked first: a feature the run's
+protocol cannot carry is unavailable whatever the server's version or services.
+
+All five facts travel together as a ServerContext, which every entry point takes as its
 single argument after the feature.  Callers build one through `cb_env.server_context`
 rather than assembling it themselves.
 
@@ -125,7 +128,7 @@ class TestProtocol(Enum):
     depend on an internal that is free to change.
     """
     CLASSIC = 'classic'
-    COUCHBASE2 = 'couchbase2'  # reserved; the SDK cannot connect over it yet
+    COUCHBASE2 = 'couchbase2'
 
 
 @dataclass(frozen=True)
@@ -137,7 +140,7 @@ class ServerContext:
     missing patch as -1: omitting it skips the test on exactly the boundary version,
     reporting a 7.6.2 server as too old for a 7.6.2 feature.  Nothing distinguishes a call
     site that judged the patch irrelevant from one that forgot it, and the gate cannot tell
-    either, because both arrive as None.  A context carries all four facts or none, so the
+    either, because both arrive as None.  A context carries every fact or none, so the
     question stops being per-call-site.
 
     Frozen because a gate that could observe one of these change mid-call would be reporting
@@ -153,6 +156,7 @@ class ServerContext:
     patch: int | None = None
     mock_type: MockServerType | None = None
     services: frozenset[ServiceType] | None = None
+    protocol: TestProtocol = TestProtocol.CLASSIC
 
     @property
     def is_mock(self) -> bool:
@@ -213,6 +217,35 @@ class EnvironmentFeatures:
     FEATURES_IN_MOCK: list[ServerFeatures] = [
         ServerFeatures.Txns,
     ]
+
+    # Features a protocol cannot carry at all, as distinct from operations the SDK has not
+    # implemented over it yet.  Those raise FeatureUnavailableException and are reported as
+    # their own skip category, so the two lists stay apart in a run's results.
+    FEATURES_NOT_IN_PROTOCOL: dict[TestProtocol, list[ServerFeatures]] = {
+        TestProtocol.COUCHBASE2: [
+            # The gateway has no analytics service in the versions the SDK targets.
+            ServerFeatures.Analytics,
+            ServerFeatures.AnalyticsDataversePathNames,
+            ServerFeatures.AnalyticsLinkManagement,
+            ServerFeatures.AnalyticsPendingMutations,
+            ServerFeatures.AnalyticsScopeQueryFqdn,
+            # No gateway service carries these.
+            ServerFeatures.Eventing,
+            ServerFeatures.EventingFunctionManagement,
+            ServerFeatures.ScopeEventingFunctionManagement,
+            ServerFeatures.KeyValueRangeScan,
+            ServerFeatures.SpatialViews,
+            # The gateway's lookup_in reads only the active copy.
+            ServerFeatures.SubdocReplicaRead,
+            ServerFeatures.UserGroupManagement,
+            ServerFeatures.UserManagement,
+            ServerFeatures.ViewIndexManagement,
+            # The SDK offers no transactions over couchbase2.
+            ServerFeatures.BinaryTxns,
+            ServerFeatures.TxnQueries,
+            ServerFeatures.Txns,
+        ],
+    }
 
     # ---------------------------------------------------------------------------
     # Version-gated features
@@ -452,6 +485,14 @@ class EnvironmentFeatures:
         f = ef._resolve_feature(feature)
         is_mock = ctx.is_mock
         srv = ctx.label
+
+        # ---- Never available over this protocol ----
+        # Ahead of BASIC_FEATURES, which holds features some protocols cannot carry.
+        if f in ef.FEATURES_NOT_IN_PROTOCOL.get(ctx.protocol, []):
+            return skip_reason(SkipCategory.PROTOCOL_MISMATCH,
+                               feature=f,
+                               active=ctx.protocol,
+                               server=srv)
 
         # ---- Always available ----
         if f in ef.BASIC_FEATURES:

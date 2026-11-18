@@ -101,6 +101,9 @@ class BinaryDurabilityTestSuite(TopologySuite):
         'test_server_durable_prepend_single_node',
     ]
 
+    # The tests marked couchbase2-unsupported here ask for client durability, which couchbase2 cannot
+    # offer: it observes each replica's node, and the gateway hides the nodes.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -111,8 +114,6 @@ class BinaryDurabilityTestSuite(TopologySuite):
         stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
         assert stored.content_as[str] == 'foo'
 
-    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
-    # error mapping raises.
     @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -131,6 +132,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().append(key, 'foo', AppendOptions(durability=durability))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -158,6 +160,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().decrement(key, DecrementOptions(durability=durability))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -185,6 +188,7 @@ class BinaryDurabilityTestSuite(TopologySuite):
         with pytest.raises(DurabilityImpossibleException):
             cb_env.collection.binary().increment(key, IncrementOptions(durability=durability))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -224,7 +228,6 @@ class BinaryDurabilityTestSuite(TopologySuite):
         stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
         assert stored.content_as[str] == 'foo'
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -244,7 +247,6 @@ class BinaryDurabilityTestSuite(TopologySuite):
         result = cb_env.collection.binary().decrement(key, opts)
         assert result.content == value - 1
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -264,7 +266,6 @@ class BinaryDurabilityTestSuite(TopologySuite):
         result = cb_env.collection.binary().increment(key, opts)
         assert result.content == value + 1
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -289,7 +290,6 @@ class BinaryDurabilityTestSuite(TopologySuite):
         stored = cb_env.collection.get(key, transcoder=RawStringTranscoder())
         assert stored.content_as[str] == 'foo'
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')

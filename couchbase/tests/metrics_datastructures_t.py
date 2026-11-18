@@ -25,7 +25,6 @@ from tests.environments.metrics_environment import MeterType, MetricsEnvironment
 from tests.environments.test_environment import (ConnectionStrategy,
                                                  SuiteRequirements,
                                                  SyncTestEnvironment,
-                                                 TestProtocol,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
@@ -63,8 +62,6 @@ class DatastructuresMetricsTestSuite(SuiteRequirements):
     # datastructure operation name, so a step that ran it would clear the meter without
     # asserting, which is a step that cannot fail.  `datastructures_t` covers what it yields.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A meter is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # Nothing is seeded: every test starts from a key the collection has never held, because

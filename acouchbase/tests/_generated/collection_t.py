@@ -295,8 +295,8 @@ class CollectionTestSuite(TopologySuite):
         if num_replicas > 0:
             assert replica_cnt >= active_cnt
 
-    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
-    # error mapping raises.
+    # The tests marked couchbase2-unsupported here send a read preference, and the gateway's replica
+    # read has no field for one.
     @pytest.mark.asyncio
     @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures("check_multi_node")
@@ -312,7 +312,6 @@ class CollectionTestSuite(TopologySuite):
                 GetAllReplicasOptions(read_preference=ReadPreference.SELECTED_SERVER_GROUP))
 
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     async def test_get_and_lock(self, cb_env: AsyncTestEnvironment) -> None:
         key, value = await cb_env.get_existing_doc()
         result = await cb_env.collection.get_and_lock(key, timedelta(seconds=3))
@@ -383,7 +382,6 @@ class CollectionTestSuite(TopologySuite):
         assert value == result.content_as[dict]
 
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures("check_replicas_online")
     async def test_get_any_replica_fail(self, cb_env: AsyncTestEnvironment) -> None:
         with pytest.raises(DocumentUnretrievableException):
@@ -526,6 +524,10 @@ class CollectionTestSuite(TopologySuite):
         # CXXCBC-295 - b8bb98c31d377100934dd4b33998f0a118df41e8, bad path no longer raises PathNotFoundException
         result = await cb_env.collection.get(key, GetOptions(project=['qzx']))
         assert result.cas is not None
+        if cb_env.protocol == TestProtocol.COUCHBASE2:
+            # The gateway answers a projection that matches none of its paths with JSON null.
+            assert result.value is None
+            return
         res_dict = result.content_as[dict]
         assert res_dict == {}
         assert 'qzx' not in res_dict

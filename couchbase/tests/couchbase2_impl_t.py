@@ -17,38 +17,63 @@
 
 from __future__ import annotations
 
+import json
 import warnings
 from collections.abc import (Callable,
                              Coroutine,
                              Iterator)
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
+import grpc
 import pytest
 
 from acouchbase.protocol.couchbase2._cluster_impl import AsyncClusterImpl
-from couchbase.auth import CertificateAuthenticator, PasswordAuthenticator
-from couchbase.common.warnings import CouchbaseApplicabilityWarning
+from acouchbase.protocol.couchbase2._collection_impl import AsyncCollectionImpl
+from couchbase.auth import (CertificateAuthenticator,
+                            JwtAuthenticator,
+                            PasswordAuthenticator)
+from couchbase.common.warnings import (CouchbaseApplicabilityWarning,
+                                       CouchbaseDeprecationWarning,
+                                       CouchbaseOptionWarning)
 from couchbase.diagnostics import ClusterState, ServiceType
-from couchbase.exceptions import (FeatureUnavailableException,
+from couchbase.durability import (ClientDurability,
+                                  DurabilityLevel,
+                                  ReplicateTo,
+                                  ServerDurability)
+from couchbase.exceptions import (DocumentNotFoundException,
+                                  FeatureUnavailableException,
                                   InvalidArgumentException,
                                   UnAmbiguousTimeoutException)
 from couchbase.options import (ClusterOptions,
                                ClusterOrphanReportingOptions,
                                ClusterTimeoutOptions,
                                ClusterTracingOptions,
+                               GetMultiOptions,
+                               GetOptions,
                                TransactionConfig,
+                               UpsertMultiOptions,
+                               UpsertOptions,
                                WaitUntilReadyOptions)
 from couchbase.protocol.couchbase2._cluster_impl import ClusterImpl
+from couchbase.protocol.couchbase2._collection_impl import CollectionImpl
+from couchbase.protocol.couchbase2._generated.kv.v1 import kv_pb2
 from couchbase.protocol.couchbase2._health import HealthCheckResponse
 from couchbase.protocol.couchbase2._histogram import PercentileHistogram
+from couchbase.transcoder import JSONTranscoder
 from tests.couchbase2_gateway import (Certificates,
+                                      Document,
+                                      Fail,
                                       FakeGateway,
                                       dropping,
                                       make_certificates,
                                       new_gateway,
                                       serving)
 from tests.event_loop import run_on_own_loop
+
+KEY = ('travel', 'inventory', 'hotels', 'hotel_1')
+JSON_FLAGS = JSONTranscoder().encode_value({})[1]
+AUTHORIZATION = 'Basic QWRtaW5pc3RyYXRvcjpwYXNzd29yZA=='
 
 NOT_SERVING = HealthCheckResponse.DESCRIPTOR.enum_types_by_name['ServingStatus'].values_by_name['NOT_SERVING'].number
 
@@ -93,6 +118,156 @@ def cluster(connect: Callable[..., tuple[str, ClusterOptions]]) -> Iterator[Clus
         impl.close_connection()
 
 
+def _collection(cluster: ClusterImpl) -> CollectionImpl:
+    return cluster.bucket(KEY[0]).scope(KEY[1]).collection(KEY[2])
+
+
+def _stored(gateway: FakeGateway, value: Any = None, expiry: int | None = None) -> None:
+    content = json.dumps(value if value is not None else {'name': 'Ritz'}).encode()
+    gateway.documents[KEY] = Document(content, JSON_FLAGS, 42, expiry)
+
+
+def _remaining(gateway: FakeGateway) -> float:
+    return gateway.calls[-1].remaining
+
+
+class Couchbase2CollectionUnitTests:
+
+    def test_an_upsert_reads_back(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        collection = _collection(cluster)
+        mutation = collection.upsert(KEY[3], {'name': 'Ritz', 'stars': 5})
+        result = collection.get(KEY[3])
+        assert result.content_as[dict] == {'name': 'Ritz', 'stars': 5}
+        assert result.cas == mutation.cas
+        token = mutation.mutation_token()
+        assert token is not None and token.as_tuple() == (7, 11, mutation.cas, 'travel')
+        upsert = gateway.calls[0].request
+        assert (upsert.bucket_name, upsert.scope_name, upsert.collection_name, upsert.key) == KEY
+        assert upsert.content_flags == JSON_FLAGS
+        assert [call.metadata['authorization'] for call in gateway.calls] == [AUTHORIZATION] * 2
+
+    def test_a_missing_document(self, cluster: ClusterImpl) -> None:
+        with pytest.raises(DocumentNotFoundException):
+            _collection(cluster).get(KEY[3])
+
+    def test_the_expiry_is_read_when_asked_for(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        _stored(gateway, expiry=1_900_000_000)
+        assert _collection(cluster).get(KEY[3]).expiry_time is None
+        assert _collection(cluster).get(KEY[3], with_expiry=True).expiry_time == datetime.fromtimestamp(1_900_000_000)
+
+    def test_a_projection_is_sent(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        _stored(gateway)
+        _collection(cluster).get(KEY[3], GetOptions(project=['name']))
+        assert list(gateway.calls[0].request.project) == ['name']
+
+    def test_the_kv_timeout_defaults_to_two_and_a_half_seconds(self, cluster: ClusterImpl,
+                                                               gateway: FakeGateway) -> None:
+        _stored(gateway)
+        _collection(cluster).get(KEY[3])
+        assert 2.0 < _remaining(gateway) <= 2.5
+
+    def test_an_operations_timeout_wins(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        _stored(gateway)
+        _collection(cluster).get(KEY[3], timeout=timedelta(seconds=20))
+        assert 19.0 < _remaining(gateway) <= 20.0
+
+    def test_the_clusters_kv_timeout(self, connect: Callable[..., tuple[str, ClusterOptions]],
+                                     gateway: FakeGateway) -> None:
+        _stored(gateway)
+        impl = ClusterImpl(*connect(kv_timeout=timedelta(seconds=7)))
+        try:
+            _collection(impl).get(KEY[3])
+        finally:
+            impl.close_connection()
+        assert 6.0 < _remaining(gateway) <= 7.0
+
+    def test_a_durable_upsert_takes_the_durable_timeout(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        _collection(cluster).upsert(KEY[3], {}, durability=ServerDurability(DurabilityLevel.MAJORITY))
+        assert gateway.calls[0].request.durability_level == kv_pb2.DURABILITY_LEVEL_MAJORITY
+        assert 9.0 < _remaining(gateway) <= 10.0
+
+    def test_unavailable_is_retried(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        _stored(gateway)
+        gateway.failures['Get'] = [Fail(grpc.StatusCode.UNAVAILABLE)]
+        assert _collection(cluster).get(KEY[3]).content_as[dict] == {'name': 'Ritz'}
+        assert len(gateway.calls) == 2
+
+    def test_an_unknown_option_is_reported(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        _stored(gateway)
+        with pytest.warns(CouchbaseOptionWarning, match='tiemout'):
+            _collection(cluster).get(KEY[3], tiemout=timedelta(seconds=1))
+
+    def test_a_timeout_that_is_not_a_timedelta_is_refused(self, cluster: ClusterImpl) -> None:
+        with pytest.raises(InvalidArgumentException):
+            _collection(cluster).get(KEY[3], timeout=5)
+
+    @pytest.mark.parametrize('call', [lambda c: c.get_any_replica('k'),
+                                      lambda c: c.get_all_replicas('k'),
+                                      lambda c: c.lookup_in_any_replica('k', ()),
+                                      lambda c: c.get_any_replica_multi(['k'])])
+    def test_every_other_operation_is_unavailable(self, cluster: ClusterImpl,
+                                                  call: Callable[[CollectionImpl], object]) -> None:
+        with pytest.raises(FeatureUnavailableException, match='couchbase2'):
+            call(_collection(cluster))
+
+
+class Couchbase2MultiUnitTests:
+
+    def test_each_key_is_its_own_operation(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        _stored(gateway)
+        result = _collection(cluster).get_multi([KEY[3], 'hotel_2'])
+        assert result.all_ok is False
+        assert result.results[KEY[3]].content_as[dict] == {'name': 'Ritz'}
+        assert isinstance(result.exceptions['hotel_2'], DocumentNotFoundException)
+        assert [call.request.key for call in gateway.calls] == [KEY[3], 'hotel_2']
+
+    def test_every_key_is_sent_before_the_first_error_is_raised(self, cluster: ClusterImpl,
+                                                                gateway: FakeGateway) -> None:
+        gateway.failures['Upsert'] = [Fail(grpc.StatusCode.NOT_FOUND, 'document')]
+        with pytest.raises(DocumentNotFoundException):
+            _collection(cluster).upsert_multi({'a': {}, 'b': {}, 'c': {}}, return_exceptions=False)
+        assert [call.request.key for call in gateway.calls] == ['a', 'b', 'c']
+        assert {key[3] for key in gateway.documents} == {'b', 'c'}
+
+    def test_a_keys_options_lie_over_the_batchs(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        opts = UpsertMultiOptions(expiry=timedelta(seconds=10),
+                                  per_key_options={'b': UpsertOptions(expiry=timedelta(seconds=20))})
+        assert _collection(cluster).upsert_multi({'a': {}, 'b': {}}, opts).all_ok is True
+        assert [call.request.expiry_secs for call in gateway.calls] == [10, 20]
+
+    def test_an_invalid_argument_raises_with_nothing_sent(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        opts = UpsertMultiOptions(per_key_options={'b': UpsertOptions(
+            durability=ClientDurability(replicate_to=ReplicateTo.ONE))})
+        with pytest.raises(FeatureUnavailableException, match='ClientDurability'):
+            _collection(cluster).upsert_multi({'a': {}, 'b': {}}, opts)
+        assert gateway.calls == []
+
+    @pytest.mark.parametrize('opts', [GetMultiOptions(project=['name']),
+                                      GetMultiOptions(per_key_options={KEY[3]: GetOptions(project=['name'])})])
+    def test_a_multi_get_cannot_project(self, cluster: ClusterImpl, gateway: FakeGateway,
+                                        opts: GetMultiOptions) -> None:
+        with pytest.raises(InvalidArgumentException, match='project'):
+            _collection(cluster).get_multi([KEY[3]], opts)
+        assert gateway.calls == []
+
+    def test_a_multi_get_drops_with_expiry_with_a_deprecation(self, cluster: ClusterImpl,
+                                                              gateway: FakeGateway) -> None:
+        _stored(gateway, expiry=60)
+        with (pytest.warns(CouchbaseApplicabilityWarning, match='with_expiry'),
+              pytest.warns(CouchbaseDeprecationWarning, match='with_expiry')):
+            result = _collection(cluster).get_multi([KEY[3]], GetMultiOptions(with_expiry=True))
+        assert result.results[KEY[3]].expiry_time is None
+
+    @pytest.mark.parametrize('call', [lambda c: c.get_multi('hotel_1'),
+                                      lambda c: c.upsert_multi(['hotel_1']),
+                                      lambda c: c.unlock_multi(['hotel_1'])])
+    def test_keys_of_the_wrong_type_are_refused(self, cluster: ClusterImpl, gateway: FakeGateway,
+                                                call: Callable[[CollectionImpl], object]) -> None:
+        with pytest.raises(InvalidArgumentException):
+            call(_collection(cluster))
+        assert gateway.calls == []
+
+
 class Couchbase2ClusterUnitTests:
 
     @pytest.mark.parametrize('call', [lambda c: c.ping(),
@@ -129,6 +304,34 @@ class Couchbase2ClusterUnitTests:
             warnings.simplefilter('error', CouchbaseApplicabilityWarning)
             ClusterImpl(*connect(**options)).close_connection()
 
+    def test_a_connection_string_query_parameter_is_read(self, certificates: Certificates,
+                                                         gateway: FakeGateway) -> None:
+        with serving(gateway, certificates) as port:
+            impl = ClusterImpl(f'couchbase2://localhost:{port}?trust_store_path={certificates.ca}',
+                               ClusterOptions(PasswordAuthenticator('Administrator', 'password')))
+            try:
+                with pytest.raises(DocumentNotFoundException):
+                    _collection(impl).get(KEY[3])
+            finally:
+                impl.close_connection()
+
+    def test_new_credentials_are_sent_on_the_next_call(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        collection = _collection(cluster)
+        collection.upsert(KEY[3], {'name': 'Ritz'})
+        cluster.update_credentials(PasswordAuthenticator('user', 'pass'))
+        collection.get(KEY[3])
+        assert [call.metadata['authorization'] for call in gateway.calls] == [AUTHORIZATION, 'Basic dXNlcjpwYXNz']
+
+    @pytest.mark.parametrize('authenticator', [JwtAuthenticator('a.b.c'),
+                                               CertificateAuthenticator(cert_path='cert', key_path='key')],
+                             ids=['jwt', 'certificate'])
+    def test_an_authenticator_of_another_type_is_refused(self, cluster: ClusterImpl, gateway: FakeGateway,
+                                                         authenticator: Any) -> None:
+        with pytest.raises(InvalidArgumentException):
+            cluster.update_credentials(authenticator)
+        _collection(cluster).upsert(KEY[3], {'name': 'Ritz'})
+        assert gateway.calls[0].metadata['authorization'] == AUTHORIZATION
+
     def test_a_certificate_cannot_be_replaced(self, connect: Callable[..., tuple[str, ClusterOptions]],
                                               certificates: Certificates) -> None:
         impl = ClusterImpl(connect()[0],
@@ -140,6 +343,17 @@ class Couchbase2ClusterUnitTests:
                 impl.update_credentials(CertificateAuthenticator(cert_path='cert', key_path='key'))
         finally:
             impl.close_connection()
+
+    def test_an_unreachable_gateway_is_unavailable(self, certificates: Certificates, unreachable: str) -> None:
+        impl = ClusterImpl(unreachable,
+                           ClusterOptions(PasswordAuthenticator('Administrator', 'password'),
+                                          trust_store_path=str(certificates.ca)))
+        try:
+            with pytest.raises(UnAmbiguousTimeoutException) as ex:
+                _collection(impl).get(KEY[3], timeout=timedelta(milliseconds=300))
+        finally:
+            impl.close_connection()
+        assert ex.value.error_context.retry_reasons == {'service_not_available'}
 
 
 class Couchbase2WaitUntilReadyUnitTests:
@@ -197,6 +411,33 @@ def _run(coroutine: Callable[[], Coroutine[Any, Any, Any]]) -> Any:
 
 class Couchbase2AsyncUnitTests:
 
+    def test_an_upsert_reads_back(self, connect: Callable[..., tuple[str, ClusterOptions]],
+                                  gateway: FakeGateway) -> None:
+        async def run() -> Any:
+            impl = AsyncClusterImpl(*connect())
+            try:
+                collection = impl.bucket(KEY[0]).scope(KEY[1]).collection(KEY[2])
+                mutation = await collection.upsert(KEY[3], {'name': 'Ritz'})
+                result = await collection.get(KEY[3])
+                return mutation.cas, result.cas, result.content_as[dict]
+            finally:
+                await impl.close_connection()
+
+        upserted, read, content = _run(run)
+        assert upserted == read and content == {'name': 'Ritz'}
+        assert [call.method for call in gateway.calls] == ['Upsert', 'Get']
+
+    def test_a_missing_document(self, connect: Callable[..., tuple[str, ClusterOptions]]) -> None:
+        async def run() -> None:
+            impl = AsyncClusterImpl(*connect())
+            try:
+                await impl.bucket(KEY[0]).scope(KEY[1]).collection(KEY[2]).get(KEY[3])
+            finally:
+                await impl.close_connection()
+
+        with pytest.raises(DocumentNotFoundException):
+            _run(run)
+
     def test_wait_until_ready_returns_once_the_gateway_reports_serving(
             self, connect: Callable[..., tuple[str, ClusterOptions]], gateway: FakeGateway) -> None:
         gateway.health_statuses = [NOT_SERVING]
@@ -211,6 +452,18 @@ class Couchbase2AsyncUnitTests:
         _run(run)
         assert [call.method for call in gateway.calls] == ['Check'] * 2
         assert 'authorization' not in gateway.calls[0].metadata
+
+    def test_every_other_operation_is_unavailable(self, connect: Callable[..., tuple[str, ClusterOptions]]) -> None:
+        async def run() -> None:
+            impl = AsyncClusterImpl(*connect())
+            collection: AsyncCollectionImpl = impl.bucket(KEY[0]).scope(KEY[1]).collection(KEY[2])
+            try:
+                await collection.lookup_in_any_replica(KEY[3], ())
+            finally:
+                await impl.close_connection()
+
+        with pytest.raises(FeatureUnavailableException, match='couchbase2'):
+            _run(run)
 
 
 class PercentileHistogramUnitTests:

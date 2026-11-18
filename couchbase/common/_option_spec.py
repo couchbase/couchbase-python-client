@@ -423,7 +423,7 @@ BLOCKS: dict[str, BlockSpec] = {
     ),
     'GetMultiOptions': block(
         PROJECT,
-        replace(WITH_EXPIRY, inert=frozenset({'classic'}),
+        replace(WITH_EXPIRY, inert=frozenset({'classic', 'couchbase2'}),
                 deprecated='A multi get does not fetch the expiry, so it has no effect.'),
         PER_KEY_OPTIONS, RETURN_EXCEPTIONS, TIMEOUT, PARENT_SPAN, TRANSCODER,
         refuses_unknown=True,
@@ -470,7 +470,7 @@ BLOCKS: dict[str, BlockSpec] = {
     ),
     'RemoveMultiOptions': block(
         PER_KEY_OPTIONS, RETURN_EXCEPTIONS, TIMEOUT, PARENT_SPAN, CAS, DURABILITY,
-        replace(TRANSCODER, inert=frozenset({'classic'}), deprecated='It has no effect.'),
+        replace(TRANSCODER, inert=frozenset({'classic', 'couchbase2'}), deprecated='It has no effect.'),
         refuses_unknown=True,
     ),
     'RemoveOptions': block(

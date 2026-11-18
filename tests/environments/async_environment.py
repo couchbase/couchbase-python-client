@@ -158,6 +158,9 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
         from tests.environments.managers import AsyncTestEnvironmentBucketManager
         available = self._used_bucket_ids.difference(self._dropped_bucket_ids,
                                                      self._reserved_bucket_ids)
+        if not available:
+            # The test ended before it took a name, by a skip in its body for one.
+            return
         # @FINDING(PYCBC-1867): carried over from the sync version deliberately.  The name
         # is recorded as dropped before the drop is attempted, so a failed drop still marks
         # it gone.  Fixing it here and not there would make the two environments disagree
@@ -223,7 +226,7 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
             replicas = settings.get('num_replicas')
 
         kv_endpoints: int | None = None
-        if self.cluster_view.reports_topology:
+        if self.cluster_view.reports_kv_endpoints:
             kv_endpoints = self._kv_endpoint_count(await self._bucket.ping())
 
         return TopologyFacts(
@@ -305,7 +308,7 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
 
         if collection_strategy in (CollectionStrategy.NAMED, CollectionStrategy.NAMED_EMPTY):
             if AsyncTestEnvironmentCollectionManager not in self._manager_registry:
-                self._no_collection_manager(collection_strategy, test_suite)
+                self._no_collection_manager(AsyncTestEnvironmentCollectionManager, collection_strategy, test_suite)
 
             coll_mgr = self.get_manager(AsyncTestEnvironmentCollectionManager)
             await AsyncTestEnvironment.try_n_times(
@@ -386,7 +389,7 @@ class AsyncTestEnvironment(TestEnvironment[AsyncCluster,
                     await default_collection.get(CONNECT_PROBE_KEY)
                 except DocumentNotFoundException:
                     pass
-                if view_of(cluster, config.protocol).reads_cluster_info:
+                if view_of(cluster, config).reads_cluster_info:
                     await cluster.cluster_info()
                 env_args.update(cluster=cluster, bucket=bucket, default_collection=default_collection)
                 break

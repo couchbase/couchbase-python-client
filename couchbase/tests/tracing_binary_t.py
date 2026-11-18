@@ -34,7 +34,6 @@ from tests.environments.test_environment import (ConnectionStrategy,
                                                  DocType,
                                                  SyncTestEnvironment,
                                                  TestEnvironment,
-                                                 TestProtocol,
                                                  build_environment,
                                                  teardown_environment)
 from tests.environments.tracing_environment import TracingEnvironment, TracingType
@@ -77,8 +76,6 @@ class BinaryTracingTestSuite(TopologySuite):
     # for the generator to read: the generated suites would call it without awaiting it, and an
     # unawaited operation produces no spans at all.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A tracer is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # Read by the topology fixtures the durability tests are gated on.

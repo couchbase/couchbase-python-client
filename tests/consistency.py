@@ -18,15 +18,25 @@ from __future__ import annotations
 from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from time import sleep
-from typing import TYPE_CHECKING, Any
+from typing import (TYPE_CHECKING,
+                    Any,
+                    NoReturn)
 
 import requests
 
+from couchbase.auth import PasswordAuthenticator
+from couchbase.cluster import Cluster
 from couchbase.diagnostics import ServiceType
+from couchbase.exceptions import (BucketDoesNotExistException,
+                                  CouchbaseException,
+                                  DocumentNotFoundException)
+from couchbase.options import ClusterOptions
 from tests.couchbase_config import CouchbaseConfig
-from tests.skips import env_degraded
+from tests.skips import CouchbaseTestEnvironmentException, env_degraded
+from tests.test_features import TestProtocol
 
 if TYPE_CHECKING:
+    from couchbase.management.collections import CollectionSpec, ScopeSpec
     from tests.environments.test_environment import TestEnvironment
 
 
@@ -293,7 +303,7 @@ class ConsistencyChecker:
         )
         self._wait_until_resource_satisfies_predicate(path, predicate, error_msg, timeout)
 
-    # These three raise through env_degraded rather than a bare RuntimeError.  A cluster
+    # These raise through env_degraded rather than a bare RuntimeError.  A cluster
     # resource that never propagates to every node is the definition of env-degraded, and a
     # RuntimeError carries neither the category nor anything a CI run can parse.  The prose
     # the callers build becomes the note; the deadline and the polled path become fields, so
@@ -301,44 +311,37 @@ class ConsistencyChecker:
     # from the source.
 
     def _wait_until_resource_present(self, path: str, error_msg: str, timeout: timedelta = DEFAULT_TIMEOUT) -> None:
-        deadline = datetime.now() + timeout
-        while datetime.now() < deadline:
-            if self._resource_is_present(path):
-                return
-            else:
-                sleep(self.RETRY_DELAY_SECS)
-        env_degraded(stage='consistency-wait',
-                     condition='resource-present',
-                     path=path,
-                     timeout_s=timeout.total_seconds(),
-                     note=error_msg)
+        self._wait_until(lambda: self._resource_is_present(path),
+                         error_msg,
+                         timeout,
+                         condition='resource-present',
+                         path=path)
 
     def _wait_until_resource_dropped(self, path: str, error_msg: str, timeout: timedelta = DEFAULT_TIMEOUT) -> None:
-        deadline = datetime.now() + timeout
-        while datetime.now() < deadline:
-            if self._resource_is_dropped(path):
-                return
-            else:
-                sleep(self.RETRY_DELAY_SECS)
-        env_degraded(stage='consistency-wait',
-                     condition='resource-dropped',
-                     path=path,
-                     timeout_s=timeout.total_seconds(),
-                     note=error_msg)
+        self._wait_until(lambda: self._resource_is_dropped(path),
+                         error_msg,
+                         timeout,
+                         condition='resource-dropped',
+                         path=path)
 
     def _wait_until_resource_satisfies_predicate(self, path: str, predicate: Callable[[dict], bool],
                                                  error_msg: str, timeout: timedelta = DEFAULT_TIMEOUT) -> None:
+        self._wait_until(lambda: self._resource_satisfies_predicate(path, predicate),
+                         error_msg,
+                         timeout,
+                         condition='resource-satisfies-predicate',
+                         path=path)
+
+    def _wait_until(self, check: Callable[[], bool], error_msg: str, timeout: timedelta, **fields: Any) -> None:
         deadline = datetime.now() + timeout
         while datetime.now() < deadline:
-            if self._resource_satisfies_predicate(path, predicate):
+            if check():
                 return
-            else:
-                sleep(self.RETRY_DELAY_SECS)
+            sleep(self.RETRY_DELAY_SECS)
         env_degraded(stage='consistency-wait',
-                     condition='resource-satisfies-predicate',
-                     path=path,
                      timeout_s=timeout.total_seconds(),
-                     note=error_msg)
+                     note=error_msg,
+                     **fields)
 
     def _resource_is_present(self, path: str) -> bool:
         for hostname in self._hostnames:
@@ -387,7 +390,211 @@ class ConsistencyChecker:
 
     @classmethod
     def from_test_environment(cls, env: TestEnvironment) -> ConsistencyChecker:
+        if env.config.protocol is TestProtocol.COUCHBASE2:
+            return GatewayConsistencyChecker(config=env.config)
+        # The mock serves no management API, so its checker polls no hosts and every wait
+        # passes at once.
         checker = cls(config=env.config)
         if env.config.has_management_api:
             checker.fetch_hostnames()
         return checker
+
+
+class GatewayConsistencyChecker(ConsistencyChecker):
+    """The waits for a couchbase2 run, asked of the gateway the run connects through.
+
+    The cluster behind the gateway is not polled directly, for the reason
+    CouchbaseConfig.has_management_api gives.  Each wait asks its question of the SDK instead,
+    over a sync cluster of its own, so the sync, asyncio and Twisted environments share it just
+    as they share the REST checker.  A wait here proves the change is visible through the
+    gateway, which is the only view a couchbase2 test has; it cannot say whether every node
+    behind the gateway agrees.
+
+    Any error other than the one that answers the question is read as "not yet", and the wait's
+    deadline decides when to give up, as it does for a node that blips mid-wait under REST.
+    """
+
+    # The same per-request ceiling as the REST checker's, for the same reason.
+    REQUEST_TIMEOUT = timedelta(seconds=ConsistencyChecker.HTTP_TIMEOUT_SECS)
+
+    PROBE_KEY = 'tests-consistency-probe'
+
+    # The REST names wait_until_collection_has_settings is called with, read off a CollectionSpec.
+    _SPEC_SETTINGS: dict[str, Callable[[CollectionSpec], Any]] = {
+        'maxTTL': lambda spec: None if spec.max_expiry is None else int(spec.max_expiry.total_seconds()),
+        'history': lambda spec: spec.history,
+    }
+
+    def __init__(self, config: CouchbaseConfig) -> None:
+        super().__init__(config)
+        self._cluster: Cluster | None = None
+
+    def _gateway(self) -> Cluster:
+        # Connected on first use, since most suites never wait.
+        if self._cluster is None:
+            username, pw = self._config.get_username_and_pw()
+            opts = ClusterOptions(PasswordAuthenticator(username, pw))
+            opts['enable_metrics'] = False
+            opts['enable_tracing'] = False
+            self._cluster = Cluster.connect(self._config.get_connection_string(), opts)
+        return self._cluster
+
+    def _bucket_present(self, name: str) -> bool | None:
+        """Whether the bucket exists, or None when the gateway gave no answer."""
+        try:
+            self._gateway().buckets().get_bucket(name, timeout=self.REQUEST_TIMEOUT)
+        except BucketDoesNotExistException:
+            return False
+        except CouchbaseException:
+            return None
+        return True
+
+    def _bucket_warm(self, name: str) -> bool:
+        try:
+            self._gateway().bucket(name).default_collection().get(self.PROBE_KEY, timeout=self.REQUEST_TIMEOUT)
+        except DocumentNotFoundException:
+            return True
+        except CouchbaseException:
+            return False
+        return True
+
+    def _scopes(self, bucket_name: str) -> list[ScopeSpec] | None:
+        try:
+            return list(self._gateway().bucket(bucket_name).collections().get_all_scopes(timeout=self.REQUEST_TIMEOUT))
+        except CouchbaseException:
+            return None
+
+    @staticmethod
+    def _find_collection(scopes: list[ScopeSpec], scope_name: str, collection_name: str) -> CollectionSpec | None:
+        for scope in scopes:
+            if scope.name == scope_name:
+                for coll in scope.collections:
+                    if coll.name == collection_name:
+                        return coll
+        return None
+
+    def _scope_present(self, bucket_name: str, scope_name: str) -> bool | None:
+        """Whether the scope exists, or None when the gateway gave no answer."""
+        scopes = self._scopes(bucket_name)
+        if scopes is None:
+            return None
+        return any(scope.name == scope_name for scope in scopes)
+
+    def _collection_present(self, bucket_name: str, scope_name: str, collection_name: str) -> bool | None:
+        """Whether the collection exists, or None when the gateway gave no answer."""
+        scopes = self._scopes(bucket_name)
+        if scopes is None:
+            return None
+        return self._find_collection(scopes, scope_name, collection_name) is not None
+
+    def wait_until_bucket_present(self, name: str, timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT) -> None:
+        self._wait_until(lambda: self._bucket_present(name) is True,
+                         f'Bucket {name} is not present through the gateway',
+                         timeout,
+                         condition='bucket-present',
+                         bucket=name)
+
+    def wait_until_bucket_healthy(self, name: str,
+                                  timeout: timedelta = ConsistencyChecker.BUCKET_WARMUP_TIMEOUT) -> None:
+        """Wait until a KV read on the bucket is answered.
+
+        The gateway reports no per-node bucket health, so this asks the thing the health check
+        guards: a read that returns, a missing document included, means the data service is
+        warm enough to open the bucket.
+        """
+        self._wait_until(lambda: self._bucket_warm(name),
+                         f'Bucket {name} does not answer a KV read through the gateway',
+                         timeout,
+                         condition='bucket-healthy',
+                         bucket=name)
+
+    def wait_until_bucket_dropped(self, name: str, timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT) -> None:
+        self._wait_until(lambda: self._bucket_present(name) is False,
+                         f'Bucket {name} has not been dropped through the gateway',
+                         timeout,
+                         condition='bucket-dropped',
+                         bucket=name)
+
+    def wait_until_scope_present(self, bucket_name: str, scope_name: str,
+                                 timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT) -> None:
+        self._wait_until(lambda: self._scope_present(bucket_name, scope_name) is True,
+                         f'Scope {scope_name} in bucket {bucket_name} is not present through the gateway',
+                         timeout,
+                         condition='scope-present',
+                         bucket=bucket_name,
+                         scope=scope_name)
+
+    def wait_until_scope_dropped(self, bucket_name: str, scope_name: str,
+                                 timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT) -> None:
+        self._wait_until(lambda: self._scope_present(bucket_name, scope_name) is False,
+                         f'Scope {scope_name} in bucket {bucket_name} has not been dropped through the gateway',
+                         timeout,
+                         condition='scope-dropped',
+                         bucket=bucket_name,
+                         scope=scope_name)
+
+    def wait_until_collection_present(self, bucket_name: str, scope_name: str, collection_name: str,
+                                      timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT) -> None:
+        self._wait_until(lambda: self._collection_present(bucket_name, scope_name, collection_name) is True,
+                         (f'Collection {collection_name} in scope {scope_name}, bucket {bucket_name} '
+                          f'is not present through the gateway'),
+                         timeout,
+                         condition='collection-present',
+                         bucket=bucket_name,
+                         scope=scope_name,
+                         collection=collection_name)
+
+    def wait_until_collection_dropped(self, bucket_name: str, scope_name: str, collection_name: str,
+                                      timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT) -> None:
+        self._wait_until(lambda: self._collection_present(bucket_name, scope_name, collection_name) is False,
+                         (f'Collection {collection_name} in scope {scope_name}, bucket {bucket_name} '
+                          f'has not been dropped through the gateway'),
+                         timeout,
+                         condition='collection-dropped',
+                         bucket=bucket_name,
+                         scope=scope_name,
+                         collection=collection_name)
+
+    def wait_until_collection_has_settings(self, bucket_name: str, scope_name: str, collection_name: str,
+                                           settings: dict, timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT
+                                           ) -> None:
+        unknown = set(settings).difference(self._SPEC_SETTINGS)
+        if unknown:
+            raise ValueError(f'No CollectionSpec reading for the settings {sorted(unknown)}.')
+
+        def satisfied() -> bool:
+            scopes = self._scopes(bucket_name)
+            coll = None if scopes is None else self._find_collection(scopes, scope_name, collection_name)
+            if coll is None:
+                return False
+            return all(self._SPEC_SETTINGS[k](coll) == v for k, v in settings.items())
+
+        self._wait_until(satisfied,
+                         (f'Collection {collection_name} in scope {scope_name}, bucket {bucket_name} '
+                          f'does not have the expected settings through the gateway ({settings})'),
+                         timeout,
+                         condition='collection-has-settings',
+                         bucket=bucket_name,
+                         scope=scope_name,
+                         collection=collection_name)
+
+    # User and group management are not in the protocol, so nothing under couchbase2 should
+    # reach these.  One that does raises, rather than polling no hosts and passing.
+
+    def wait_until_user_present(self, name: str, domain: str = 'local',
+                                timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT) -> None:
+        self._unsupported('wait_until_user_present')
+
+    def wait_until_user_dropped(self, name: str, domain: str = 'local',
+                                timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT) -> None:
+        self._unsupported('wait_until_user_dropped')
+
+    def wait_until_group_present(self, name: str, timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT) -> None:
+        self._unsupported('wait_until_group_present')
+
+    def wait_until_group_dropped(self, name: str, timeout: timedelta = ConsistencyChecker.DEFAULT_TIMEOUT) -> None:
+        self._unsupported('wait_until_group_dropped')
+
+    @staticmethod
+    def _unsupported(wait: str) -> NoReturn:
+        raise CouchbaseTestEnvironmentException(f'{wait} has no couchbase2 equivalent.')

@@ -31,6 +31,8 @@ markers = [
     "pycbc_txcouchbase: marks a test for the txcouchbase API (deselect with '-m \"not pycbc_txcouchbase\"')",
     "pycbc_slow_mgmt: marks a test as a management API test that is slow",
     "unsupported_protocol(*protocols): skip this test under any of the given TestProtocol values",
+    "covers_protocols(*protocols): this test checks each given TestProtocol itself, so it runs only under the first",
+    "known_issue(*protocols, ticket=, note=): skip this test as a known issue under any of the given TestProtocol values",
     "testgen_exclude(*apis, reason=...): do not generate this test for the named APIs",
 ]
 

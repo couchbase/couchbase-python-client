@@ -62,7 +62,6 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
-from tests.test_features import TestProtocol
 
 # A bytes value that is not text and not JSON, for the RawBinaryTranscoder hex tests.
 HEX_CONTENT = bytes.fromhex('ff0102030405060708090a0b0c0d0e0f'
@@ -265,9 +264,6 @@ class KeyValueOpTranscoderTestSuite(SuiteRequirements):
                                                    GetOptions(transcoder=tc),
                                                    expected_exceptions=(DocumentNotFoundException,))
 
-    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
-    # error mapping raises.
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     def test_get_and_lock(self, cb_env: SyncTestEnvironment) -> None:
         key, value = cb_env.get_existing_doc_by_type(DocType.BYTES)
         tc = RawBinaryTranscoder()

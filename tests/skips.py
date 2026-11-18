@@ -55,9 +55,8 @@ _TICKET_RE = re.compile(r'^[A-Z][A-Z0-9]+-\d+$')
 # filed.  It exists so that the debt is greppable (`grep -r 'ticket=UNTRACKED'`) rather than
 # dissolving into prose, and so that an author who has no key to hand does not invent a
 # plausible one: `_TICKET_RE` cannot tell a real key from a fabricated one, but a grep finds
-# every `UNTRACKED`.  Currently unused, which is the intended steady state.  File the ticket
-# first; reach for this only when the defect blocks the work in hand and the filing cannot
-# wait.
+# every `UNTRACKED`.  Unused is the intended steady state.  File the ticket first; reach for
+# this only when the defect blocks the work in hand and the filing cannot wait.
 UNTRACKED_TICKET = 'UNTRACKED'
 
 
@@ -100,6 +99,11 @@ class SkipCategory(Enum):
     # The test does not run under the wire protocol this run is exercising.  Expected, and
     # countable from the run's protocol rather than from the server version.
     PROTOCOL_MISMATCH = 'protocol-mismatch'
+
+    # The protocol can carry the operation and the SDK does not implement it over that
+    # protocol yet: an uncaught FeatureUnavailableException.  Expected while the protocol is
+    # being built out, and the run's list of these is the list of what is left to build.
+    FEATURE_UNAVAILABLE = 'feature-unavailable'
 
 
 def render_value(value: Any) -> str:
@@ -261,6 +265,15 @@ def skip_protocol_mismatch(*, note: str | None = None, **fields: Any) -> NoRetur
     the run's protocol rather than from the server version.
     """
     _skip(SkipCategory.PROTOCOL_MISMATCH, note=note, **fields)
+
+
+def skip_feature_unavailable(*, note: str | None = None, **fields: Any) -> NoReturn:
+    """Skip because the SDK does not implement the operation over the run's protocol.
+
+    Conventionally carries `active=` and `note=` holding the exception's message, which names
+    the operation, so the run's skips group into the list of what is left to build.
+    """
+    _skip(SkipCategory.FEATURE_UNAVAILABLE, note=note, **fields)
 
 
 def env_degraded(*, note: str | None = None, **fields: Any) -> NoReturn:

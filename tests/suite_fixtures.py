@@ -91,13 +91,16 @@ class TopologySuite(SuiteRequirements):
             # look legitimate.
             skip_topology(nodes='unknown',
                           protocol=cb_env.protocol.value,
-                          note='the protocol cannot see the cluster nodes')
+                          note='the protocol cannot see the cluster nodes; couchbase2 reads $PYCBC_NUM_NODES')
         return num_nodes
 
     @pytest.fixture(scope='class')
     def num_replicas(self, cb_env: TestEnvironment) -> int:
         replicas = cb_env.topology.test_bucket_replicas
         if replicas is None:
+            unavailable = cb_env.unavailable_manager(ServerFeatures.BasicBucketManagement)
+            if unavailable is not None:
+                raise unavailable
             # Reading this needs the bucket manager, and the suite did not declare one.  A
             # broken environment rather than a skip: the suite asked for a number the
             # framework could not supply, which is a wiring mistake in the suite, not a

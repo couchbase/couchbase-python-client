@@ -21,6 +21,7 @@ from typing import (TYPE_CHECKING,
                     Any,
                     NoReturn)
 
+from acouchbase.protocol.couchbase2._collection_impl import AsyncCollectionImpl
 from couchbase.protocol.couchbase2._core import unsupported
 
 if TYPE_CHECKING:
@@ -59,8 +60,9 @@ class AsyncScopeImpl:
     def connection(self) -> object:
         raise unsupported('AsyncScope.connection')
 
-    def collection(self, name: str) -> NoReturn:
-        raise unsupported('Collections')
+    def collection(self, name: str) -> AsyncCollectionImpl:
+        """**INTERNAL**"""
+        return AsyncCollectionImpl(name, self)
 
     def query(self,
               statement: str,

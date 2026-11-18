@@ -299,12 +299,15 @@ class SubDocumentTestSuite(TopologySuite):
             run_in_reactor_thread(cb_env.collection.mutate_in, key, (SD.array_addunique('a', 2),))
 
         if not (cb_env.is_mock_server and cb_env.mock_server_type == MockServerType.GoCAVES):
+            # The gateway answers a value the server cannot insert with a bare INVALID_ARGUMENT,
+            # which tells it apart from no other invalid argument.
+            refused = InvalidArgumentException if cb_env.protocol == TestProtocol.COUCHBASE2 else InvalidValueException
             bad_list: Any = [4, 5, 6]
-            with pytest.raises(InvalidValueException):
+            with pytest.raises(refused):
                 run_in_reactor_thread(cb_env.collection.mutate_in, key, (SD.array_addunique('b', bad_list),))
 
             bad_dict: Any = {'c': 'd'}
-            with pytest.raises(InvalidValueException):
+            with pytest.raises(refused):
                 run_in_reactor_thread(cb_env.collection.mutate_in, key, (SD.array_addunique('b', bad_dict),))
 
             # 'c' *is* an array, but it holds a dict.  A real server rejects this on the
@@ -313,6 +316,9 @@ class SubDocumentTestSuite(TopologySuite):
             with pytest.raises(PathMismatchException):
                 run_in_reactor_thread(cb_env.collection.mutate_in, key, (SD.array_addunique('c', 2),))
 
+    # The tests marked couchbase2-unsupported here write a mutation macro, which couchbase2 cannot
+    # expand: the gateway would store the macro as written.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('skip_mock_no_array_mutation_macros')
     @pytest.mark.usefixtures('check_xattr_supported')
     def test_array_add_unique_mutate_in_macros(self, cb_env: TwistedTestEnvironment) -> None:
@@ -361,6 +367,7 @@ class SubDocumentTestSuite(TopologySuite):
         assert len(app_res) == 3
         assert app_res == [8, 9, 10]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('skip_mock_no_array_mutation_macros')
     @pytest.mark.usefixtures('check_xattr_supported')
     def test_array_add_append_mutate_in_macros(self, cb_env: TwistedTestEnvironment) -> None:
@@ -426,6 +433,7 @@ class SubDocumentTestSuite(TopologySuite):
         assert len(ins_res) == 3
         assert ins_res == [6, 7, 8]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('skip_mock_no_array_mutation_macros')
     @pytest.mark.usefixtures('check_xattr_supported')
     def test_array_insert_mutate_in_macros(self, cb_env: TwistedTestEnvironment) -> None:
@@ -488,6 +496,7 @@ class SubDocumentTestSuite(TopologySuite):
         assert len(pre_res) == 3
         assert pre_res == [-2, -1, 0]
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('skip_mock_no_array_mutation_macros')
     @pytest.mark.usefixtures('check_xattr_supported')
     def test_array_add_prepend_mutate_in_macros(self, cb_env: TwistedTestEnvironment) -> None:
@@ -694,9 +703,6 @@ class SubDocumentTestSuite(TopologySuite):
             active_count += not result.is_replica
         assert active_count == 1
 
-    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
-    # error mapping raises.
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replica_read_supported')
     @pytest.mark.usefixtures('check_server_groups_supported')
     def test_lookup_in_all_replicas_read_preference(self, cb_env: TwistedTestEnvironment) -> None:
@@ -709,7 +715,6 @@ class SubDocumentTestSuite(TopologySuite):
 
     # --- lookup_in_any_replica ---
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replica_read_supported')
     def test_lookup_in_any_replica_bad_key(self, cb_env: TwistedTestEnvironment) -> None:
         with pytest.raises(DocumentUnretrievableException):
@@ -777,7 +782,6 @@ class SubDocumentTestSuite(TopologySuite):
         assert result.content_as[str](0) == value['batch']
         assert result.is_replica is not None
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_replica_read_supported')
     @pytest.mark.usefixtures('check_server_groups_supported')
     def test_lookup_in_any_replica_read_preference(self, cb_env: TwistedTestEnvironment) -> None:
@@ -957,6 +961,7 @@ class SubDocumentTestSuite(TopologySuite):
         res = TwistedTestEnvironment.try_n_times(10, 3, cb_env.collection.get, key)
         assert res.content_as[dict] == {'new_path': 'im new'}
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_xattr_supported')
     @pytest.mark.parametrize('macro', [SD.MutationMacro.cas(),
                                        SD.MutationMacro.seq_no(),
@@ -976,6 +981,7 @@ class SubDocumentTestSuite(TopologySuite):
         if 'CAS' in macro.value:
             assert res.cas == SD.convert_macro_cas_to_cas(macro_res)
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_xattr_supported')
     @pytest.mark.parametrize('macro', [SD.MutationMacro.cas(),
                                        SD.MutationMacro.seq_no(),

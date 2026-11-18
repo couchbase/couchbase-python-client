@@ -42,7 +42,7 @@ from tests.environments.test_environment import (SuiteRequirements,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
-from tests.test_features import ServerFeatures
+from tests.test_features import ServerFeatures, TestProtocol
 
 
 class ClusterDiagnosticsTestSuite(SuiteRequirements):
@@ -249,6 +249,39 @@ class ClusterDiagnosticsTestSuite(SuiteRequirements):
         cb_assert_eq(returned, allowed & deployed, what='pinged services')
 
 
+@pytest.mark.testgen_exclude('txcouchbase',
+                             reason='txcouchbase.Cluster has no connect() classmethod')
+class ClusterWaitUntilReadyTestSuite(SuiteRequirements):
+    # Query rather than any readiness feature: an unrestricted wait waits on every service the
+    # cluster runs, and the mock serves key-value alone.
+    #
+    # The wait runs on a cluster of its own because an unrestricted wait reports on every
+    # endpoint the cluster has opened.  Over classic, a cluster that opened a bucket since
+    # dropped keeps that bucket's key-value endpoints connecting and never reaches online, and
+    # `cb_env.cluster` is shared with the bucket management tests on the same worker.
+
+    NUM_DOCS = 0
+    REQUIRED_FEATURES = [ServerFeatures.Query]
+
+    TEST_MANIFEST = [
+        'test_wait_until_ready',
+    ]
+
+    @staticmethod
+    def _connect(cb_env: SyncTestEnvironment) -> Cluster:
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        return Cluster.connect(conn_string, ClusterOptions(PasswordAuthenticator(username, pw)))
+
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    def test_wait_until_ready(self, cb_env: SyncTestEnvironment) -> None:
+        cluster: Cluster = self._connect(cb_env)
+        try:
+            cluster.wait_until_ready(timedelta(seconds=10))
+        finally:
+            cluster.close()
+
+
 # Every test in this class opens a cluster of its own with `Cluster.connect(...)`, a
 # classmethod `txcouchbase.cluster.Cluster` does not have, so the class is excluded whole.
 @pytest.mark.testgen_exclude('txcouchbase',
@@ -270,6 +303,18 @@ class ClusterCloseTestSuite(SuiteRequirements):
     ]
 
     CLOSED_CLUSTER_MSG = 'Cannot perform operations on a closed cluster'
+    # couchbase2 refuses these before it looks at the cluster, closed or not.
+    NOT_OVER_COUCHBASE2 = frozenset({'analytics_indexes',
+                                     'analytics_query',
+                                     'diagnostics',
+                                     'eventing_functions',
+                                     'ping',
+                                     'users',
+                                     'view_indexes',
+                                     'view_query'})
+
+    def _offered(self, cb_env: SyncTestEnvironment, name: str) -> bool:
+        return cb_env.protocol != TestProtocol.COUCHBASE2 or name not in self.NOT_OVER_COUCHBASE2
 
     @staticmethod
     def _connect(cb_env: SyncTestEnvironment) -> Cluster:
@@ -291,26 +336,30 @@ class ClusterCloseTestSuite(SuiteRequirements):
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             cluster.buckets().get_all_buckets()
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            cluster.users().get_all_users()
+        if self._offered(cb_env, 'users'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                cluster.users().get_all_users()
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             cluster.query_indexes().get_all_indexes(bucket_name)
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            cluster.analytics_indexes().get_all_datasets()
+        if self._offered(cb_env, 'analytics_indexes'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                cluster.analytics_indexes().get_all_datasets()
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             cluster.search_indexes().get_all_indexes()
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            cluster.eventing_functions().get_all_functions()
+        if self._offered(cb_env, 'eventing_functions'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                cluster.eventing_functions().get_all_functions()
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             bucket.collections().get_all_scopes()
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            bucket.view_indexes().get_all_design_documents(DesignDocumentNamespace.DEVELOPMENT)
+        if self._offered(cb_env, 'view_indexes'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                bucket.view_indexes().get_all_design_documents(DesignDocumentNamespace.DEVELOPMENT)
 
     @pytest.mark.flaky(reruns=5, reruns_delay=1)
     def test_multiple_close_cluster(self, cb_env: SyncTestEnvironment) -> None:
@@ -324,11 +373,13 @@ class ClusterCloseTestSuite(SuiteRequirements):
         cluster: Cluster = self._connect(cb_env)
         cluster.close()
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            cluster.ping()
+        if self._offered(cb_env, 'ping'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                cluster.ping()
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            cluster.diagnostics()
+        if self._offered(cb_env, 'diagnostics'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                cluster.diagnostics()
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             cluster.bucket(cb_env.bucket.name)
@@ -344,15 +395,17 @@ class ClusterCloseTestSuite(SuiteRequirements):
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             cluster.query('SELECT 1=1')
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            cluster.analytics_query('SELECT 1=1')
+        if self._offered(cb_env, 'analytics_query'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                cluster.analytics_query('SELECT 1=1')
 
         with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
             cluster.search_query('dummy-index', MatchQuery('test'))
 
-        with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
-            bucket = cluster.bucket(cb_env.bucket.name)
-            bucket.view_query('dummy-design', 'dummy-view')
+        if self._offered(cb_env, 'view_query'):
+            with pytest.raises(RuntimeError, match=self.CLOSED_CLUSTER_MSG):
+                bucket = cluster.bucket(cb_env.bucket.name)
+                bucket.view_query('dummy-design', 'dummy-view')
 
 
 class ClusterDiagnosticsTests(ClusterDiagnosticsTestSuite):
@@ -368,6 +421,23 @@ class ClusterDiagnosticsTests(ClusterDiagnosticsTestSuite):
         env = build_environment(cb_base_env, ClusterDiagnosticsTestSuite)
         yield env
         teardown_environment(env, ClusterDiagnosticsTestSuite)
+
+
+@pytest.mark.testgen_exclude('txcouchbase',
+                             reason='txcouchbase.Cluster has no connect() classmethod')
+class ClusterWaitUntilReadyTests(ClusterWaitUntilReadyTestSuite):
+
+    @pytest.fixture(scope='class', autouse=True)
+    def manifest_validated(self) -> None:
+        validate_test_manifest(ClusterWaitUntilReadyTestSuite, self.__class__)
+
+    @pytest.fixture(scope='class', name='cb_env')
+    def couchbase_test_environment(self,
+                                   cb_base_env: SyncTestEnvironment
+                                   ) -> Generator[SyncTestEnvironment, None, None]:
+        env = build_environment(cb_base_env, ClusterWaitUntilReadyTestSuite)
+        yield env
+        teardown_environment(env, ClusterWaitUntilReadyTestSuite)
 
 
 # The concrete class needs the marker too, not only the suite class above.  Without it the

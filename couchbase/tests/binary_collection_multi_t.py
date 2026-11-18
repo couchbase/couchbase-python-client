@@ -51,6 +51,7 @@ from tests.environments.test_environment import (CollectionStrategy,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
+from tests.test_features import TestProtocol
 
 
 class BinaryCollectionMultiTestSuite(SuiteRequirements):
@@ -225,6 +226,9 @@ class BinaryCollectionMultiTestSuite(SuiteRequirements):
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
         assert len(res.results) == len(keys)
 
+    # couchbase2 cannot offer client durability, so it cannot be mixed with server durability: it
+    # observes each replica's node, and the gateway hides the nodes.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.parametrize(
         'op_info',
         [

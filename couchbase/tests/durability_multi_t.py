@@ -98,6 +98,9 @@ class DurabilityMultiTestSuite(TopologySuite):
         'test_server_durable_upsert_multi_single_node',
     ]
 
+    # The tests marked couchbase2-unsupported here ask for client durability, which couchbase2 cannot
+    # offer: it observes each replica's node, and the gateway hides the nodes.
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_online')
@@ -112,8 +115,6 @@ class DurabilityMultiTestSuite(TopologySuite):
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
 
-    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
-    # error mapping raises.
     @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_online')
@@ -140,6 +141,7 @@ class DurabilityMultiTestSuite(TopologySuite):
             cb_env.collection.insert_multi(keys_and_docs, InsertMultiOptions(durability=durability,
                                                                              return_exceptions=False))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_online')
@@ -173,6 +175,7 @@ class DurabilityMultiTestSuite(TopologySuite):
         assert isinstance(res.exceptions, dict)
         assert all(map(lambda e: issubclass(type(e), DurabilityImpossibleException), res.exceptions.values())) is True
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_online')
@@ -208,6 +211,7 @@ class DurabilityMultiTestSuite(TopologySuite):
         assert isinstance(res.exceptions, dict)
         assert all(map(lambda e: issubclass(type(e), DurabilityImpossibleException), res.exceptions.values())) is True
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_online')
@@ -250,6 +254,7 @@ class DurabilityMultiTestSuite(TopologySuite):
             cb_env.collection.upsert_multi(keys_and_docs, UpsertMultiOptions(durability=durability,
                                                                              return_exceptions=False))
 
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.parametrize(
         'op_info',
         [
@@ -297,7 +302,7 @@ class DurabilityMultiTestSuite(TopologySuite):
 
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_replicas_online')
+    @pytest.mark.usefixtures('check_replicas_configured')
     def test_server_durable_insert_multi(self, cb_env: SyncTestEnvironment) -> None:
         keys_and_docs = cb_env.get_new_docs(4)
         durability = ServerDurability(level=DurabilityLevel.PERSIST_TO_MAJORITY)
@@ -309,7 +314,6 @@ class DurabilityMultiTestSuite(TopologySuite):
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_online')
@@ -325,7 +329,7 @@ class DurabilityMultiTestSuite(TopologySuite):
 
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_replicas_online')
+    @pytest.mark.usefixtures('check_replicas_configured')
     def test_server_durable_remove_multi(self, cb_env: SyncTestEnvironment) -> None:
         keys_and_docs = cb_env.get_docs(4)
         keys = list(keys_and_docs.keys())
@@ -339,7 +343,6 @@ class DurabilityMultiTestSuite(TopologySuite):
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
         assert_all_expired(cb_env, keys, ctx='after a server-durable remove_multi')
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_online')
@@ -356,7 +359,7 @@ class DurabilityMultiTestSuite(TopologySuite):
 
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_replicas_online')
+    @pytest.mark.usefixtures('check_replicas_configured')
     def test_server_durable_replace_multi(self, cb_env: SyncTestEnvironment) -> None:
         keys_and_docs = cb_env.get_docs(4)
         for _, v in keys_and_docs.items():
@@ -370,7 +373,6 @@ class DurabilityMultiTestSuite(TopologySuite):
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_online')
@@ -388,7 +390,7 @@ class DurabilityMultiTestSuite(TopologySuite):
 
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_multi_node')
-    @pytest.mark.usefixtures('check_replicas_online')
+    @pytest.mark.usefixtures('check_replicas_configured')
     def test_server_durable_upsert_multi(self, cb_env: SyncTestEnvironment) -> None:
         keys_and_docs = cb_env.get_docs(4)
         for _, v in keys_and_docs.items():
@@ -402,7 +404,6 @@ class DurabilityMultiTestSuite(TopologySuite):
         assert res.exceptions == {}
         assert all(map(lambda r: isinstance(r, MutationResult), res.results.values())) is True
 
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_online')

@@ -38,7 +38,6 @@ from tests.environments.test_environment import (ConnectionStrategy,
                                                  SuiteRequirements,
                                                  SyncTestEnvironment,
                                                  TestEnvironment,
-                                                 TestProtocol,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
@@ -94,8 +93,6 @@ class KeyValueMetricsTestSuite(SuiteRequirements):
     # Only the two negative-expiry cases fail that early, which is why they alone pass
     # `expect_collection_labels=False`.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A meter is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # `get_existing_doc` marks each key used and never hands it back, and twenty tests take one,

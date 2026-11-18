@@ -16,8 +16,8 @@
 """An in-process stand-in for the gateway, so the couchbase2 impls can be run with no cluster.
 
 It serves TLS, as the gateway does, on a certificate signed by a CA made for the run, and answers
-the health check from a list of statuses.  Each call is recorded with its metadata and deadline,
-so a test can read what an impl sent.
+KV `Get` and `Upsert` from a dict and the health check from a list of statuses.  Each call is
+recorded with its metadata and deadline, so a test can read what an impl sent.
 """
 
 from __future__ import annotations
@@ -32,13 +32,15 @@ from collections.abc import Iterator
 from concurrent import futures
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 import grpc
 from google.protobuf import any_pb2
+from google.protobuf.timestamp_pb2 import Timestamp
 from google.rpc import error_details_pb2, status_pb2
 
 from couchbase.protocol.couchbase2._error_mapping import STATUS_DETAILS_KEY
+from couchbase.protocol.couchbase2._generated.kv.v1 import kv_pb2, kv_pb2_grpc
 from couchbase.protocol.couchbase2._health import (SERVING,
                                                    HealthCheckRequest,
                                                    HealthCheckResponse)
@@ -95,6 +97,14 @@ class Call:
         return self.arrived + self.remaining
 
 
+@dataclass
+class Document:
+    content: bytes
+    flags: int
+    cas: int
+    expiry: int | None = None
+
+
 @dataclass(frozen=True)
 class Fail:
     code: grpc.StatusCode
@@ -103,12 +113,14 @@ class Fail:
 
 
 @dataclass
-class FakeGateway:
+class FakeGateway(kv_pb2_grpc.KvServiceServicer):
+    documents: dict[tuple[str, str, str, str], Document] = field(default_factory=dict)
     calls: list[Call] = field(default_factory=list)
     # Failures each method answers with, in order, before it answers normally.
     failures: dict[str, list[Fail]] = field(default_factory=dict)
     # The serving statuses the health check answers with, in order, before it answers serving.
     health_statuses: list[int] = field(default_factory=list)
+    _cas: int = 1000
 
     def _record(self, method: str, request: Any, context: grpc.ServicerContext) -> None:
         remaining = context.time_remaining()
@@ -118,14 +130,40 @@ class FakeGateway:
         if pending:
             _abort(context, pending.pop(0))
 
+    def Get(self, request: kv_pb2.GetRequest, context: grpc.ServicerContext) -> kv_pb2.GetResponse:
+        self._record('Get', request, context)
+        document = self.documents.get((request.bucket_name, request.scope_name, request.collection_name, request.key))
+        if document is None:
+            _abort(context, Fail(grpc.StatusCode.NOT_FOUND, 'document'))
+            raise AssertionError('unreachable')
+        response = kv_pb2.GetResponse(content_uncompressed=document.content, content_flags=document.flags,
+                                      cas=document.cas)
+        response.expiry.CopyFrom(Timestamp(seconds=document.expiry or 0))
+        return response
+
+    def Upsert(self, request: kv_pb2.UpsertRequest, context: grpc.ServicerContext) -> kv_pb2.UpsertResponse:
+        self._record('Upsert', request, context)
+        self._cas += 1
+        key = (request.bucket_name, request.scope_name, request.collection_name, request.key)
+        self.documents[key] = Document(request.content_uncompressed, request.content_flags, self._cas,
+                                       request.expiry_secs or None)
+        token = kv_pb2.MutationToken(bucket_name=request.bucket_name, vbucket_id=7, vbucket_uuid=11,
+                                     seq_no=self._cas)
+        return kv_pb2.UpsertResponse(cas=self._cas, mutation_token=token)
+
     def Check(self, request: Any, context: grpc.ServicerContext) -> int:
         self._record('Check', request, context)
         return self.health_statuses.pop(0) if self.health_statuses else SERVING
 
 
 def new_gateway() -> FakeGateway:
-    """A gateway scripting no failures."""
-    return FakeGateway()
+    """A gateway holding no documents and scripting no failures.
+
+    The service stubs declare every servicer method abstract.  The classes protoc writes are not:
+    each method `FakeGateway` leaves out answers UNIMPLEMENTED.  So it is built through its type,
+    which mypy lets an abstract class be called through, rather than by name.
+    """
+    return cast('type[FakeGateway]', FakeGateway)()
 
 
 def _abort(context: grpc.ServicerContext, fail: Fail) -> None:
@@ -145,6 +183,7 @@ def _abort(context: grpc.ServicerContext, fail: Fail) -> None:
 def serving(gateway: FakeGateway, certificates: Certificates) -> Iterator[int]:
     """Serve `gateway` on a free port of localhost, answering on the port it yields."""
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
+    kv_pb2_grpc.add_KvServiceServicer_to_server(gateway, server)
     check: grpc.RpcMethodHandler[Any, int] = grpc.unary_unary_rpc_method_handler(
         gateway.Check,
         request_deserializer=HealthCheckRequest.FromString,

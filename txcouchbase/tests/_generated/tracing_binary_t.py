@@ -34,7 +34,6 @@ from couchbase.options import (AppendOptions,
                                PrependOptions,
                                SignedInt64)
 from tests.environments.managers import TwistedTestEnvironmentBucketManager
-from tests.environments.test_environment import TestProtocol
 from tests.environments.tracing_environment import TracingEnvironment, TracingType
 from tests.environments.twisted_environment import (ConnectionStrategy,
                                                     DocType,
@@ -81,8 +80,6 @@ class BinaryTracingTestSuite(TopologySuite):
     # for the generator to read: the generated suites would call it without awaiting it, and an
     # unawaited operation produces no spans at all.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A tracer is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # Read by the topology fixtures the durability tests are gated on.

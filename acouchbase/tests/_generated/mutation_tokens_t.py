@@ -33,6 +33,7 @@ from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   teardown_async_environment)
 from tests.manifest import validate_test_manifest
 from tests.skips import server_label, skip_mock_limitation
+from tests.test_features import TestProtocol
 
 
 class MutationTokensEnabledTestSuite(SuiteRequirements):
@@ -91,8 +92,11 @@ class MutationTokensDisabledTestSuite(SuiteRequirements):
     # `cb_env.verify_mutation_tokens*` helpers, and a check that asserts only `isinstance` on
     # the three token fields cannot tell an enabled token from an empty one.  The shared
     # helpers assert nothing about a nonzero partition_id, which is the flake half of 1885.
+    #
+    # Classic-only: couchbase2 always returns mutation tokens, and the option is inert there.
 
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
+    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
 
     TEST_MANIFEST = [
         'test_mutation_tokens_disabled_insert',

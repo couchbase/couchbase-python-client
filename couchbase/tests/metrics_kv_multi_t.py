@@ -33,6 +33,9 @@ from tests.environments.test_environment import (ConnectionStrategy,
 from tests.manifest import validate_test_manifest
 from tests.metrics_validators import KeyValueMeterValidator
 
+# couchbase2 has no replica reads.
+NO_REPLICA_READS = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+
 NUM_KEYS = 3
 ONE_SECOND = timedelta(seconds=1)
 HALF_SECOND = timedelta(milliseconds=500)
@@ -49,8 +52,6 @@ class KeyValueMultiMetricsTestSuite(SuiteRequirements):
     # `getattr` here where the single-key suites name each one literally, the literal naming
     # being there to let the generator type a call's receiver.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A meter is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # Each drawn key is marked used and never handed back, and nine of these cases take three,
@@ -77,8 +78,8 @@ class KeyValueMultiMetricsTestSuite(SuiteRequirements):
     @pytest.mark.parametrize('multi_op, sub_op', [
         (Op.ExistsMulti, Op.Exists),
         (Op.GetMulti, Op.Get),
-        (Op.GetAllReplicasMulti, Op.GetAllReplicas),
-        (Op.GetAnyReplicaMulti, Op.GetAnyReplica),
+        pytest.param(Op.GetAllReplicasMulti, Op.GetAllReplicas, marks=NO_REPLICA_READS),
+        pytest.param(Op.GetAnyReplicaMulti, Op.GetAnyReplica, marks=NO_REPLICA_READS),
     ])
     def test_multi_kv_op(self,
                          cb_env: SyncTestEnvironment,
@@ -92,8 +93,8 @@ class KeyValueMultiMetricsTestSuite(SuiteRequirements):
 
     @pytest.mark.parametrize('multi_op, sub_op', [
         (Op.GetMulti, Op.Get),
-        (Op.GetAllReplicasMulti, Op.GetAllReplicas),
-        (Op.GetAnyReplicaMulti, Op.GetAnyReplica),
+        pytest.param(Op.GetAllReplicasMulti, Op.GetAllReplicas, marks=NO_REPLICA_READS),
+        pytest.param(Op.GetAnyReplicaMulti, Op.GetAnyReplica, marks=NO_REPLICA_READS),
         (Op.GetAndLockMulti, Op.GetAndLock),
     ])
     def test_multi_kv_op_with_error(self,
@@ -156,9 +157,9 @@ class KeyValueMultiMetricsTestSuite(SuiteRequirements):
     @pytest.mark.parametrize('multi_op, sub_op, keys_as_mapping', [
         (Op.ExistsMulti, Op.Exists, True),
         (Op.GetMulti, Op.Get, True),
-        (Op.GetAllReplicasMulti, Op.GetAllReplicas, True),
+        pytest.param(Op.GetAllReplicasMulti, Op.GetAllReplicas, True, marks=NO_REPLICA_READS),
         (Op.GetAndLockMulti, Op.GetAndLock, True),
-        (Op.GetAnyReplicaMulti, Op.GetAnyReplica, True),
+        pytest.param(Op.GetAnyReplicaMulti, Op.GetAnyReplica, True, marks=NO_REPLICA_READS),
         (Op.InsertMulti, Op.Insert, False),
         (Op.RemoveMulti, Op.Remove, True),
         (Op.ReplaceMulti, Op.Replace, False),

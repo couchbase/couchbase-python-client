@@ -109,7 +109,10 @@ class DurabilityTestSuite(TopologySuite):
         'test_server_durable_upsert_single_node',
     ]
 
+    # The tests marked couchbase2-unsupported here ask for client durability, which couchbase2 cannot
+    # offer: it observes each replica's node, and the gateway hides the nodes.
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -121,8 +124,6 @@ class DurabilityTestSuite(TopologySuite):
         result = await cb_env.collection.get(key)
         assert value == result.content_as[dict]
 
-    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
-    # error mapping raises.
     @pytest.mark.asyncio
     @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
@@ -138,6 +139,7 @@ class DurabilityTestSuite(TopologySuite):
             await cb_env.collection.insert(key, value, InsertOptions(durability=durability))
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -170,6 +172,7 @@ class DurabilityTestSuite(TopologySuite):
                                               MutateInOptions(durability=durability))
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -195,6 +198,7 @@ class DurabilityTestSuite(TopologySuite):
             await cb_env.collection.remove(key, RemoveOptions(durability=durability))
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -221,6 +225,7 @@ class DurabilityTestSuite(TopologySuite):
             await cb_env.collection.replace(key, value, ReplaceOptions(durability=durability))
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @OBSERVE_DEADLINE_RERUN
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -259,6 +264,7 @@ class DurabilityTestSuite(TopologySuite):
             await cb_env.collection.upsert(key, value, UpsertOptions(durability=durability))
 
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_multi_node')
     @pytest.mark.usefixtures('check_replicas_configured')
     @pytest.mark.parametrize('persist_to', [PersistToExtended.NONE, PersistToExtended.ACTIVE, PersistToExtended.ONE])
@@ -284,7 +290,6 @@ class DurabilityTestSuite(TopologySuite):
         assert value == result.content_as[dict]
 
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -313,7 +318,6 @@ class DurabilityTestSuite(TopologySuite):
         assert value == result.content_as[dict]
 
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -338,7 +342,6 @@ class DurabilityTestSuite(TopologySuite):
             await cb_env.collection.get(key)
 
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -361,7 +364,6 @@ class DurabilityTestSuite(TopologySuite):
         assert value == result.content_as[dict]
 
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')
@@ -384,7 +386,6 @@ class DurabilityTestSuite(TopologySuite):
         assert value == result.content_as[dict]
 
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     @pytest.mark.usefixtures('check_sync_durability_supported')
     @pytest.mark.usefixtures('check_single_node')
     @pytest.mark.usefixtures('check_replicas_configured')

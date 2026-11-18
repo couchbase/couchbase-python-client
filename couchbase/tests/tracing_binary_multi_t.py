@@ -31,7 +31,6 @@ from tests.environments.test_environment import (ConnectionStrategy,
                                                  DocType,
                                                  SuiteRequirements,
                                                  SyncTestEnvironment,
-                                                 TestProtocol,
                                                  build_environment,
                                                  teardown_environment)
 from tests.environments.tracing_environment import TracingEnvironment, TracingType
@@ -52,8 +51,6 @@ class BinaryMultiTracingTestSuite(SuiteRequirements):
     # No `@pytest.mark.flaky` over the class: a blanket rerun hides a real intermittent failure
     # as effectively as it hides a nuisance one.  Where it is warranted it goes on the test.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A tracer is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     DATA_SET = [DocType.BYTES_EMPTY, DocType.COUNTER]

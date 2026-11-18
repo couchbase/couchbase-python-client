@@ -40,7 +40,6 @@ from tests.environments.async_environment import (AsyncTestEnvironment,
                                                   build_async_environment,
                                                   teardown_async_environment)
 from tests.environments.managers import AsyncTestEnvironmentBucketManager
-from tests.environments.test_environment import TestProtocol
 from tests.environments.tracing_environment import TracingEnvironment, TracingType
 from tests.manifest import validate_test_manifest
 from tests.suite_fixtures import TopologySuite
@@ -81,8 +80,6 @@ class BinaryTracingTestSuite(TopologySuite):
     # for the generator to read: the generated suites would call it without awaiting it, and an
     # unawaited operation produces no spans at all.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A tracer is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # Read by the topology fixtures the durability tests are gated on.

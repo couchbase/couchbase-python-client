@@ -30,7 +30,6 @@ from tests.environments.test_environment import (ConnectionStrategy,
                                                  DocType,
                                                  SuiteRequirements,
                                                  SyncTestEnvironment,
-                                                 TestProtocol,
                                                  build_environment,
                                                  teardown_environment)
 from tests.manifest import validate_test_manifest
@@ -48,8 +47,6 @@ class BinaryMultiMetricsTestSuite(SuiteRequirements):
     # recorders and no `append_multi` recorder.  Sync-only and not generated, because the multi
     # surface is defined on `couchbase.Collection` alone.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A meter is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # append and prepend need documents that are already empty bytes; increment and decrement

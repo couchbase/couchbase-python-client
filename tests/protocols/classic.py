@@ -36,7 +36,11 @@ class ClassicClusterView:
         return True
 
     @property
-    def reports_topology(self) -> bool:
+    def reports_node_count(self) -> bool:
+        return True
+
+    @property
+    def reports_kv_endpoints(self) -> bool:
         return True
 
     @property

@@ -21,6 +21,7 @@ from typing import (TYPE_CHECKING,
                     Any,
                     NoReturn)
 
+from couchbase.protocol.couchbase2._collection_impl import CollectionImpl
 from couchbase.protocol.couchbase2._core import unsupported
 
 if TYPE_CHECKING:
@@ -55,8 +56,9 @@ class ScopeImpl:
         """**INTERNAL**"""
         return self._cluster_impl
 
-    def collection(self, name: str) -> NoReturn:
-        raise unsupported('Collections')
+    def collection(self, name: str) -> CollectionImpl:
+        """**INTERNAL**"""
+        return CollectionImpl(name, self)
 
     def query(self,
               statement: str,

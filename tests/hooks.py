@@ -19,10 +19,12 @@ A plugin module and not a conftest.  The root conftest registers it by name thro
 `pytest_plugins`, and a `conftest.py` loaded that way is also loaded by path whenever
 a run collects this directory, which pytest rejects as one module registered twice.
 
-Enforces the @pytest.mark.unsupported_protocol(*protocols) mark, registered once
-here for every suite rather than per-suite, reports which config file the run
-resolved and which server it will reach, and keeps a parallel run on the one
-dist mode that honours the suites' `xdist_group` marks.
+Enforces the @pytest.mark.unsupported_protocol(*protocols),
+@pytest.mark.covers_protocols(*protocols) and @pytest.mark.known_issue(*protocols, ticket=,
+note=) marks, registered once here for every suite rather than per-suite, reports which config file the run
+resolved and which server it will reach, keeps a parallel run on the one
+dist mode that honours the suites' `xdist_group` marks, and reports an operation the SDK does
+not implement over couchbase2 as a skip of its own category.
 """
 
 from __future__ import annotations
@@ -35,14 +37,64 @@ if TYPE_CHECKING:
     from tests.couchbase_config import ConfigSource
 
 
+@pytest.hookimpl(wrapper=True, trylast=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[None]) -> Any:
+    """Report an uncaught FeatureUnavailableException under couchbase2 as `feature-unavailable`.
+
+    Rewritten at the report rather than caught where it is raised, because the raise is as
+    often in a class-scoped fixture as in the test, and pytest re-raises a fixture's cached
+    exception for every later test in the class without passing it through any hook.
+
+    The innermost wrapper, so pytest-rerunfailures reads the skip and not the failure.  Reading
+    the failure on a `flaky` test, it takes every class and module off the setup stack at
+    teardown to rerun the test, and then never reruns it, so they are never put back.  Their
+    class-scoped fixtures then stay cached for every later class, which reuses them instead of
+    running its own `UNSUPPORTED_PROTOCOLS` and `REQUIRED_FEATURES` gates.
+
+    Classic is left alone: an operation classic does not offer is a defect there, not a gap.  So is
+    an exception mapped from the gateway's answer, which carries its gRPC status: the SDK sent the
+    request, so the gateway refusing it is a failure to report, not a gap the SDK declared.
+    """
+    report = yield
+    if call.excinfo is None or not report.failed:
+        return report
+    from couchbase.exceptions import FeatureUnavailableException
+    exc = call.excinfo.value
+    if not isinstance(exc, FeatureUnavailableException) or 'grpc_status' in exc.error_context._get_base():
+        return report
+    from tests.couchbase_config import describe_config_source
+    from tests.skips import SkipCategory, skip_reason
+    from tests.test_features import TestProtocol
+    if describe_config_source().protocol is not TestProtocol.COUCHBASE2:
+        return report
+    reason = skip_reason(SkipCategory.FEATURE_UNAVAILABLE,
+                         note=exc.message,
+                         active=TestProtocol.COUCHBASE2,
+                         phase=call.when)
+    path, line = item.reportinfo()[:2]
+    report.outcome = 'skipped'
+    # The shape pytest gives a skip's report, which the terminal and JUnit reporters read.
+    report.longrepr = (str(path), (line or 0) + 1, f'Skipped: {reason}')
+    return report
+
+
 def pytest_runtest_setup(item: pytest.Item) -> None:
     # Before the fixtures set up, so a skipped test builds no environment it would not use.
-    marker = item.get_closest_marker('unsupported_protocol')
-    if marker is None:
+    unsupported = item.get_closest_marker('unsupported_protocol')
+    covered = item.get_closest_marker('covers_protocols')
+    known = item.get_closest_marker('known_issue')
+    if unsupported is None and covered is None and known is None:
         return
     # At call time, for the reason _config_source() gives.
-    from tests.couchbase_config import skip_unsupported_protocol
-    skip_unsupported_protocol(marker.args)
+    from tests.couchbase_config import (skip_protocol_known_issue,
+                                        skip_unless_first_covered,
+                                        skip_unsupported_protocol)
+    if unsupported is not None:
+        skip_unsupported_protocol(unsupported.args)
+    if covered is not None:
+        skip_unless_first_covered(covered.args)
+    if known is not None:
+        skip_protocol_known_issue(known.args, ticket=known.kwargs['ticket'], note=known.kwargs['note'])
 
 
 # Every `xdist_group` a suite may name, and the cluster state its members share.  Only

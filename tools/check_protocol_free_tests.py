@@ -33,7 +33,8 @@ depend on how classic is built.  Four kinds of site depend on it:
 
 A site is exempt when it is in a test declared classic-only, by a module ``pytestmark`` or a
 class's ``unsupported_protocol`` mark or ``UNSUPPORTED_PROTOCOLS`` naming ``COUCHBASE2``.  The
-classic adapter's own unit tests are that, and stay.
+classic adapter's own unit tests are that, and stay.  So is one whose ``covers_protocols`` mark
+names ``CLASSIC``: it checks each protocol it names itself, classic among them.
 
 The protocol views under ``tests/protocols/`` are not read either: each module there is one
 protocol's answer to what the shared environments ask of a cluster, and reaching into that
@@ -94,13 +95,15 @@ def _imported(node: ast.Import | ast.ImportFrom) -> list[str]:
     return [node.module] + [f'{node.module}.{alias.name}' for alias in node.names]
 
 
-def _names_couchbase2(node: ast.expr) -> bool:
-    return any(isinstance(n, ast.Attribute) and n.attr == 'COUCHBASE2' for n in ast.walk(node))
+def _names(node: ast.expr, protocol: str) -> bool:
+    return any(isinstance(n, ast.Attribute) and n.attr == protocol for n in ast.walk(node))
 
 
 def _is_classic_only_mark(node: ast.expr) -> bool:
-    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
-            and node.func.attr == 'unsupported_protocol' and _names_couchbase2(node))
+    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+        return False
+    return ((node.func.attr == 'unsupported_protocol' and _names(node, 'COUCHBASE2'))
+            or (node.func.attr == 'covers_protocols' and _names(node, 'CLASSIC')))
 
 
 def _marks(value: ast.expr) -> list[ast.expr]:
@@ -123,7 +126,7 @@ def is_classic_only_class(node: ast.ClassDef) -> bool:
                   else stmt.target if isinstance(stmt, ast.AnnAssign) else None)
         if (isinstance(target, ast.Name) and target.id in ('UNSUPPORTED_PROTOCOLS', 'pytestmark')
                 and stmt.value is not None):
-            if target.id == 'UNSUPPORTED_PROTOCOLS' and _names_couchbase2(stmt.value):
+            if target.id == 'UNSUPPORTED_PROTOCOLS' and _names(stmt.value, 'COUCHBASE2'):
                 return True
             if target.id == 'pytestmark' and any(_is_classic_only_mark(m) for m in _marks(stmt.value)):
                 return True

@@ -66,8 +66,6 @@ class DatastructuresTracingTestSuite(SuiteRequirements):
     # datastructure span, so a step that ran it would clear the tracer without asserting, which
     # is a step that cannot fail.  `datastructures_t` covers what iteration yields.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A tracer is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # Nothing is seeded: every test starts from a key the collection has never held, because

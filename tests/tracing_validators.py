@@ -38,10 +38,15 @@ SDK never asked it for a span at all.
 The deprecated tracer is a fourth *tracer* but not a fourth path: it shares the tree walk with
 the current one, minus the two things `CouchbaseSpan` cannot carry, a status and cluster
 labels.  Where the tree walk says "not for the deprecated span", that is the reason.
+
+**Over couchbase2 a dispatch is a gRPC call.**  Its span is named for the RPC rather than
+`dispatch_to_server`, and carries only the gateway's address: the gateway reports no local or
+operation id and no server duration, and the SDK sees no socket of its own.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, cast
@@ -69,6 +74,7 @@ from tests.observability_test_impls import (PARENT_SPAN_PREFIX,
                                             ThresholdRecordingTracer)
 
 DISPATCH_SPAN = OpAttributeName.DispatchSpanName.value
+GRPC_DISPATCH_SPAN = re.compile(r'couchbase\.[a-z.]+\.v1\.[A-Za-z]+Service/[A-Za-z]+')
 ENCODING_SPAN = OpAttributeName.EncodingSpanName.value
 
 # A sub-operation of a datastructure operation, and whether it was expected to fail.  The first
@@ -220,9 +226,10 @@ class _HttpExpectations:
 class _SpanTreeValidator:
     """What the key-value and http validators share: the tracer, and how to read a span tree."""
 
-    def __init__(self, tracer: TestTracerType, supports_cluster_labels: bool) -> None:
+    def __init__(self, tracer: TestTracerType, supports_cluster_labels: bool, couchbase2: bool) -> None:
         self._tracer = tracer
         self._supports_cluster_labels = supports_cluster_labels
+        self._couchbase2 = couchbase2
         self._is_legacy = isinstance(tracer, LegacyRecordingTracer)
         self._is_inert = isinstance(tracer, InertTracer)
         self._is_threshold = isinstance(tracer, ThresholdRecordingTracer)
@@ -238,6 +245,20 @@ class _SpanTreeValidator:
     @property
     def is_legacy(self) -> bool:
         return self._is_legacy
+
+    def _is_dispatch(self, span: TestSpanProtocol) -> bool:
+        if self._couchbase2:
+            return GRPC_DISPATCH_SPAN.fullmatch(span.name) is not None
+        return span.name == DISPATCH_SPAN
+
+    def _dispatch_children(self, span: TestSpanProtocol) -> list[TestSpanProtocol]:
+        return [child for child in span.children if self._is_dispatch(child)]
+
+    def _dispatch_descendants(self, span: TestSpanProtocol) -> list[TestSpanProtocol]:
+        found: list[TestSpanProtocol] = [span] if self._is_dispatch(span) else []
+        for child in span.children:
+            found.extend(self._dispatch_descendants(child))
+        return found
 
     def reset(self) -> None:
         """Drop every span the tracer holds, so the next assertion is about one operation."""
@@ -345,15 +366,28 @@ class _SpanTreeValidator:
             f'span status: expected {expected_status}, found {span.status}. {ctx}'
         )
 
-    def _validate_dispatch_span(self, span: TestSpanProtocol, parent_span: TestSpanProtocol) -> None:
-        """The attributes a dispatch span carries whichever service dispatched it."""
+    def _validate_dispatch_span(self,
+                                span: TestSpanProtocol,
+                                parent_span: TestSpanProtocol,
+                                failed: bool | None = False) -> None:
+        """The attributes a dispatch span carries whichever service dispatched it.
+
+        `failed` says the dispatch was answered with an error, which only a gRPC call's span
+        records: any status but OK fails the call, and so every retried attempt fails.  None
+        is either, for an operation that may fail on an answer its call returned with OK.
+        """
         ctx = _describe(span=span)
-        self._validate_request_span(span, DISPATCH_SPAN)
-        _expect(span.attributes, DispatchAttributeName.NetworkTransport, 'tcp', ctx)
+        if self._couchbase2:
+            errored = span.status is SpanStatusCode.ERROR if failed is None else failed
+            self._validate_request_span(span, span.name, validate_error=errored)
+        else:
+            self._validate_request_span(span, DISPATCH_SPAN)
         _expect_type(span.attributes, DispatchAttributeName.ServerAddress, str, ctx)
         _expect_type(span.attributes, DispatchAttributeName.ServerPort, int, ctx)
-        _expect_type(span.attributes, DispatchAttributeName.PeerAddress, str, ctx)
-        _expect_type(span.attributes, DispatchAttributeName.PeerPort, int, ctx)
+        if not self._couchbase2:
+            _expect(span.attributes, DispatchAttributeName.NetworkTransport, 'tcp', ctx)
+            _expect_type(span.attributes, DispatchAttributeName.PeerAddress, str, ctx)
+            _expect_type(span.attributes, DispatchAttributeName.PeerPort, int, ctx)
         assert span.parent_span is parent_span, (
             f'dispatch span does not point back at the operation that dispatched it. {ctx}'
         )
@@ -380,7 +414,7 @@ class _SpanTreeValidator:
         point: the arithmetic under test is the arithmetic that ships.
         """
         ctx = _describe(span=span)
-        dispatch_spans = _descendants_named(span, DISPATCH_SPAN)
+        dispatch_spans = self._dispatch_descendants(span)
         _expect_count(dispatch_spans, 1, 'dispatch spans under the operation', ctx, at_least=True)
 
         total_dispatch = sum(_elapsed(d) for d in dispatch_spans)
@@ -397,6 +431,14 @@ class _SpanTreeValidator:
             f'dispatch duration: the last dispatch span measured {last_duration}ns, the '
             f'operation span reported {span._dispatch_duration_ns}ns. {ctx}'
         )
+        if self._couchbase2:
+            remote = _socket(last.attributes.get(DispatchAttributeName.ServerAddress.value),
+                             last.attributes.get(DispatchAttributeName.ServerPort.value))
+            assert remote == span.remote_socket, (
+                f'remote_socket: expected {remote!r}, found {span.remote_socket!r}. {ctx}'
+            )
+            assert span.local_socket is None, f'local_socket={span.local_socket!r}. {ctx}'
+            return
         assert last.attributes.get(DispatchAttributeName.LocalId.value) == span._local_id, (
             f'local_id does not match the last dispatch span. {ctx}'
         )
@@ -461,8 +503,9 @@ class KeyValueSpanValidator(_SpanTreeValidator):
     def __init__(self,
                  tracer: TestTracerType,
                  collection_details: KeyspaceDetails,
-                 supports_cluster_labels: bool) -> None:
-        super().__init__(tracer, supports_cluster_labels)
+                 supports_cluster_labels: bool,
+                 couchbase2: bool) -> None:
+        super().__init__(tracer, supports_cluster_labels, couchbase2)
         self._collection_details = collection_details
 
     def validate_kv_op(self,
@@ -643,14 +686,22 @@ class KeyValueSpanValidator(_SpanTreeValidator):
     def _validate_dispatch_spans(self, expectations: _KvExpectations) -> None:
         span = expectations.span
         ctx = _describe(span=span, op_name=expectations.op_name)
-        dispatch_spans = _children_named(span, DISPATCH_SPAN)
+        dispatch_spans = self._dispatch_children(span)
         if not expectations.validate_error:
             # An operation that failed may have failed before dispatching at all; one that
             # succeeded dispatched at least once per key.
             _expect_count(dispatch_spans, expectations.multi_op_key_count or 1,
                           'dispatch spans', ctx, at_least=True)
-        for dispatch_span in dispatch_spans:
-            self._validate_dispatch_span(dispatch_span, span)
+        for idx, dispatch_span in enumerate(dispatch_spans):
+            failed: bool | None
+            if expectations.multi_op_key_count is not None:
+                # Each key has calls of its own, and a failed multi operation may have keys that worked.
+                failed = None if expectations.validate_error else False
+            else:
+                failed = expectations.validate_error or idx < len(dispatch_spans) - 1
+            self._validate_dispatch_span(dispatch_span, span, failed=failed)
+            if self._couchbase2:
+                continue
             _expect_type(dispatch_span.attributes, DispatchAttributeName.LocalId, str, ctx)
             _expect_type(dispatch_span.attributes, DispatchAttributeName.OperationId, str, ctx)
             _expect_type(dispatch_span.attributes, DispatchAttributeName.ServerDuration, int, ctx)
@@ -719,7 +770,7 @@ class KeyValueSpanValidator(_SpanTreeValidator):
             for child_span in child_spans:
                 if first_response and not self._is_complete_sub_op(child_span):
                     continue
-                dispatch_spans.extend(_children_named(child_span, DISPATCH_SPAN))
+                dispatch_spans.extend(self._dispatch_children(child_span))
                 self._validate_span(_KvExpectations(child_span,
                                                     nested_op,
                                                     expectations.collection_details,
@@ -743,7 +794,7 @@ class KeyValueSpanValidator(_SpanTreeValidator):
             _expect_count(measured, 1, 'dispatch spans reporting a server duration', ctx, at_least=True)
 
     def _is_complete_sub_op(self, span: TestSpanProtocol) -> bool:
-        if not span.end_time or not _children_named(span, DISPATCH_SPAN):
+        if not span.end_time or not self._dispatch_children(span):
             return False
         return self._is_legacy or OpAttributeName.RetryCount.value in span.attributes
 
@@ -756,7 +807,7 @@ class KeyValueSpanValidator(_SpanTreeValidator):
                 # populated rather than what they add up to.
                 self._validate_threshold_multi_op(span)
             else:
-                self._threshold_dispatch_totals(span, check_server_duration=True)
+                self._threshold_dispatch_totals(span, check_server_duration=not self._couchbase2)
         if expectations.op_name in ENCODING_OPS:
             ctx = _describe(span=span, op_name=expectations.op_name)
             encoding_spans = _descendants_named(span, ENCODING_SPAN)
@@ -770,6 +821,13 @@ class KeyValueSpanValidator(_SpanTreeValidator):
 
     def _validate_threshold_multi_op(self, span: ThresholdRecordingSpan) -> None:
         ctx = _describe(span=span)
+        if self._couchbase2:
+            for field_name in ('_total_dispatch_duration_ns', '_dispatch_duration_ns'):
+                value = getattr(span, field_name)
+                assert isinstance(value, int), f'{field_name}: expected an int, found {value!r}. {ctx}'
+            assert isinstance(span.remote_socket, str), f'remote_socket={span.remote_socket!r}. {ctx}'
+            assert span.local_socket is None, f'local_socket={span.local_socket!r}. {ctx}'
+            return
         for field_name, expected_type in (('_total_dispatch_duration_ns', int),
                                           ('_total_server_duration_ns', int),
                                           ('_dispatch_duration_ns', int),
@@ -863,11 +921,15 @@ class HttpSpanValidator(_SpanTreeValidator):
         if expectations.error_before_dispatch:
             return
         _expect_count(span.children, 1, 'children of the operation span', ctx, at_least=True)
-        dispatch_spans = _children_named(span, DISPATCH_SPAN)
+        dispatch_spans = self._dispatch_children(span)
         if not expectations.validate_error:
             _expect_count(dispatch_spans, 1, 'dispatch spans', ctx, at_least=True)
-        for dispatch_span in dispatch_spans:
-            self._validate_dispatch_span(dispatch_span, span)
+        for idx, dispatch_span in enumerate(dispatch_spans):
+            # A manager can fail on what a call returned, as `get_bucket` fails on a listing
+            # that lacks the bucket, so the last call of a failed operation may have succeeded.
+            failed: bool | None = True if idx < len(dispatch_spans) - 1 else (
+                None if expectations.validate_error else False)
+            self._validate_dispatch_span(dispatch_span, span, failed=failed)
 
     def _validate_nested(self, expectations: _HttpExpectations, nested_ops: Sequence[Op]) -> None:
         """An http operation the SDK carries out through others, each with its own span.
@@ -887,7 +949,7 @@ class HttpSpanValidator(_SpanTreeValidator):
             child_spans = _children_named(span, span_name(nested_op))
             _expect_count(child_spans, 1, f'spans for nested op {span_name(nested_op)!r}', ctx, at_least=True)
             for child_span in child_spans:
-                dispatch_spans.extend(_children_named(child_span, DISPATCH_SPAN))
+                dispatch_spans.extend(self._dispatch_children(child_span))
                 self._validate_span(_HttpExpectations(child_span,
                                                       nested_op,
                                                       parent_span=span,

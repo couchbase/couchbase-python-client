@@ -33,7 +33,7 @@ from __future__ import annotations
 from enum import IntEnum
 
 from couchbase.common._observability import KeyspaceDetails
-from tests.environments.test_environment import TestEnvironment
+from tests.environments.test_environment import TestEnvironment, TestProtocol
 from tests.observability_test_impls import (InertTracer,
                                             LegacyRecordingTracer,
                                             RecordingTracer,
@@ -112,8 +112,11 @@ class TracingEnvironment:
     def kv_span_validator(cb_env: TestEnvironment) -> KeyValueSpanValidator:
         return KeyValueSpanValidator(TracingEnvironment.tracer(cb_env),
                                      TracingEnvironment.collection_details(cb_env),
-                                     expects_cluster_labels(cb_env))
+                                     expects_cluster_labels(cb_env),
+                                     cb_env.protocol is TestProtocol.COUCHBASE2)
 
     @staticmethod
     def http_span_validator(cb_env: TestEnvironment) -> HttpSpanValidator:
-        return HttpSpanValidator(TracingEnvironment.tracer(cb_env), expects_cluster_labels(cb_env))
+        return HttpSpanValidator(TracingEnvironment.tracer(cb_env),
+                                 expects_cluster_labels(cb_env),
+                                 cb_env.protocol is TestProtocol.COUCHBASE2)

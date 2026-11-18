@@ -58,6 +58,7 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   BucketDoesNotExistException,
                                   CouchbaseException,
                                   DocumentNotFoundException,
+                                  FeatureUnavailableException,
                                   InternalServerFailureException,
                                   UnAmbiguousTimeoutException)
 from couchbase.management.buckets import (BucketType,
@@ -353,6 +354,9 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         self._manager_registry: dict[type[TestEnvironmentManager], TestEnvironmentManager] = {}
         for mgr in kwargs.pop('managers', None) or []:
             self._manager_registry[type(mgr)] = mgr
+        # Managers whose setup raised FeatureUnavailableException under couchbase2, with what
+        # they raised.  See _setup_managers.
+        self._unavailable_managers: dict[type[TestEnvironmentManager], FeatureUnavailableException] = {}
 
         # Document tracking
         self._extra_docs: dict[str, Any] = {}
@@ -623,7 +627,7 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
     @property
     def cluster_view(self) -> ClusterView:
         """What the cluster's protocol reports about it that no public API gives without I/O."""
-        return view_of(self._cluster, self.protocol)
+        return view_of(self._cluster, self._config)
 
     @property
     def named_collection(self) -> CollectionT | None:
@@ -654,20 +658,21 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
 
     @property
     def server_context(self) -> ServerContext:
-        """The four facts the feature gate needs, as one argument.
+        """The facts the feature gate needs, as one argument.
 
         Built fresh per access rather than captured in __init__, and the reason is narrow:
         `server_version_short` is read off the live cluster, and snapshotting it would turn
         any window in which it is not yet populated into a permanent env-degraded for the
         rest of the run.  The gate raises on a None version by design, so a stale snapshot
         would be indistinguishable from a broken connection.  The services probe is the one
-        field that *is* cached, in __init__, because it costs an HTTP round trip; the other
-        three are attribute reads and this runs at class scope, not per operation.
+        field that *is* cached, in __init__, because it costs an HTTP round trip; the rest
+        are attribute reads and this runs at class scope, not per operation.
         """
         return ServerContext(version=self.server_version_short,
                              patch=self.server_version_patch,
                              mock_type=self.mock_server_type,
-                             services=self._available_services)
+                             services=self._available_services,
+                             protocol=self.protocol)
 
     @property
     def server_version(self) -> str | None:
@@ -713,6 +718,9 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         """
         m = self._manager_registry.get(manager_cls)
         if m is None:
+            unavailable = self._unavailable_managers.get(manager_cls)
+            if unavailable is not None:
+                raise unavailable
             env_degraded(stage='get-manager',
                          manager=manager_cls.__name__,
                          required_feature=getattr(manager_cls, 'required_feature', None),
@@ -734,8 +742,25 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         """
         return manager_cls in self._manager_registry
 
+    def unavailable_manager(self, feature: ServerFeatures) -> FeatureUnavailableException | None:
+        """What the setup of a manager for *feature* raised under couchbase2, if it did.
+
+        By feature rather than by manager class, so the shared fixtures can ask it without
+        knowing which api style's manager the suite registered.
+        """
+        for mgr_cls, ex in self._unavailable_managers.items():
+            if getattr(mgr_cls, 'required_feature', None) is feature:
+                return ex
+        return None
+
     def _setup_managers(self) -> None:
-        """Run setup() on each registered manager; drop managers whose feature is unavailable."""
+        """Run setup() on each registered manager; drop managers whose feature is unavailable.
+
+        Under couchbase2 a manager whose setup raises FeatureUnavailableException is dropped
+        too, and the exception kept for get_manager() to raise again.  Only the tests that use
+        the manager are then reported as the SDK's gap, rather than every test of a suite that
+        registered it.
+        """
         unsupported: list[type[TestEnvironmentManager]] = []
         for mgr_cls, mgr in self._manager_registry.items():
             required = getattr(mgr_cls, 'required_feature', None)
@@ -743,7 +768,13 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
                 if not EnvironmentFeatures.is_feature_supported(required, self.server_context):
                     unsupported.append(mgr_cls)
                     continue
-            mgr.setup(self)
+            try:
+                mgr.setup(self)
+            except FeatureUnavailableException as ex:
+                if self.protocol is not TestProtocol.COUCHBASE2:
+                    raise
+                self._unavailable_managers[mgr_cls] = ex
+                unsupported.append(mgr_cls)
         for key in unsupported:
             del self._manager_registry[key]
 
@@ -1134,6 +1165,7 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
     # ------------------------------------------------------------------
 
     def _no_collection_manager(self,
+                               manager_cls: type[TestEnvironmentManager],
                                collection_strategy: CollectionStrategy,
                                test_suite: str) -> NoReturn:
         """Report a missing collection manager, having first established *why* it is missing.
@@ -1146,9 +1178,12 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         there, the environment did not build correctly and saying "unsupported" would retire
         the suite's whole coverage behind a plausible-looking message.
 
-        Shared by all three environments; only the manager class differs and this reports
-        rather than looks up.
+        Shared by all three environments; only the manager class differs.  A manager the SDK
+        cannot build over the run's protocol raises what its setup raised.
         """
+        unavailable = self._unavailable_managers.get(manager_cls)
+        if unavailable is not None:
+            raise unavailable
         supported = EnvironmentFeatures.is_feature_supported(ServerFeatures.Collections,
                                                              self.server_context)
         srv = server_label(self.is_mock_server)
@@ -1170,7 +1205,7 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
     def _node_count(self) -> int | None:
         """Style-agnostic: no I/O, no await.  None when the protocol cannot see the nodes."""
         view = self.cluster_view
-        if not view.reports_topology:
+        if not view.reports_node_count:
             return None
         node_count = view.node_count
         if node_count is None:
@@ -1202,7 +1237,7 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
             replicas = settings.get('num_replicas')
 
         kv_endpoints: int | None = None
-        if self.cluster_view.reports_topology:
+        if self.cluster_view.reports_kv_endpoints:
             kv_endpoints = self._kv_endpoint_count(self._bucket.ping())
 
         return TopologyFacts(
@@ -1247,7 +1282,7 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         # Provision named collections when requested
         if collection_strategy in (CollectionStrategy.NAMED, CollectionStrategy.NAMED_EMPTY):
             if TestEnvironmentCollectionManager not in self._manager_registry:
-                self._no_collection_manager(collection_strategy, test_suite)
+                self._no_collection_manager(TestEnvironmentCollectionManager, collection_strategy, test_suite)
 
             coll_mgr = self.get_manager(TestEnvironmentCollectionManager)
             TestEnvironment.try_n_times(
@@ -1376,6 +1411,9 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
         from tests.environments.managers import TestEnvironmentBucketManager
         available = self._used_bucket_ids.difference(self._dropped_bucket_ids,
                                                      self._reserved_bucket_ids)
+        if not available:
+            # The test ended before it took a name, by a skip in its body for one.
+            return
         # @FINDING(PYCBC-1867): the name is recorded as dropped before the drop is
         # attempted, so a failed drop still marks it gone.  teardown_bucket_pool() only
         # cleans up names not yet marked, so it skips this one and the bucket survives the
@@ -1499,7 +1537,7 @@ class TestEnvironment(Generic[ClusterT, BucketT, ScopeT, CollectionT]):
                     default_collection.get(CONNECT_PROBE_KEY)
                 except DocumentNotFoundException:
                     pass
-                if view_of(cluster, config.protocol).reads_cluster_info:
+                if view_of(cluster, config).reads_cluster_info:
                     cluster.cluster_info()
                 env_args.update(cluster=cluster, bucket=bucket, default_collection=default_collection)
                 break

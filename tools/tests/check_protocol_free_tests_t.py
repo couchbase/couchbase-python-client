@@ -88,6 +88,16 @@ from couchbase.protocol.classic._result import _get_from_core
 pytestmark = pytest.mark.unsupported_protocol(TestProtocol.CLASSIC)
 '''
 
+COVERS_CLASSIC = '''
+from couchbase.protocol.classic._n1ql import N1QLQuery
+pytestmark = pytest.mark.covers_protocols(TestProtocol.CLASSIC, TestProtocol.COUCHBASE2)
+'''
+
+COVERS_ANOTHER_PROTOCOL = '''
+from couchbase.protocol.classic._n1ql import N1QLQuery
+pytestmark = pytest.mark.covers_protocols(TestProtocol.COUCHBASE2)
+'''
+
 
 def test_a_classic_only_module_has_no_sites() -> None:
     assert own_sites(CLASSIC_ONLY_MODULE) == Counter()
@@ -104,6 +114,14 @@ def test_unsupported_protocols_naming_couchbase2_exempts_the_class() -> None:
 
 def test_a_mark_that_does_not_name_couchbase2_exempts_nothing() -> None:
     assert own_sites(ANOTHER_PROTOCOL_ONLY) == Counter({'classic': 1})
+
+
+def test_covering_classic_exempts_the_module() -> None:
+    assert own_sites(COVERS_CLASSIC) == Counter()
+
+
+def test_covering_only_another_protocol_exempts_nothing() -> None:
+    assert own_sites(COVERS_ANOTHER_PROTOCOL) == Counter({'classic': 1})
 
 
 def test_a_helper_that_imports_classic_flags_its_importers() -> None:

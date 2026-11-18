@@ -44,6 +44,9 @@ from tests.environments.tracing_environment import TracingEnvironment, TracingTy
 from tests.manifest import validate_test_manifest
 from tests.tracing_validators import KeyValueSpanValidator
 
+# couchbase2 has no replica reads.
+NO_REPLICA_READS = pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+
 NUM_KEYS = 3
 ONE_SECOND = timedelta(seconds=1)
 HALF_SECOND = timedelta(milliseconds=500)
@@ -66,8 +69,6 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
     # No `@pytest.mark.flaky` over the class: a blanket rerun hides a real intermittent failure
     # as effectively as it hides a nuisance one.  Where it is warranted it goes on the test.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A tracer is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # Each drawn key is marked used and never handed back, and most of these cases take three,
@@ -95,8 +96,8 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
     @pytest.mark.parametrize('multi_op, nested_ops', [
         (Op.ExistsMulti, None),
         (Op.GetMulti, None),
-        (Op.GetAllReplicasMulti, REPLICA_READ_OPS),
-        (Op.GetAnyReplicaMulti, REPLICA_READ_OPS),
+        pytest.param(Op.GetAllReplicasMulti, REPLICA_READ_OPS, marks=NO_REPLICA_READS),
+        pytest.param(Op.GetAnyReplicaMulti, REPLICA_READ_OPS, marks=NO_REPLICA_READS),
     ])
     def test_multi_kv_op(self,
                          cb_env: SyncTestEnvironment,
@@ -110,8 +111,8 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
 
     @pytest.mark.parametrize('multi_op, nested_ops', [
         (Op.GetMulti, None),
-        (Op.GetAllReplicasMulti, REPLICA_READ_OPS),
-        (Op.GetAnyReplicaMulti, REPLICA_READ_OPS),
+        pytest.param(Op.GetAllReplicasMulti, REPLICA_READ_OPS, marks=NO_REPLICA_READS),
+        pytest.param(Op.GetAnyReplicaMulti, REPLICA_READ_OPS, marks=NO_REPLICA_READS),
         (Op.GetAndLockMulti, None),
     ])
     def test_multi_kv_op_with_error(self,
@@ -211,8 +212,8 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
     @pytest.mark.parametrize('multi_op, opts_cls, nested_ops', [
         (Op.ExistsMulti, ExistsMultiOptions, None),
         (Op.GetMulti, GetMultiOptions, None),
-        (Op.GetAllReplicasMulti, GetAllReplicasMultiOptions, REPLICA_READ_OPS),
-        (Op.GetAnyReplicaMulti, GetAnyReplicaMultiOptions, REPLICA_READ_OPS),
+        pytest.param(Op.GetAllReplicasMulti, GetAllReplicasMultiOptions, REPLICA_READ_OPS, marks=NO_REPLICA_READS),
+        pytest.param(Op.GetAnyReplicaMulti, GetAnyReplicaMultiOptions, REPLICA_READ_OPS, marks=NO_REPLICA_READS),
     ])
     def test_multi_kv_op_with_parent(self,
                                      cb_env: SyncTestEnvironment,
@@ -274,9 +275,9 @@ class KeyValueMultiTracingTestSuite(SuiteRequirements):
     @pytest.mark.parametrize('multi_op, keys_as_mapping', [
         (Op.ExistsMulti, True),
         (Op.GetMulti, True),
-        (Op.GetAllReplicasMulti, True),
+        pytest.param(Op.GetAllReplicasMulti, True, marks=NO_REPLICA_READS),
         (Op.GetAndLockMulti, True),
-        (Op.GetAnyReplicaMulti, True),
+        pytest.param(Op.GetAnyReplicaMulti, True, marks=NO_REPLICA_READS),
         (Op.InsertMulti, False),
         (Op.RemoveMulti, True),
         (Op.ReplaceMulti, False),

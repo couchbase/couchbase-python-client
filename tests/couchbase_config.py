@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import pathlib
+import re
 import time
 from collections.abc import Generator, Sequence
 from configparser import ConfigParser
@@ -25,7 +26,9 @@ from typing import NamedTuple
 import pytest
 
 from tests.environments import CouchbaseTestEnvironmentException
-from tests.skips import server_label, skip_protocol_mismatch
+from tests.skips import (server_label,
+                         skip_known_issue,
+                         skip_protocol_mismatch)
 from tests.test_features import TestProtocol
 
 from .mock_server import CavesMockServer, MockServer
@@ -45,6 +48,8 @@ _ENV_PASSWORD = "PYCBC_PASSWORD"
 _ENV_BUCKET = "PYCBC_BUCKET"
 _ENV_SERVER_ENABLED = "PYCBC_SERVER_ENABLED"
 _ENV_COUCHBASE2 = "PYCBC_COUCHBASE2"
+_ENV_SERVER_VERSION = "PYCBC_SERVER_VERSION"
+_ENV_NUM_NODES = "PYCBC_NUM_NODES"
 _ENV_CONNSTR_PARAMS = "PYCBC_CONNSTR_PARAMS"
 _ENV_GOCAVES_ENABLED = "PYCBC_GOCAVES_ENABLED"
 _ENV_GOCAVES_VERSION = "PYCBC_GOCAVES_VERSION"
@@ -89,6 +94,10 @@ def _section_enabled(env_name: str, ini: ConfigParser, section: str) -> tuple[bo
     if from_env is not None:
         return from_env, f'${env_name}'
     return ini.getboolean(section, "enabled", fallback=False), 'ini'
+
+
+# major.minor.patch, with an optional build number: the shape cluster_info() reports.
+_SERVER_VERSION_RE = re.compile(r'^\d+\.\d+\.\d+(-\d+)?$')
 
 
 def _couchbase2_enabled(ini: ConfigParser) -> bool:
@@ -175,6 +184,32 @@ def skip_unsupported_protocol(unsupported: Sequence[TestProtocol]) -> None:
                                server=server_label(source.server == 'mock'))
 
 
+def skip_protocol_known_issue(protocols: Sequence[TestProtocol], *, ticket: str, note: str) -> None:
+    """Skip the running test as a known issue when this run's protocol is one of *protocols*.
+
+    For a defect outside the SDK that shows only over some protocols, such as one in the gateway
+    couchbase2 runs through.  The test still runs under every other protocol.
+    """
+    source = describe_config_source()
+    if source.protocol in protocols:
+        skip_known_issue(ticket=ticket,
+                         note=note,
+                         active=source.protocol,
+                         server=server_label(source.server == 'mock'))
+
+
+def skip_unless_first_covered(covered: Sequence[TestProtocol]) -> None:
+    """Skip the running test unless this run's protocol is the first of *covered*."""
+    if not covered:
+        raise ValueError('covers_protocols names no protocol.')
+    source = describe_config_source()
+    if source.protocol is not covered[0]:
+        skip_protocol_mismatch(note=f'checked under {covered[0].name}',
+                               covered=','.join(p.name for p in covered),
+                               active=source.protocol,
+                               server=server_label(source.server == 'mock'))
+
+
 def _gocaves_binary_spec(ini: ConfigParser) -> tuple[str, str, str]:
     """Which gocaves binary this run wants: path, download url, version."""
     mock_path = _env_str(_ENV_GOCAVES_PATH) or ""
@@ -222,6 +257,12 @@ class CouchbaseConfig:
         self.mock_server_enabled: bool = False
         self.mock_server: MockServer | None = None
         self.couchbase2_enabled: bool = False
+        # The server version behind the gateway, as declared by whoever deployed it.  The
+        # gateway reports none, and the feature gates need one.
+        self.server_version: str | None = None
+        # The node count behind the gateway, likewise declared.  Optional: unset, the topology
+        # fixtures skip as they would for any protocol that cannot see the nodes.
+        self.num_nodes: int | None = None
         # Query-string parameters for a real server's connection string, without the `?`.
         self.connstr_params: str = ""
 
@@ -310,6 +351,9 @@ class CouchbaseConfig:
         config.real_server_enabled = True
 
         config.couchbase2_enabled = _couchbase2_enabled(ini)
+        if config.couchbase2_enabled:
+            config.server_version = cls._declared_server_version(ini)
+            config.num_nodes = cls._declared_num_nodes(ini)
 
         # connection details, env vars shadow ini values
         # is not None (not `or`) so a falsy-but-valid value like port 0 isn't dropped
@@ -342,6 +386,38 @@ class CouchbaseConfig:
         env_params = _env_str(_ENV_CONNSTR_PARAMS)
         params = env_params if env_params is not None else ini.get("realserver", "connstr_params", fallback="")
         config.connstr_params = params.lstrip("?")
+
+    @staticmethod
+    def _declared_server_version(ini: ConfigParser) -> str:
+        """The [realserver] `server_version`, env var first, required for a couchbase2 run.
+
+        Required rather than defaulted: a guessed version moves every version gate in the run,
+        and the tests it wrongly runs or skips look like results.
+        """
+        env_version = _env_str(_ENV_SERVER_VERSION)
+        version = env_version if env_version is not None else ini.get("realserver", "server_version", fallback="")
+        if not version:
+            raise CouchbaseTestEnvironmentException(
+                f"A couchbase2 run needs the server version behind the gateway: set "
+                f"${_ENV_SERVER_VERSION} or [realserver] server_version, e.g. 8.0.0."
+            )
+        if not _SERVER_VERSION_RE.match(version):
+            raise CouchbaseTestEnvironmentException(
+                f"Server version {version!r} is not major.minor.patch, optionally with -build."
+            )
+        return version
+
+    @staticmethod
+    def _declared_num_nodes(ini: ConfigParser) -> int | None:
+        """The [realserver] `num_nodes`, env var first, or None when neither is set."""
+        num_nodes = _env_int(_ENV_NUM_NODES)
+        if num_nodes is None:
+            num_nodes = ini.getint("realserver", "num_nodes", fallback=None)
+        if num_nodes is not None and num_nodes < 1:
+            raise CouchbaseTestEnvironmentException(
+                f"The declared node count must be at least 1; got {num_nodes}."
+            )
+        return num_nodes
 
     @classmethod
     def _load_gocaves_config(

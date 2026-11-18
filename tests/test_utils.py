@@ -45,6 +45,10 @@ anything not known to be transient, and the polling call sites reach their condi
 until `QueryIndexNotFoundException` stops arriving.  A strict try_n_times therefore breaks
 every one of those sites unless they move to `wait_until` in the same change.  What is here
 is the half that is correct on its own: failures stop being silent.
+
+The one exception none of them retries is FeatureUnavailableException.  It names an operation
+the SDK does not implement over the run's protocol, which no later attempt changes, and no
+polling site waits for one to stop arriving.
 """
 
 from __future__ import annotations
@@ -55,6 +59,7 @@ import time
 from collections.abc import Callable
 from typing import Any, NoReturn
 
+from couchbase.exceptions import FeatureUnavailableException
 from tests.skips import env_degraded
 
 
@@ -128,6 +133,8 @@ class RetryHelper:
         for attempt in range(1, num_times + 1):
             try:
                 return func(*args, **kwargs)
+            except FeatureUnavailableException:
+                raise
             except Exception as exc:
                 last_exc = exc
                 if attempt < num_times:
@@ -210,6 +217,8 @@ class RetryHelper:
                 if predicate():
                     return
                 last_error = None
+            except FeatureUnavailableException:
+                raise
             except Exception as exc:
                 last_error = exc
             if time.monotonic() >= deadline:
@@ -241,6 +250,8 @@ class RetryHelper:
         for attempt in range(1, num_times + 1):
             try:
                 return await _maybe_await(func(*args, **kwargs))
+            except FeatureUnavailableException:
+                raise
             except Exception as exc:
                 last_exc = exc
                 if attempt < num_times:
@@ -305,6 +316,8 @@ class RetryHelper:
                 if outcome:
                     return
                 last_error = None
+            except FeatureUnavailableException:
+                raise
             except Exception as exc:
                 last_error = exc
             if time.monotonic() >= deadline:
@@ -348,6 +361,8 @@ class RetryHelper:
                     return run_in_reactor_thread(func, *args, **kwargs)
                 else:
                     return func(*args, **kwargs)
+            except FeatureUnavailableException:
+                raise
             except Exception as exc:
                 last_exc = exc
                 if attempt < num_times:
@@ -423,6 +438,8 @@ class RetryHelper:
                 if outcome:
                     return
                 last_error = None
+            except FeatureUnavailableException:
+                raise
             except Exception as exc:
                 last_error = exc
             if time.monotonic() >= deadline:

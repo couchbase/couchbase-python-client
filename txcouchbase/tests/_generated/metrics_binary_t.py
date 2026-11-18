@@ -30,7 +30,6 @@ from couchbase.options import (DecrementOptions,
                                IncrementOptions,
                                SignedInt64)
 from tests.environments.metrics_environment import MeterType, MetricsEnvironment
-from tests.environments.test_environment import TestProtocol
 from tests.environments.twisted_environment import (ConnectionStrategy,
                                                     DocType,
                                                     SuiteRequirements,
@@ -60,8 +59,6 @@ class BinaryMetricsTestSuite(SuiteRequirements):
     # records nothing: the `Basic` half would fail far from the cause and the `NoOp` half would
     # pass, empty being the expectation there.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A meter is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # append and prepend need a document that is already empty bytes; increment and decrement
