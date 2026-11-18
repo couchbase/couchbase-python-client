@@ -24,7 +24,7 @@ which is done off the loop.  Any operation couchbase2 does not provide raises
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 from typing import (TYPE_CHECKING,
                     Any,
@@ -32,11 +32,15 @@ from typing import (TYPE_CHECKING,
                     cast)
 
 from acouchbase.protocol.couchbase2._bucket_impl import AsyncBucketImpl
-from couchbase.common._observability import ObservabilityInstruments
+from acouchbase.protocol.couchbase2._streaming import AsyncStreamExecutor
+from acouchbase.result import AsyncQueryResult
+from couchbase.common._observability import ObservabilityInstruments, ObservableRequestHandler
 from couchbase.common._operations import Op
+from couchbase.common._streaming import AsyncRowIterator
 from couchbase.protocol.couchbase2._channel import channel_arguments, open_aio_channel
 from couchbase.protocol.couchbase2._cluster_req_builder import ClusterRequestBuilder
 from couchbase.protocol.couchbase2._core import ClusterCore, unsupported
+from couchbase.protocol.couchbase2._driver import call_stream_async
 from couchbase.protocol.couchbase2._generated.admin.bucket.v1 import bucket_pb2_grpc
 from couchbase.protocol.couchbase2._generated.admin.collection.v1 import collection_pb2_grpc
 from couchbase.protocol.couchbase2._generated.admin.query.v1 import query_pb2_grpc as query_admin_pb2_grpc
@@ -45,6 +49,7 @@ from couchbase.protocol.couchbase2._generated.kv.v1 import kv_pb2_grpc
 from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2_grpc
 from couchbase.protocol.couchbase2._generated.search.v1 import search_pb2_grpc
 from couchbase.protocol.couchbase2._health import health_check_async, wait_until_serving_async
+from couchbase.protocol.couchbase2._streaming import QueryRows
 
 if TYPE_CHECKING:
     from asyncio import AbstractEventLoop
@@ -71,6 +76,8 @@ if TYPE_CHECKING:
                                          PingResult)
     from couchbase.common.search_queries import SearchQuery
     from couchbase.common.search_request import SearchRequest
+    from couchbase.protocol.couchbase2._cluster_types import QueryRequest
+    from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2
 
 
 @dataclass(frozen=True)
@@ -218,8 +225,29 @@ class AsyncClusterImpl:
     def query(self,
               statement: str,
               *options: QueryOptions | JSONType,
-              **kwargs: Any) -> NoReturn:
-        raise unsupported('query')
+              **kwargs: Any) -> AsyncQueryResult:
+        self._core.ensure_open()
+        return self.run_query(self._request_builder.build_query_request(statement, *options, **kwargs))
+
+    def run_query(self, req: QueryRequest) -> AsyncQueryResult:
+        """**INTERNAL** A query the cluster or a scope built, sent once its rows are first read."""
+        obs_handler = ObservableRequestHandler(Op.Query, self.observability_instruments)
+        return AsyncQueryResult(AsyncRowIterator(AsyncStreamExecutor(lambda: self.open_query(req, obs_handler),
+                                                                     QueryRows(req.serializer),
+                                                                     obs_handler=obs_handler,
+                                                                     span_attributes=req.span_attributes)))
+
+    async def open_query(self,
+                         req: QueryRequest,
+                         obs_handler: ObservableRequestHandler | None) -> AsyncGenerator[query_pb2.QueryResponse, None]:
+        """**INTERNAL** Send a built query; its deadline starts here."""
+        self._core.ensure_open()
+        service = await self.query_service()
+        ctx = self._core.context(Op.Query,
+                                 req.timeout,
+                                 readonly=req.readonly,
+                                 obs_handler=obs_handler)
+        return call_stream_async(service.Query, req.message, ctx, self._core.metadata)
 
     async def get_cluster_info(self) -> ClusterInfoResult:
         raise unsupported('get_cluster_info')

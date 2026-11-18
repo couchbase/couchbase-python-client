@@ -16,8 +16,9 @@
 """An in-process stand-in for the gateway, so the couchbase2 impls can be run with no cluster.
 
 It serves TLS, as the gateway does, on a certificate signed by a CA made for the run, and answers
-KV `Get` and `Upsert` from a dict and the health check from a list of statuses.  Each call is
-recorded with its metadata and deadline, so a test can read what an impl sent.
+KV `Get` and `Upsert` from a dict, `Query` from a script, and the health check from a list of
+statuses.  Each call is recorded with its metadata and deadline, so a test can read what an impl
+sent.
 """
 
 from __future__ import annotations
@@ -28,7 +29,7 @@ import socket
 import subprocess  # nosec
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from concurrent import futures
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -41,6 +42,7 @@ from google.rpc import error_details_pb2, status_pb2
 
 from couchbase.protocol.couchbase2._error_mapping import STATUS_DETAILS_KEY
 from couchbase.protocol.couchbase2._generated.kv.v1 import kv_pb2, kv_pb2_grpc
+from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2, query_pb2_grpc
 from couchbase.protocol.couchbase2._health import (SERVING,
                                                    HealthCheckRequest,
                                                    HealthCheckResponse)
@@ -113,11 +115,19 @@ class Fail:
 
 
 @dataclass
-class FakeGateway(kv_pb2_grpc.KvServiceServicer):
+class FakeGateway(kv_pb2_grpc.KvServiceServicer,
+                  query_pb2_grpc.QueryServiceServicer):
     documents: dict[tuple[str, str, str, str], Document] = field(default_factory=dict)
     calls: list[Call] = field(default_factory=list)
     # Failures each method answers with, in order, before it answers normally.
     failures: dict[str, list[Fail]] = field(default_factory=dict)
+    # The messages a query streams, then how it ends: OK when None.
+    query_messages: Sequence[query_pb2.QueryResponse] = ()
+    query_end: Fail | None = None
+    # Set when a query stream left open is cancelled by the client.
+    query_cancelled: threading.Event = field(default_factory=threading.Event)
+    # How long a query waits after each message it sends.
+    query_pause: float = 0.0
     # The serving statuses the health check answers with, in order, before it answers serving.
     health_statuses: list[int] = field(default_factory=list)
     _cas: int = 1000
@@ -150,6 +160,21 @@ class FakeGateway(kv_pb2_grpc.KvServiceServicer):
         token = kv_pb2.MutationToken(bucket_name=request.bucket_name, vbucket_id=7, vbucket_uuid=11,
                                      seq_no=self._cas)
         return kv_pb2.UpsertResponse(cas=self._cas, mutation_token=token)
+
+    def Query(self, request: query_pb2.QueryRequest, context: grpc.ServicerContext
+              ) -> Iterator[query_pb2.QueryResponse]:
+        self._record('Query', request, context)
+        for message in self.query_messages:
+            yield message
+            if self.query_pause:
+                deadline = time.monotonic() + self.query_pause
+                while context.is_active() and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                if not context.is_active():
+                    self.query_cancelled.set()
+                    return
+        if self.query_end is not None:
+            _abort(context, self.query_end)
 
     def Check(self, request: Any, context: grpc.ServicerContext) -> int:
         self._record('Check', request, context)
@@ -184,6 +209,7 @@ def serving(gateway: FakeGateway, certificates: Certificates) -> Iterator[int]:
     """Serve `gateway` on a free port of localhost, answering on the port it yields."""
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=4))
     kv_pb2_grpc.add_KvServiceServicer_to_server(gateway, server)
+    query_pb2_grpc.add_QueryServiceServicer_to_server(gateway, server)
     check: grpc.RpcMethodHandler[Any, int] = grpc.unary_unary_rpc_method_handler(
         gateway.Check,
         request_deserializer=HealthCheckRequest.FromString,

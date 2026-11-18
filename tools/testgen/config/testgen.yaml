@@ -275,6 +275,7 @@ not_generated:
     - couchbase/tests/couchbase2_error_mapping_t.py
     - couchbase/tests/couchbase2_impl_t.py
     - couchbase/tests/couchbase2_kv_t.py
+    - couchbase/tests/couchbase2_query_t.py
     - couchbase/tests/couchbase2_request_context_t.py
     - couchbase/tests/couchbase2_tracing_t.py
     - couchbase/tests/collection_req_builder_t.py
@@ -294,6 +295,7 @@ not_generated:
     - couchbase/tests/no_op_observability_t.py
     - couchbase/tests/option_diagnostics_t.py
     - couchbase/tests/pycbc_core_t.py
+    - couchbase/tests/protocol_conformance_t.py
     - couchbase/tests/protocol_gates_t.py
     - couchbase/tests/query_args_t.py
     - couchbase/tests/query_metadata_t.py

@@ -23,6 +23,7 @@ from couchbase.common._operations import Op
 from couchbase.exceptions import (CouchbaseException,
                                   DataverseNotFoundException,
                                   DesignDocumentNotFoundException,
+                                  InvalidArgumentException,
                                   ParsingFailedException,
                                   QueryIndexNotFoundException)
 from couchbase.management.views import DesignDocumentNamespace
@@ -69,8 +70,6 @@ class StreamingMetricsTestSuite(SuiteRequirements):
     # Sixteen named tests rather than four reset-run-validate sequences over the same cases: a
     # sequence names the test on failure rather than the case.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A meter is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # Nothing here reads a document: every statement is a constant expression, and the search
@@ -162,7 +161,9 @@ class StreamingMetricsTestSuite(SuiteRequirements):
     def test_query_invalid_statement(self,
                                      cb_env: SyncTestEnvironment,
                                      http_validator: HttpMeterValidator) -> None:
-        with pytest.raises(ParsingFailedException):
+        # The gateway reports a parse error as a bare INVALID_ARGUMENT.
+        refused = InvalidArgumentException if cb_env.protocol == TestProtocol.COUCHBASE2 else ParsingFailedException
+        with pytest.raises(refused):
             result = cb_env.cluster.query(INVALID_STATEMENT)
             cb_env.drain_rows(result)
         http_validator.validate_http_op(Op.Query, validate_error=True)
@@ -207,7 +208,9 @@ class StreamingMetricsTestSuite(SuiteRequirements):
     def test_scope_query_invalid_statement(self,
                                            cb_env: SyncTestEnvironment,
                                            http_validator: HttpMeterValidator) -> None:
-        with pytest.raises(ParsingFailedException):
+        # The gateway reports a parse error as a bare INVALID_ARGUMENT.
+        refused = InvalidArgumentException if cb_env.protocol == TestProtocol.COUCHBASE2 else ParsingFailedException
+        with pytest.raises(refused):
             result = cb_env.scope.query(INVALID_STATEMENT)
             cb_env.drain_rows(result)
         http_validator.validate_http_op(Op.Query,

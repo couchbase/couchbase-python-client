@@ -25,8 +25,8 @@ if TYPE_CHECKING:
     from twisted.internet.defer import Deferred
 
     from couchbase.common._utils import JSONType
-    from couchbase.common.options import AnalyticsOptions
-    from couchbase.result import AnalyticsResult
+    from couchbase.common.options import AnalyticsOptions, QueryOptions
+    from couchbase.result import AnalyticsResult, QueryResult
     from txcouchbase.protocol.couchbase2._bucket_impl import TxBucketImpl
     from txcouchbase.protocol.couchbase2._cluster_impl import TxClusterImpl
 
@@ -45,6 +45,12 @@ class TxScopeImpl(AsyncScopeImpl):
     def collection(self, name: str) -> TxCollectionImpl:
         """**INTERNAL**"""
         return TxCollectionImpl(name, self)
+
+    def query_deferred(self,
+                       statement: str,
+                       *options: QueryOptions | JSONType,
+                       **kwargs: Any) -> Deferred[QueryResult]:
+        return self._tx_cluster_impl.query_deferred_from(lambda: self.prepare_query(statement, options, kwargs))
 
     def analytics_query_deferred(self,
                                  statement: str,

@@ -245,7 +245,7 @@ SCAN_CONSISTENCY = OptionSpec('scan_consistency')
 SCAN_WAIT = OptionSpec('scan_wait', duration=True)
 SCOPE = OptionSpec('scope')
 SCORING = OptionSpec('scoring')
-SEND_TO_NODE = OptionSpec('send_to_node')
+SEND_TO_NODE = OptionSpec('send_to_node', inert=frozenset({'couchbase2'}))
 SERIALIZER = OptionSpec('serializer')
 SHOW_REQUEST = OptionSpec('show_request')
 SKIP = OptionSpec('skip')
@@ -253,7 +253,7 @@ SORT = OptionSpec('sort')
 STARTKEY = OptionSpec('startkey')
 STARTKEY_DOCID = OptionSpec('startkey_docid')
 STREAMING_SCOPE_NAME = OptionSpec('scope_name', deprecated='Use Scope.search() instead.')
-USE_REPLICA = OptionSpec('use_replica')
+USE_REPLICA = OptionSpec('use_replica', inert=frozenset({'couchbase2'}))
 VECTOR_QUERY_COMBINATION = OptionSpec('vector_query_combination')
 
 # ==========================================================================================
@@ -521,10 +521,10 @@ BLOCKS: dict[str, BlockSpec] = {
         free_keywords=True,
     ),
     'QueryOptions': block(
-        CLIENT_CONTEXT_ID, RAW, ADHOC, MAX_PARALLELISM, PIPELINE_BATCH, PIPELINE_CAP, PROFILE, SCAN_CAP,
-        SCAN_WAIT, METRICS, NAMED_PARAMETERS, POSITIONAL_PARAMETERS, READ_ONLY, TIMEOUT, SCAN_CONSISTENCY,
-        QUERY_CONTEXT, FLEX_INDEX, PRESERVE_EXPIRY, USE_REPLICA, CONSISTENT_WITH, SEND_TO_NODE, PARENT_SPAN,
-        SPAN, SERIALIZER,
+        CLIENT_CONTEXT_ID, replace(RAW, inert=frozenset({'couchbase2'})), ADHOC, MAX_PARALLELISM,
+        PIPELINE_BATCH, PIPELINE_CAP, PROFILE, SCAN_CAP, SCAN_WAIT, METRICS, NAMED_PARAMETERS,
+        POSITIONAL_PARAMETERS, READ_ONLY, TIMEOUT, SCAN_CONSISTENCY, QUERY_CONTEXT, FLEX_INDEX, PRESERVE_EXPIRY,
+        USE_REPLICA, CONSISTENT_WITH, SEND_TO_NODE, PARENT_SPAN, SPAN, SERIALIZER,
         free_keywords=True,
     ),
     'SearchOptions': block(

@@ -17,18 +17,23 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterator
 from typing import Any
 
+import grpc
 import pytest
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import Deferred, inlineCallbacks
 
 from couchbase.auth import PasswordAuthenticator
 from couchbase.exceptions import (DocumentNotFoundException,
                                   FeatureUnavailableException,
                                   InvalidArgumentException)
 from couchbase.options import ClusterOptions
+from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2
+from couchbase.result import QueryResult
 from tests.couchbase2_gateway import (Certificates,
+                                      Fail,
                                       FakeGateway,
                                       make_certificates,
                                       new_gateway,
@@ -36,6 +41,8 @@ from tests.couchbase2_gateway import (Certificates,
 from tests.environments.twisted_reactor import run_in_reactor_thread
 from txcouchbase.protocol.couchbase2._cluster_impl import TxClusterImpl
 from txcouchbase.protocol.couchbase2._collection_impl import TxCollectionImpl
+
+MetaData = query_pb2.QueryResponse.MetaData
 
 
 @pytest.fixture(scope='module')
@@ -70,6 +77,13 @@ def _collection(cluster: TxClusterImpl) -> TxCollectionImpl:
     return cluster.bucket('travel').scope('inventory').collection('hotels')
 
 
+def _rows(*values: Any, meta: MetaData | None = None) -> query_pb2.QueryResponse:
+    message = query_pb2.QueryResponse(rows=[json.dumps(v).encode() for v in values])
+    if meta is not None:
+        message.meta_data.CopyFrom(meta)
+    return message
+
+
 def _in_reactor(fn: Callable[[], Any]) -> Any:
     return run_in_reactor_thread(inlineCallbacks(fn))
 
@@ -95,6 +109,23 @@ class Couchbase2TwistedUnitTests:
         with pytest.raises(InvalidArgumentException):
             run_in_reactor_thread(lambda: _collection(cluster).get_deferred('hotel_1', timeout=5))
         assert gateway.calls == []
+
+    def test_the_query_fires_once_its_rows_are_read(self, cluster: TxClusterImpl, gateway: FakeGateway) -> None:
+        gateway.query_messages = [_rows(1, 2), _rows(3, meta=MetaData(request_id='r-1'))]
+
+        def query() -> Deferred[QueryResult]:
+            return cluster.bucket('travel').scope('inventory').query_deferred('SELECT 1')
+
+        result: QueryResult = run_in_reactor_thread(query)
+        assert result.execute() == [1, 2, 3]
+        metadata = result.metadata()
+        assert metadata is not None and metadata.request_id() == 'r-1'
+        assert gateway.calls[0].request.scope_name == 'inventory'
+
+    def test_a_query_error_fails_the_deferred(self, cluster: TxClusterImpl, gateway: FakeGateway) -> None:
+        gateway.query_end = Fail(grpc.StatusCode.INVALID_ARGUMENT)
+        with pytest.raises(InvalidArgumentException):
+            run_in_reactor_thread(lambda: cluster.query_deferred('SELEC 1'))
 
     @pytest.mark.parametrize('call', [lambda c: c.ping_deferred(),
                                       lambda c: c.analytics_query_deferred('SELECT 1'),

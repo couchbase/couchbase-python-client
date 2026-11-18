@@ -1,0 +1,573 @@
+{
+  "cases": [
+    {
+      "name": "select, defaults",
+      "statement": "SELECT 1 AS one",
+      "options": {},
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "14121988-211c-4fb9-a065-a34dc382d8ce",
+          "client_context_id": "d706c7-8418-4240-ca2c-0f885c014c5041",
+          "status": "success",
+          "metrics": null,
+          "signature": "{\"one\":\"number\"}",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "5db4e698-97a6-43f7-a57a-5e1b392c9b91",
+          "client_context_id": "909d0427-64d9-4a3c-a307-ad67c3a2846d",
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "eyJvbmUiOiJudW1iZXIifQ=="
+        }
+      }
+    },
+    {
+      "name": "select, metrics",
+      "statement": "SELECT 1 AS one",
+      "options": {
+        "metrics": true
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "384cd2f7-30cd-47ac-a387-2ad035f7610c",
+          "client_context_id": "5eec18-4417-a844-34f6-7b812637ff67b5",
+          "status": "success",
+          "metrics": {
+            "elapsed_time": 280003,
+            "execution_time": 235511,
+            "result_count": 1,
+            "result_size": 9,
+            "sort_count": 0,
+            "mutation_count": 0,
+            "error_count": 0,
+            "warning_count": 0
+          },
+          "signature": "{\"one\":\"number\"}",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "3db7c506-460a-4d22-b0f8-52d9c95b3e1d",
+          "client_context_id": "6d126c8b-1ae6-4bb6-adbd-6f8444f868a6",
+          "metrics": {
+            "elapsed_time": "0.000245769s",
+            "execution_time": "0.000205197s",
+            "result_count": "1",
+            "result_size": "9"
+          },
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "eyJvbmUiOiJudW1iZXIifQ=="
+        }
+      }
+    },
+    {
+      "name": "select, client_context_id",
+      "statement": "SELECT 1 AS one",
+      "options": {
+        "client_context_id": "w01-rerun-ccid"
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "1efa55b3-2e94-4dfe-a68a-ba4038f090a8",
+          "client_context_id": "w01-rerun-ccid",
+          "status": "success",
+          "metrics": null,
+          "signature": "{\"one\":\"number\"}",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "3c70b4a8-3062-4403-a57d-a8edbb253aaa",
+          "client_context_id": "w01-rerun-ccid",
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "eyJvbmUiOiJudW1iZXIifQ=="
+        }
+      }
+    },
+    {
+      "name": "select raw, scope",
+      "statement": "SELECT RAW 2",
+      "options": {},
+      "scope": true,
+      "classic": {
+        "metadata": {
+          "request_id": "915939f3-9eae-4589-82a9-70141c4102b0",
+          "client_context_id": "41e007-31dd-0541-5f4a-5aca5b012054a1",
+          "status": "success",
+          "metrics": null,
+          "signature": "\"number\"",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "9df52fce-7caa-4d56-980b-d54ec1665351",
+          "client_context_id": "be281e7a-f8b6-4957-ae32-e33b75ba95b9",
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "Im51bWJlciI="
+        }
+      }
+    },
+    {
+      "name": "profile phases",
+      "statement": "SELECT 1 AS one",
+      "options": {
+        "profile": "phases"
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "3772e432-513e-4379-936b-a942bea46ca2",
+          "client_context_id": "236fee-5a5e-664f-717f-2d83259799a7d9",
+          "status": "success",
+          "metrics": null,
+          "signature": "{\"one\":\"number\"}",
+          "profile": "{\"cpuTime\":\"35.651\u00b5s\",\"ioTime\":\"125ns\",\"phaseOperators\":{\"authorize\":1,\"project\":1,\"stream\":1},\"phaseTimes\":{\"authorize\":\"499ns\",\"instantiate\":\"2.502\u00b5s\",\"parse\":\"89.068\u00b5s\",\"plan\":\"10.008\u00b5s\",\"project\":\"14.261\u00b5s\",\"queued\":\"376ns\",\"run\":\"45.034\u00b5s\",\"setup\":\"18.765\u00b5s\",\"stream\":\"18.181\u00b5s\"},\"requestTime\":\"2026-10-24T18:49:01.873Z\",\"servicingHost\":\"localhost:8091\",\"waitTime\":\"2.21\u00b5s\"}",
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "8aa6fc99-f496-4ac6-b99e-c55af5d35f8d",
+          "client_context_id": "f92bf9b0-77b3-46f7-8e5f-a006da68fb33",
+          "status": "STATUS_SUCCESS",
+          "profile": "eyJwaGFzZVRpbWVzIjp7ImF1dGhvcml6ZSI6IjYyNW5zIiwiaW5zdGFudGlhdGUiOiIzLjE2OcK1cyIsInBhcnNlIjoiOTAuNjkzwrVzIiwicGxhbiI6IjkuNzE2wrVzIiwicHJvamVjdCI6IjE2LjY3OcK1cyIsInF1ZXVlZCI6IjUwMG5zIiwicnVuIjoiMzUuNTI3wrVzIiwic2V0dXAiOiIzOC4wMjnCtXMiLCJzdHJlYW0iOiI0Ljc5NcK1cyJ9LCJwaGFzZU9wZXJhdG9ycyI6eyJhdXRob3JpemUiOjEsInByb2plY3QiOjEsInN0cmVhbSI6MX0sInJlcXVlc3RUaW1lIjoiMjAyNi0xMC0yNFQxODo0OTowMS44NzRaIiwic2VydmljaW5nSG9zdCI6ImNsdXN0ZXItMDAwMy5jbHVzdGVyLmNiZGMyLTFiZjE5Y2NkOThlMDQzMTNhNzEwZmZlZDlhNDg2OGIyLnN2Yzo4MDkxIiwiY3B1VGltZSI6IjIzLjAxOMK1cyIsImlvVGltZSI6IjI5Mm5zIiwid2FpdFRpbWUiOiIyLjM3N8K1cyJ9",
+          "signature": "eyJvbmUiOiJudW1iZXIifQ=="
+        }
+      }
+    },
+    {
+      "name": "profile timings",
+      "statement": "SELECT 1 AS one",
+      "options": {
+        "profile": "timings"
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "a30a8ed5-c590-49a3-b51e-a8aa6fb63a93",
+          "client_context_id": "b6b8d6-dcbc-0b4f-af8d-6168c8032e9026",
+          "status": "success",
+          "metrics": null,
+          "signature": "{\"one\":\"number\"}",
+          "profile": "{\"cpuTime\":\"19.932\u00b5s\",\"executionTimings\":{\"#operator\":\"Authorize\",\"#planPreparedTime\":\"2026-10-24T18:49:01.875Z\",\"#stats\":{\"#phaseSwitches\":4,\"execTime\":\"585ns\",\"servTime\":\"166ns\"},\"privileges\":{\"List\":[]},\"~child\":{\"#operator\":\"Sequence\",\"#stats\":{\"#phaseSwitches\":2,\"execTime\":\"709ns\"},\"~children\":[{\"#operator\":\"DummyScan\",\"#stats\":{\"#itemsOut\":1,\"#phaseSwitches\":3,\"execTime\":\"792ns\",\"kernTime\":\"209ns\"},\"optimizer_estimates\":{\"cardinality\":1,\"cost\":1.0842021724855044e-19,\"fr_cost\":1.0842021724855044e-19,\"size\":1}},{\"#operator\":\"InitialProject\",\"#stats\":{\"#itemsIn\":1,\"#itemsOut\":1,\"#phaseSwitches\":7,\"execTime\":\"4.003\u00b5s\",\"kernTime\":\"2.544\u00b5s\"},\"discard_original\":true,\"optimizer_estimates\":{\"cardinality\":1,\"cost\":0.001,\"fr_cost\":0.001,\"size\":1},\"preserve_order\":true,\"result_terms\":[{\"as\":\"one\",\"expr\":\"1\"}]},{\"#operator\":\"Stream\",\"#stats\":{\"#itemsIn\":1,\"#itemsOut\":1,\"#phaseSwitches\":2,\"execTime\":\"13.843\u00b5s\"},\"optimizer_estimates\":{\"cardinality\":1,\"cost\":0.001,\"fr_cost\":0.001,\"size\":1},\"serializable\":true}]},\"~versions\":[\"8.0.0-N1QL\",\"8.0.0-3777-enterprise\"]},\"ioTime\":\"166ns\",\"optimizerEstimates\":{\"cardinality\":1,\"cost\":0.001},\"phaseOperators\":{\"authorize\":1,\"project\":1,\"stream\":1},\"phaseTimes\":{\"authorize\":\"751ns\",\"instantiate\":\"6.38\u00b5s\",\"parse\":\"90.193\u00b5s\",\"plan\":\"13.552\u00b5s\",\"project\":\"4.003\u00b5s\",\"queued\":\"417ns\",\"run\":\"28.313\u00b5s\",\"setup\":\"31.524\u00b5s\",\"stream\":\"13.843\u00b5s\"},\"requestTime\":\"2026-10-24T18:49:01.875Z\",\"servicingHost\":\"localhost:8091\",\"waitTime\":\"2.753\u00b5s\"}",
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "70a8cfbb-a918-4e0d-9d90-e372f83eb678",
+          "client_context_id": "6bdb62d6-e624-4f22-94e4-c2225016eb94",
+          "status": "STATUS_SUCCESS",
+          "profile": "eyJwaGFzZVRpbWVzIjp7ImF1dGhvcml6ZSI6Ijk1OW5zIiwiaW5zdGFudGlhdGUiOiI2Ljc5N8K1cyIsInBhcnNlIjoiMTEyLjAwMsK1cyIsInBsYW4iOiIzMy41NjfCtXMiLCJwcm9qZWN0IjoiNS4wNDTCtXMiLCJxdWV1ZWQiOiI4MzRucyIsInJ1biI6IjQxLjY5OMK1cyIsInNldHVwIjoiMTcuMjYzwrVzIiwic3RyZWFtIjoiMjQuNjQzwrVzIn0sInBoYXNlT3BlcmF0b3JzIjp7ImF1dGhvcml6ZSI6MSwicHJvamVjdCI6MSwic3RyZWFtIjoxfSwicmVxdWVzdFRpbWUiOiIyMDI2LTEwLTI0VDE4OjQ5OjAxLjg3N1oiLCJzZXJ2aWNpbmdIb3N0IjoiY2x1c3Rlci0wMDAzLmNsdXN0ZXIuY2JkYzItMWJmMTljY2Q5OGUwNDMxM2E3MTBmZmVkOWE0ODY4YjIuc3ZjOjgwOTEiLCJjcHVUaW1lIjoiMzIuMTg3wrVzIiwiaW9UaW1lIjoiMjA5bnMiLCJ3YWl0VGltZSI6IjMuMTfCtXMiLCJleGVjdXRpb25UaW1pbmdzIjp7IiNvcGVyYXRvciI6IkF1dGhvcml6ZSIsIiNwbGFuUHJlcGFyZWRUaW1lIjoiMjAyNi0xMC0yNFQxODo0OTowMS44NzdaIiwiI3N0YXRzIjp7IiNwaGFzZVN3aXRjaGVzIjo0LCJleGVjVGltZSI6Ijc1MG5zIiwic2VydlRpbWUiOiIyMDlucyJ9LCJwcml2aWxlZ2VzIjp7Ikxpc3QiOltdfSwifmNoaWxkIjp7IiNvcGVyYXRvciI6IlNlcXVlbmNlIiwiI3N0YXRzIjp7IiNwaGFzZVN3aXRjaGVzIjoyLCJleGVjVGltZSI6IjkxNm5zIn0sIn5jaGlsZHJlbiI6W3siI29wZXJhdG9yIjoiRHVtbXlTY2FuIiwiI3N0YXRzIjp7IiNpdGVtc091dCI6MSwiI3BoYXNlU3dpdGNoZXMiOjMsImV4ZWNUaW1lIjoiODM0bnMiLCJrZXJuVGltZSI6IjI5Mm5zIn0sIm9wdGltaXplcl9lc3RpbWF0ZXMiOnsiY2FyZGluYWxpdHkiOjEsImNvc3QiOjEuMDg0MjAyMTcyNDg1NTA0NGUtMTksImZyX2Nvc3QiOjEuMDg0MjAyMTcyNDg1NTA0NGUtMTksInNpemUiOjF9fSx7IiNvcGVyYXRvciI6IkluaXRpYWxQcm9qZWN0IiwiI3N0YXRzIjp7IiNpdGVtc0luIjoxLCIjaXRlbXNPdXQiOjEsIiNwaGFzZVN3aXRjaGVzIjo3LCJleGVjVGltZSI6IjUuMDQ0wrVzIiwia2VyblRpbWUiOiIyLjg3OMK1cyJ9LCJkaXNjYXJkX29yaWdpbmFsIjp0cnVlLCJvcHRpbWl6ZXJfZXN0aW1hdGVzIjp7ImNhcmRpbmFsaXR5IjoxLCJjb3N0IjowLjAwMSwiZnJfY29zdCI6MC4wMDEsInNpemUiOjF9LCJwcmVzZXJ2ZV9vcmRlciI6dHJ1ZSwicmVzdWx0X3Rlcm1zIjpbeyJhcyI6Im9uZSIsImV4cHIiOiIxIn1dfSx7IiNvcGVyYXRvciI6IlN0cmVhbSIsIiNzdGF0cyI6eyIjaXRlbXNJbiI6MSwiI2l0ZW1zT3V0IjoxLCIjcGhhc2VTd2l0Y2hlcyI6MiwiZXhlY1RpbWUiOiIyNC42NDPCtXMifSwib3B0aW1pemVyX2VzdGltYXRlcyI6eyJjYXJkaW5hbGl0eSI6MSwiY29zdCI6MC4wMDEsImZyX2Nvc3QiOjAuMDAxLCJzaXplIjoxfSwic2VyaWFsaXphYmxlIjp0cnVlfV19LCJ+dmVyc2lvbnMiOlsiOC4wLjAtTjFRTCIsIjguMC4wLTM3NzctZW50ZXJwcmlzZSJdfSwib3B0aW1pemVyRXN0aW1hdGVzIjp7ImNhcmRpbmFsaXR5IjoxLCJjb3N0IjowLjAwMX19",
+          "signature": "eyJvbmUiOiJudW1iZXIifQ=="
+        }
+      }
+    },
+    {
+      "name": "keyspace, metrics",
+      "statement": "SELECT META().id FROM `default` USE KEYS \"w01-rerun-doc\"",
+      "options": {
+        "metrics": true
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "588160a0-a609-4c29-8f2f-d1999afd6fd4",
+          "client_context_id": "c5c1f6-5164-8c46-8a43-0b8b234f4a0b9e",
+          "status": "success",
+          "metrics": {
+            "elapsed_time": 529900,
+            "execution_time": 497334,
+            "result_count": 1,
+            "result_size": 22,
+            "sort_count": 0,
+            "mutation_count": 0,
+            "error_count": 0,
+            "warning_count": 0
+          },
+          "signature": "{\"id\":\"json\"}",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "f71e1d07-c4b0-48ec-bfb8-eadbe4a0970e",
+          "client_context_id": "82a205dc-76bb-4b5f-93e9-ec4d8950e928",
+          "metrics": {
+            "elapsed_time": "0.000521977s",
+            "execution_time": "0.000480529s",
+            "result_count": "1",
+            "result_size": "22"
+          },
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "eyJpZCI6Impzb24ifQ=="
+        }
+      }
+    },
+    {
+      "name": "ordered, metrics",
+      "statement": "SELECT x FROM [3, 1, 2] AS x ORDER BY x",
+      "options": {
+        "metrics": true
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "4638f7f3-4ccc-4ac8-a747-1e15c21d3f70",
+          "client_context_id": "88906c-81e8-d046-cf66-20fe658b20af6c",
+          "status": "success",
+          "metrics": {
+            "elapsed_time": 255193,
+            "execution_time": 234636,
+            "result_count": 3,
+            "result_size": 21,
+            "sort_count": 3,
+            "mutation_count": 0,
+            "error_count": 0,
+            "warning_count": 0
+          },
+          "signature": "{\"x\":\"json\"}",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "a7efacab-77c0-4e71-badb-203d292b6904",
+          "client_context_id": "67d5d504-3be9-4f25-ac91-84b61dad05d5",
+          "metrics": {
+            "elapsed_time": "0.000490496s",
+            "execution_time": "0.000433453s",
+            "result_count": "3",
+            "result_size": "21",
+            "sort_count": "3"
+          },
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "eyJ4IjoianNvbiJ9"
+        }
+      }
+    },
+    {
+      "name": "upsert, metrics",
+      "statement": "UPSERT INTO `default` (KEY, VALUE) VALUES (\"w01-rerun-dml\", {\"n\": 1})",
+      "options": {
+        "metrics": true
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "40507f91-31e8-4da2-a28a-681db1192cc3",
+          "client_context_id": "28acf3-1ffb-d944-7365-a05456777bf75a",
+          "status": "success",
+          "metrics": {
+            "elapsed_time": 550791,
+            "execution_time": 520727,
+            "result_count": 0,
+            "result_size": 0,
+            "sort_count": 0,
+            "mutation_count": 1,
+            "error_count": 0,
+            "warning_count": 0
+          },
+          "signature": "null",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "41648005-3ff7-415b-997d-ba913938d4bc",
+          "client_context_id": "ca23b351-578c-4281-9474-621118461d9b",
+          "metrics": {
+            "elapsed_time": "0.000482489s",
+            "execution_time": "0.000421443s",
+            "mutation_count": "1"
+          },
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "bnVsbA=="
+        }
+      }
+    },
+    {
+      "name": "update no returning",
+      "statement": "UPDATE `default` USE KEYS \"w01-rerun-dml\" SET n = 2",
+      "options": {
+        "metrics": true
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "0d3d0c22-51da-49ef-8988-02ee155b99dd",
+          "client_context_id": "72866b-0aef-c64a-3d8d-43dfb2356c2153",
+          "status": "success",
+          "metrics": {
+            "elapsed_time": 784759,
+            "execution_time": 734221,
+            "result_count": 0,
+            "result_size": 0,
+            "sort_count": 0,
+            "mutation_count": 1,
+            "error_count": 0,
+            "warning_count": 0
+          },
+          "signature": "null",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "11eefc11-419f-4738-981e-8553fc8524a3",
+          "client_context_id": "481faf4c-88f0-4573-840a-a20d4ae965a6",
+          "metrics": {
+            "elapsed_time": "0.000746147s",
+            "execution_time": "0.000713163s",
+            "mutation_count": "1"
+          },
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "bnVsbA=="
+        }
+      }
+    },
+    {
+      "name": "delete returning",
+      "statement": "DELETE FROM `default` USE KEYS \"w01-rerun-dml\" RETURNING META().id",
+      "options": {},
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "ed9c67f0-118c-4c58-8074-cb58387cc339",
+          "client_context_id": "94b956-2400-5d4d-fe4f-f5b68e935d7599",
+          "status": "success",
+          "metrics": null,
+          "signature": "{\"id\":\"json\"}",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "fb508f32-6389-4e47-90e8-40f2a571fc47",
+          "client_context_id": "42cfa7ee-68b6-4099-b950-570d124336ab",
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "eyJpZCI6Impzb24ifQ=="
+        }
+      }
+    },
+    {
+      "name": "prepared",
+      "statement": "SELECT 1 AS one",
+      "options": {
+        "adhoc": false
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "aed14ac3-9942-42ba-8b3a-4427edf100b3",
+          "client_context_id": "f4c783-11fb-2b49-524e-8d6b8cc2e21612",
+          "status": "success",
+          "metrics": null,
+          "signature": "{\"one\":\"number\"}",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "0848538e-4db6-490e-935e-216b485e6032",
+          "client_context_id": "3a6591bf-a558-4a76-aaab-eabf74f431e5",
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "eyJvbmUiOiJudW1iZXIifQ=="
+        }
+      }
+    },
+    {
+      "name": "named parameter",
+      "statement": "SELECT $v AS v",
+      "options": {
+        "named_parameters": {
+          "v": 7
+        },
+        "metrics": true
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "b926f3be-2e0d-4ffa-b013-a312e5ef69e0",
+          "client_context_id": "0c60bc-9182-3646-f02d-6fad4c5024be53",
+          "status": "success",
+          "metrics": {
+            "elapsed_time": 219791,
+            "execution_time": 186975,
+            "result_count": 1,
+            "result_size": 7,
+            "sort_count": 0,
+            "mutation_count": 0,
+            "error_count": 0,
+            "warning_count": 0
+          },
+          "signature": "{\"v\":\"json\"}",
+          "profile": null,
+          "warnings": null,
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "b52f7982-4c3b-48f3-a0ce-88021b0e369d",
+          "client_context_id": "442b9a0f-3653-4ee3-b3fe-3c28bf021ac9",
+          "metrics": {
+            "elapsed_time": "0.000230466s",
+            "execution_time": "0.000207407s",
+            "result_count": "1",
+            "result_size": "7"
+          },
+          "status": "STATUS_SUCCESS",
+          "profile": "bnVsbA==",
+          "signature": "eyJ2IjoianNvbiJ9"
+        }
+      }
+    },
+    {
+      "name": "warning, key type",
+      "statement": "SELECT META().id FROM `default` USE KEYS [1, \"w01-rerun-doc\"]",
+      "options": {
+        "metrics": true
+      },
+      "scope": false,
+      "classic": {
+        "metadata": {
+          "request_id": "da293c08-d077-4bcc-a5ff-6985844aad3b",
+          "client_context_id": "f8e9db-2996-3940-d68a-3a5db436c8bb14",
+          "status": "success",
+          "metrics": {
+            "elapsed_time": 517516,
+            "execution_time": 495249,
+            "result_count": 1,
+            "result_size": 22,
+            "sort_count": 0,
+            "mutation_count": 0,
+            "error_count": 0,
+            "warning_count": 1
+          },
+          "signature": "{\"id\":\"json\"}",
+          "profile": null,
+          "warnings": [
+            {
+              "code": 4998,
+              "message": "Document key must be a string: 1",
+              "reason": null,
+              "retry": null
+            }
+          ],
+          "errors": null
+        }
+      },
+      "couchbase2": {
+        "metadata": {
+          "request_id": "8189d9da-3fa0-49c6-a96d-87a945b71f3b",
+          "client_context_id": "33e2ddc4-650d-4f28-9884-65588ba8a961",
+          "metrics": {
+            "elapsed_time": "0.000413187s",
+            "execution_time": "0.000380871s",
+            "result_count": "1",
+            "result_size": "22",
+            "warning_count": "1"
+          },
+          "status": "STATUS_SUCCESS",
+          "warnings": [
+            {
+              "code": 4998,
+              "message": "Document key must be a string: 1"
+            }
+          ],
+          "profile": "bnVsbA==",
+          "signature": "eyJpZCI6Impzb24ifQ=="
+        }
+      }
+    },
+    {
+      "name": "syntax error",
+      "statement": "SELEC 1",
+      "options": {},
+      "scope": false,
+      "classic": {
+        "error": {
+          "err": 8,
+          "category": "couchbase.common",
+          "strerror": "Streaming operation failed",
+          "context": {
+            "context_type": "QueryErrorContext",
+            "statement": "SELEC 1",
+            "parameters": "{\"client_context_id\":\"f68f74-4f8d-d143-0fd4-c8d9a47e61bafe\",\"metrics\":false,\"statement\":\"SELEC 1\",\"timeout\":\"19500ms\"}",
+            "client_context_id": "f68f74-4f8d-d143-0fd4-c8d9a47e61bafe",
+            "first_error_code": 3000,
+            "first_error_message": "syntax error - line 1, column 7, near 'SELEC ', at: 1",
+            "method": "POST",
+            "path": "/query/service",
+            "http_status": 400,
+            "http_body": "{\n\"requestID\": \"cd0510f2-7416-4db1-af3e-ed6e6ec8bdc2\",\n\"clientContextID\": \"f68f74-4f8d-d143-0fd4-c8d9a47e61bafe\",\n\"errors\": [{\"code\":3000,\"column\":7,\"line\":1,\"msg\":\"syntax error - line 1, column 7, near 'SELEC ', at: 1\"}],\n\"status\": \"fatal\"\n}\n",
+            "hostname": "localhost",
+            "port": 31684,
+            "last_dispatched_to": "localhost:8093",
+            "last_dispatched_from": "localhost:54321",
+            "retry_attempts": 0,
+            "retry_reasons": []
+          },
+          "info": {
+            "cinfo": [
+              "src/connection.hxx",
+              679
+            ],
+            "message": "Streaming operation failed"
+          }
+        },
+        "raised": "ParsingFailedException"
+      },
+      "couchbase2": {
+        "error": {
+          "code": "INVALID_ARGUMENT",
+          "details": "Query parsing failed: syntax error - line 1, column 7, near 'SELEC ', at: 1",
+          "rich_status": null,
+          "readonly": false
+        },
+        "raised": "InvalidArgumentException"
+      }
+    }
+  ]
+}

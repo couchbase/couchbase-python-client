@@ -22,6 +22,7 @@ carries is the blocking one and iterating it must not block the reactor.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable, Coroutine
 from typing import (TYPE_CHECKING,
                     Any,
                     cast)
@@ -29,9 +30,13 @@ from typing import (TYPE_CHECKING,
 from twisted.internet.defer import Deferred
 
 from acouchbase.protocol.couchbase2._cluster_impl import AsyncClusterImpl
+from acouchbase.protocol.couchbase2._streaming import buffered_rows
+from couchbase.common._observability import ObservableRequestHandler
 from couchbase.common._operations import Op
 from couchbase.protocol.couchbase2._core import unsupported
 from couchbase.protocol.couchbase2._health import wait_until_serving_async
+from couchbase.protocol.couchbase2._streaming import QueryRows
+from couchbase.result import QueryResult
 from txcouchbase.protocol.couchbase2._bucket_impl import TxBucketImpl
 from txcouchbase.protocol.couchbase2._deferred import defer
 
@@ -46,10 +51,12 @@ if TYPE_CHECKING:
                                           ClusterOptions,
                                           DiagnosticsOptions,
                                           PingOptions,
+                                          QueryOptions,
                                           WaitUntilReadyOptions)
     from couchbase.common.result import (ClusterInfoResult,
                                          DiagnosticsResult,
                                          PingResult)
+    from couchbase.protocol.couchbase2._cluster_types import QueryRequest
     from couchbase.result import AnalyticsResult
 
 
@@ -82,6 +89,31 @@ class TxClusterImpl(AsyncClusterImpl):
 
     def wait_until_connected_deferred(self) -> Deferred[None]:
         return Deferred.fromFuture(asyncio.ensure_future(self.wait_until_connected(), loop=self.loop))
+
+    def query_deferred(self,
+                       statement: str,
+                       *options: QueryOptions | JSONType,
+                       **kwargs: Any) -> Deferred[QueryResult]:
+        def build() -> QueryRequest:
+            self.core.ensure_open()
+            return self._request_builder.build_query_request(statement, *options, **kwargs)
+
+        return self.query_deferred_from(build)
+
+    def query_deferred_from(self, build: Callable[[], QueryRequest]) -> Deferred[QueryResult]:
+        """**INTERNAL** A query the cluster or a scope builds at the call, read whole before its Deferred fires."""
+        obs_handler = ObservableRequestHandler(Op.Query, self.observability_instruments)
+
+        async def read(req: QueryRequest) -> QueryResult:
+            return QueryResult(await buffered_rows(lambda: self.open_query(req, obs_handler),
+                                                   QueryRows(req.serializer)))
+
+        def start() -> Coroutine[Any, Any, QueryResult]:
+            req = build()
+            obs_handler.create_http_span(**req.span_attributes)
+            return read(req)
+
+        return defer(self.loop, obs_handler, start)
 
     def get_cluster_info_deferred(self) -> Deferred[ClusterInfoResult]:
         raise unsupported('get_cluster_info')

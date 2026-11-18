@@ -21,9 +21,11 @@ from typing import TYPE_CHECKING, Any
 from couchbase.common._option_args import merge
 from couchbase.common.exceptions import InvalidArgumentException
 from couchbase.protocol.couchbase2._cluster_types import ClusterOptionsBlock, WaitUntilReadyRequest
+from couchbase.protocol.couchbase2._query import create_query_request
 
 if TYPE_CHECKING:
     from couchbase.common.options import WaitUntilReadyOptions
+    from couchbase.protocol.couchbase2._cluster_types import QueryRequest
     from couchbase.protocol.couchbase2._core import ClusterCore
 
 
@@ -31,6 +33,9 @@ class ClusterRequestBuilder:
 
     def __init__(self, core: ClusterCore) -> None:
         self._core = core
+
+    def build_query_request(self, statement: str, *options: object, **kwargs: Any) -> QueryRequest:
+        return create_query_request(self._core, statement, *options, **kwargs)
 
     def build_wait_until_ready_request(self,
                                        timeout: timedelta,

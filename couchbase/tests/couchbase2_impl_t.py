@@ -30,6 +30,7 @@ import pytest
 
 from acouchbase.protocol.couchbase2._cluster_impl import AsyncClusterImpl
 from acouchbase.protocol.couchbase2._collection_impl import AsyncCollectionImpl
+from acouchbase.protocol.couchbase2._streaming import buffered_rows
 from couchbase.auth import (CertificateAuthenticator,
                             JwtAuthenticator,
                             PasswordAuthenticator)
@@ -45,12 +46,14 @@ from couchbase.exceptions import (DocumentNotFoundException,
                                   FeatureUnavailableException,
                                   InvalidArgumentException,
                                   UnAmbiguousTimeoutException)
+from couchbase.n1ql import QueryStatus
 from couchbase.options import (ClusterOptions,
                                ClusterOrphanReportingOptions,
                                ClusterTimeoutOptions,
                                ClusterTracingOptions,
                                GetMultiOptions,
                                GetOptions,
+                               QueryOptions,
                                TransactionConfig,
                                UpsertMultiOptions,
                                UpsertOptions,
@@ -58,8 +61,11 @@ from couchbase.options import (ClusterOptions,
 from couchbase.protocol.couchbase2._cluster_impl import ClusterImpl
 from couchbase.protocol.couchbase2._collection_impl import CollectionImpl
 from couchbase.protocol.couchbase2._generated.kv.v1 import kv_pb2
+from couchbase.protocol.couchbase2._generated.query.v1 import query_pb2
 from couchbase.protocol.couchbase2._health import HealthCheckResponse
 from couchbase.protocol.couchbase2._histogram import PercentileHistogram
+from couchbase.protocol.couchbase2._streaming import QueryRows
+from couchbase.result import QueryResult
 from couchbase.transcoder import JSONTranscoder
 from tests.couchbase2_gateway import (Certificates,
                                       Document,
@@ -75,6 +81,7 @@ KEY = ('travel', 'inventory', 'hotels', 'hotel_1')
 JSON_FLAGS = JSONTranscoder().encode_value({})[1]
 AUTHORIZATION = 'Basic QWRtaW5pc3RyYXRvcjpwYXNzd29yZA=='
 
+MetaData = query_pb2.QueryResponse.MetaData
 NOT_SERVING = HealthCheckResponse.DESCRIPTOR.enum_types_by_name['ServingStatus'].values_by_name['NOT_SERVING'].number
 
 
@@ -125,6 +132,13 @@ def _collection(cluster: ClusterImpl) -> CollectionImpl:
 def _stored(gateway: FakeGateway, value: Any = None, expiry: int | None = None) -> None:
     content = json.dumps(value if value is not None else {'name': 'Ritz'}).encode()
     gateway.documents[KEY] = Document(content, JSON_FLAGS, 42, expiry)
+
+
+def _rows(*values: Any, meta: MetaData | None = None) -> query_pb2.QueryResponse:
+    message = query_pb2.QueryResponse(rows=[json.dumps(v).encode() for v in values])
+    if meta is not None:
+        message.meta_data.CopyFrom(meta)
+    return message
 
 
 def _remaining(gateway: FakeGateway) -> float:
@@ -268,7 +282,80 @@ class Couchbase2MultiUnitTests:
         assert gateway.calls == []
 
 
+class Couchbase2QueryUnitTests:
+
+    def test_the_rows_stream_then_the_metadata(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        gateway.query_messages = [_rows({'a': 1}, {'a': 2}),
+                                  _rows({'a': 3}, meta=MetaData(request_id='r-1', status=MetaData.STATUS_SUCCESS))]
+        result = cluster.query('SELECT a FROM t WHERE x=$1', 'y')
+        assert result.execute() == [{'a': 1}, {'a': 2}, {'a': 3}]
+        metadata = result.metadata()
+        assert metadata is not None
+        assert (metadata.request_id(), metadata.status()) == ('r-1', QueryStatus.SUCCESS)
+        request = gateway.calls[0].request
+        assert request.statement == 'SELECT a FROM t WHERE x=$1'
+        assert [json.loads(p) for p in request.positional_parameters] == ['y']
+        assert not request.HasField('bucket_name')
+
+    def test_nothing_is_sent_until_the_rows_are_read(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        result = cluster.query('SELECT 1')
+        assert gateway.calls == []
+        assert result.execute() == []
+        assert len(gateway.calls) == 1
+
+    def test_a_scope_query_runs_in_its_scope(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        cluster.bucket('travel').scope('inventory').query('SELECT 1').execute()
+        request = gateway.calls[0].request
+        assert (request.bucket_name, request.scope_name) == ('travel', 'inventory')
+
+    def test_the_query_timeout_defaults_to_seventy_five_seconds(self, cluster: ClusterImpl,
+                                                                gateway: FakeGateway) -> None:
+        cluster.query('SELECT 1').execute()
+        assert 74.0 < _remaining(gateway) <= 75.0
+
+    def test_a_query_error_is_raised_from_the_rows(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        gateway.query_end = Fail(grpc.StatusCode.INVALID_ARGUMENT)
+        result = cluster.query('SELEC 1')
+        with pytest.raises(InvalidArgumentException):
+            result.execute()
+
+    def test_a_query_is_retried_before_its_first_message(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        gateway.failures['Query'] = [Fail(grpc.StatusCode.UNAVAILABLE)]
+        gateway.query_messages = [_rows(1)]
+        assert cluster.query('SELECT 1', QueryOptions(read_only=True)).execute() == [1]
+        assert len(gateway.calls) == 2
+
+    def test_closing_early_cancels_the_stream(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        gateway.query_messages = [_rows(1), _rows(2)]
+        gateway.query_pause = 5.0
+        rows = cluster.query('SELECT 1').rows()
+        assert next(rows) == 1
+        rows.close()
+        assert gateway.query_cancelled.wait(5)
+
+    def test_the_serializer_decodes_the_rows(self, cluster: ClusterImpl, gateway: FakeGateway) -> None:
+        class Upper:
+            def serialize(self, value: Any) -> bytes:
+                return json.dumps(value).encode()
+
+            def deserialize(self, value: bytes) -> Any:
+                return json.loads(value).upper()
+
+        gateway.query_messages = [_rows('a', 'b')]
+        assert cluster.query('SELECT 1', serializer=Upper()).execute() == ['A', 'B']
+
+
 class Couchbase2ClusterUnitTests:
+
+    def test_a_closed_cluster_refuses_operations(self, connect: Callable[..., tuple[str, ClusterOptions]]) -> None:
+        impl = ClusterImpl(*connect())
+        collection = _collection(impl)
+        impl.close_connection()
+        impl.close_connection()
+        with pytest.raises(RuntimeError, match='closed cluster'):
+            collection.get(KEY[3])
+        with pytest.raises(RuntimeError, match='closed cluster'):
+            impl.query('SELECT 1')
 
     @pytest.mark.parametrize('call', [lambda c: c.ping(),
                                       lambda c: c.diagnostics(),
@@ -437,6 +524,73 @@ class Couchbase2AsyncUnitTests:
 
         with pytest.raises(DocumentNotFoundException):
             _run(run)
+
+    def test_the_rows_stream_then_the_metadata(self, connect: Callable[..., tuple[str, ClusterOptions]],
+                                               gateway: FakeGateway) -> None:
+        gateway.query_messages = [_rows(1, 2), _rows(3, meta=MetaData(request_id='r-1'))]
+
+        async def run() -> Any:
+            impl = AsyncClusterImpl(*connect())
+            try:
+                result = impl.bucket('travel').scope('inventory').query('SELECT 1')
+                rows = [row async for row in result]
+                metadata = result.metadata()
+                return rows, None if metadata is None else metadata.request_id()
+            finally:
+                await impl.close_connection()
+
+        assert _run(run) == ([1, 2, 3], 'r-1')
+        assert gateway.calls[0].request.scope_name == 'inventory'
+
+    def test_a_query_error_is_raised_from_the_rows(self, connect: Callable[..., tuple[str, ClusterOptions]],
+                                                   gateway: FakeGateway) -> None:
+        gateway.query_end = Fail(grpc.StatusCode.INVALID_ARGUMENT)
+
+        async def run() -> None:
+            impl = AsyncClusterImpl(*connect())
+            try:
+                [row async for row in impl.query('SELEC 1')]
+            finally:
+                await impl.close_connection()
+
+        with pytest.raises(InvalidArgumentException):
+            _run(run)
+
+    def test_closing_early_cancels_the_stream(self, connect: Callable[..., tuple[str, ClusterOptions]],
+                                              gateway: FakeGateway) -> None:
+        gateway.query_messages = [_rows(1), _rows(2)]
+        gateway.query_pause = 5.0
+
+        async def run() -> Any:
+            impl = AsyncClusterImpl(*connect())
+            try:
+                rows = impl.query('SELECT 1').rows()
+                first = await rows.__anext__()
+                await rows.aclose()
+                return first
+            finally:
+                await impl.close_connection()
+
+        assert _run(run) == 1
+        assert gateway.query_cancelled.wait(5)
+
+    def test_the_whole_stream_is_read_for_twisted(self, connect: Callable[..., tuple[str, ClusterOptions]],
+                                                  gateway: FakeGateway) -> None:
+        gateway.query_messages = [_rows(1, 2), _rows(3, meta=MetaData(request_id='r-1'))]
+
+        async def run() -> Any:
+            impl = AsyncClusterImpl(*connect())
+            try:
+                prepared = impl.bucket('travel').scope('inventory').prepare_query('SELECT 1', (), {})
+                return QueryResult(await buffered_rows(lambda: impl.open_query(prepared, None),
+                                                       QueryRows(prepared.serializer)))
+            finally:
+                await impl.close_connection()
+
+        result = _run(run)
+        assert result.execute() == [1, 2, 3]
+        metadata = result.metadata()
+        assert metadata is not None and metadata.request_id() == 'r-1'
 
     def test_wait_until_ready_returns_once_the_gateway_reports_serving(
             self, connect: Callable[..., tuple[str, ClusterOptions]], gateway: FakeGateway) -> None:

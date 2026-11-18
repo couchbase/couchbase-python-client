@@ -27,6 +27,7 @@ from couchbase.common._operations import Op
 from couchbase.exceptions import (CouchbaseException,
                                   DataverseNotFoundException,
                                   DesignDocumentNotFoundException,
+                                  InvalidArgumentException,
                                   ParsingFailedException,
                                   QueryIndexNotFoundException)
 from couchbase.options import (AnalyticsOptions,
@@ -82,8 +83,6 @@ class StreamingTracingTestSuite(SuiteRequirements):
     # because which of the two raises is api-dependent: sync and acouchbase build a lazy request
     # and fail from the iteration, while a Twisted call can errback on its own.
 
-    # Observability support in CNG is pending.
-    UNSUPPORTED_PROTOCOLS = [TestProtocol.COUCHBASE2]
     # A tracer is a cluster option, so the suite needs a cluster of its own.
     CONNECTION_STRATEGY = ConnectionStrategy.NEW_CONNECTION
     # Nothing here reads a document: every statement is a constant expression, and the search
@@ -180,7 +179,9 @@ class StreamingTracingTestSuite(SuiteRequirements):
     @pytest.mark.usefixtures('check_query_supported')
     def test_query_invalid_statement(self, cb_env: TwistedTestEnvironment,
                                      http_validator: HttpSpanValidator) -> None:
-        with pytest.raises(ParsingFailedException):
+        # The gateway reports a parse error as a bare INVALID_ARGUMENT.
+        refused = InvalidArgumentException if cb_env.protocol == TestProtocol.COUCHBASE2 else ParsingFailedException
+        with pytest.raises(refused):
             result = run_in_reactor_thread(cb_env.cluster.query, INVALID_STATEMENT)
             cb_env.drain_rows(result)
         http_validator.validate_http_op(Op.Query, validate_error=True)
@@ -231,7 +232,9 @@ class StreamingTracingTestSuite(SuiteRequirements):
     @pytest.mark.usefixtures('check_collections_supported')
     def test_scope_query_invalid_statement(self, cb_env: TwistedTestEnvironment,
                                            http_validator: HttpSpanValidator) -> None:
-        with pytest.raises(ParsingFailedException):
+        # The gateway reports a parse error as a bare INVALID_ARGUMENT.
+        refused = InvalidArgumentException if cb_env.protocol == TestProtocol.COUCHBASE2 else ParsingFailedException
+        with pytest.raises(refused):
             result = run_in_reactor_thread(cb_env.scope.query, INVALID_STATEMENT)
             cb_env.drain_rows(result)
         http_validator.validate_http_op(Op.Query,

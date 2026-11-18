@@ -32,6 +32,7 @@ import couchbase.subdocument as SD
 from acouchbase.cluster import Cluster
 from couchbase.exceptions import (AmbiguousTimeoutException,
                                   CouchbaseException,
+                                  InvalidArgumentException,
                                   KeyspaceNotFoundException,
                                   ParsingFailedException,
                                   QueryErrorContext,
@@ -79,10 +80,10 @@ class QueryCollectionTestSuite(SuiteRequirements):
         'test_scope_query_with_positional_params_in_options',
     ]
 
-    # The tests marked couchbase2-unsupported in this module expect an exception class that only classic's
-    # error mapping raises.
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+    @pytest.mark.known_issue(TestProtocol.COUCHBASE2,
+                             ticket='ING-2778',
+                             note='the gateway answers a query naming a missing scope with UNKNOWN')
     async def test_bad_query_context(self, cb_env: AsyncTestEnvironment) -> None:
         q_str = f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2"
         # test w/ no context
@@ -97,7 +98,9 @@ class QueryCollectionTestSuite(SuiteRequirements):
             await cb_env.assert_rows_exact(result, 2)
 
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
+    @pytest.mark.known_issue(TestProtocol.COUCHBASE2,
+                             ticket='ING-2778',
+                             note='the gateway answers a query naming a missing scope with UNKNOWN')
     async def test_bad_scope_query(self, cb_env: AsyncTestEnvironment) -> None:
         q_str = f"SELECT * FROM `{cb_env.collection.name}` LIMIT 2"
         q_context = f'{cb_env.bucket.name}.`fake-scope`'
@@ -277,9 +280,10 @@ class QueryTestSuite(SuiteRequirements):
         EnvironmentFeatures.check_if_feature_supported(ServerFeatures.PreserveExpiry, cb_env.server_context)
 
     @pytest.mark.asyncio
-    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     async def test_bad_query(self, cb_env: AsyncTestEnvironment) -> None:
-        with pytest.raises(ParsingFailedException):
+        # The gateway reports a parse error as a bare INVALID_ARGUMENT.
+        refused = InvalidArgumentException if cb_env.protocol == TestProtocol.COUCHBASE2 else ParsingFailedException
+        with pytest.raises(refused):
             result = cb_env.cluster.query("I'm not N1QL!")
             await cb_env.drain_rows(result)
 
@@ -392,7 +396,9 @@ class QueryTestSuite(SuiteRequirements):
             assert isinstance(warning.message(), str)
             assert isinstance(warning.code(), int)
 
+    # The gateway's query request has no raw options, so couchbase2 warns and does not send them.
     @pytest.mark.asyncio
+    @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)
     async def test_query_raw_options(self, cb_env: AsyncTestEnvironment) -> None:
         # via raw, we should be able to pass any option
         # if using named params, need to match full name param in query
