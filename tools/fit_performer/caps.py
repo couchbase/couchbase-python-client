@@ -21,6 +21,7 @@ PERFORMER_CAPS = [
     performer_caps_pb.CLUSTER_CONFIG_CERT,
     performer_caps_pb.CLUSTER_CONFIG_INSECURE,
     performer_caps_pb.OBSERVABILITY_1,
+    performer_caps_pb.AS_NULL_CONTENT_TYPE_SUPPORT,
 ]
 
 SDK_CAPS = [
@@ -61,4 +62,6 @@ SDK_CAPS = [
     sdk_caps_pb.SDK_EVENTING_FUNCTION_MANAGER,
     sdk_caps_pb.SDK_EVENTING_RESUMING_FUNCTION_STATUS,
     sdk_caps_pb.SDK_SCOPE_EVENTING_FUNCTION_MANAGER,
+    sdk_caps_pb.PROTOSTELLAR,
+    sdk_caps_pb.SDK_COUCHBASE2_OBSERVABILITY,
 ]

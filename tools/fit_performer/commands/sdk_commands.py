@@ -49,6 +49,7 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   DocumentNotFoundOnReplicaException,
                                   DocumentNotJsonException,
                                   DocumentNotLockedException,
+                                  DocumentTooDeepException,
                                   DocumentUnretrievableException,
                                   DurabilityImpossibleException,
                                   DurabilityInvalidLevelException,
@@ -87,7 +88,7 @@ from couchbase.exceptions import (AmbiguousTimeoutException,
                                   ValueTooDeepException,
                                   WatchQueryIndexTimeoutException)
 from couchbase.mutation_state import MutationState
-from couchbase.result import MutationToken
+from couchbase.result import GetResult, MutationToken
 from couchbase.transcoder import (JSONTranscoder,
                                   LegacyTranscoder,
                                   RawBinaryTranscoder,
@@ -303,6 +304,7 @@ class SdkCommandResult:
         PathInvalidException: exceptions_pb.SDK_PATH_INVALID_EXCEPTION,
         PathTooBigException: exceptions_pb.SDK_PATH_TOO_BIG_EXCEPTION,
         PathTooDeepException: exceptions_pb.SDK_PATH_TOO_DEEP_EXCEPTION,
+        DocumentTooDeepException: exceptions_pb.SDK_DOCUMENT_TOO_DEEP_EXCEPTION,
         ValueTooDeepException: exceptions_pb.SDK_VALUE_TOO_DEEP_EXCEPTION,
         UnsupportedOperation: exceptions_pb.SDK_UNSUPPORTED_OPERATION_EXCEPTION,
         DocumentNotLockedException: exceptions_pb.SDK_DOCUMENT_NOT_LOCKED_EXCEPTION,
@@ -363,6 +365,11 @@ class SdkCommandResult:
                    ) -> content_pb.ContentTypes:
         res = content_pb.ContentTypes()
         as_type = content_as.WhichOneof('as')
+
+        if index is None and isinstance(cb_result, GetResult) and cb_result.value is None:
+            # JSON null, which a projection matching none of its paths reads as over couchbase2.
+            res.content_as_null.SetInParent()
+            return res
 
         try:
             getattr(cb_result, 'content_as')
