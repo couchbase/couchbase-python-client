@@ -100,12 +100,12 @@ module = [
 ]
 ignore_errors = true
 
-# Ruff enforces two things here: annotations are spelled the way python_requires>=3.10 allows,
+# Ruff enforces two things here: annotations are spelled the way python_requires>=3.11 allows,
 # `X | None` and `dict[...]` rather than `Optional[X]` and `Dict[...]`, and the user-facing package
 # has Google-style docstrings, the style Sphinx's napoleon reads.  flake8, isort and autopep8 still
 # own linting, import order and formatting, so `select` names only these rules.
 [tool.ruff]
-target-version = "py310"
+target-version = "py311"
 line-length = 120
 # pre-commit passes file names, and ruff checks a named file even when `exclude` matches it
 # unless this is set.

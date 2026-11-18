@@ -16,16 +16,11 @@
 # flake8: noqa: E501
 from __future__ import annotations
 
-import sys
 from collections.abc import Callable
 from typing import (Any,
                     NamedTuple,
-                    TypedDict)
-
-if sys.version_info >= (3, 11):
-    from typing import Unpack
-else:
-    from typing_extensions import Unpack
+                    TypedDict,
+                    Unpack)
 
 import couchbase.protocol.classic._pycbc_core.binding_cpp_types as CppTypes
 from couchbase.protocol.classic._pycbc_core import (pycbc_kv_request,

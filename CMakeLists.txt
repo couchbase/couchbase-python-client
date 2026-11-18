@@ -278,9 +278,9 @@ target_compile_definitions(pycbc_core PRIVATE COUCHBASE_CXX_CLIENT_IGNORE_CORE_D
 option(PYCBC_PY_LIMITED_API "Build the C extension against Py_LIMITED_API (abi3)" ON)
 # PYCBC_PY_LIMITED_API_HEX is the lowest CPython release this binary will load on.
 # Driven by PYCBC_PY_LIMITED_API_VERSION in pycbc_build_setup.py so it stays in
-# lockstep with the bdist_wheel --py-limited-api tag. 0x030A0000 == CPython 3.10,
-# the floor required by the limited-API symbols pycbc uses.
-set(PYCBC_PY_LIMITED_API_HEX "0x030A0000" CACHE STRING "Py_LIMITED_API hex (e.g. 0x030A0000 for CPython 3.10)")
+# lockstep with the bdist_wheel --py-limited-api tag. 0x030B0000 == CPython 3.11,
+# the oldest CPython pycbc supports.
+set(PYCBC_PY_LIMITED_API_HEX "0x030B0000" CACHE STRING "Py_LIMITED_API hex (e.g. 0x030B0000 for CPython 3.11)")
 message(STATUS "PYCBC_PY_LIMITED_API=${PYCBC_PY_LIMITED_API}")
 set(PYCBC_C_MOD_OUTPUT_NAME "_core")
 if(PYCBC_PY_LIMITED_API)

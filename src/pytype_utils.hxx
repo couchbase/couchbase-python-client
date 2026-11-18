@@ -67,6 +67,6 @@ free_heap_type_instance(PyObject* self)
 // type's own tp_name (e.g. "pycbc_core.pycbc_result" -> "pycbc_result"), so there's no longer
 // a separate name argument that could drift from the spec, and no manual INCREF/DECREF dance
 // -- PyModule_AddType and PyModule_AddObjectRef (for non-type objects) never steal the caller's
-// reference. Both are limited-API safe from our 3.10 floor. PYCBC-1854 (v4.7.0) dropped the
+// reference. Both are limited-API safe from our 3.11 floor. PYCBC-1854 (v4.7.0) dropped the
 // register_pytype/register_heap_type wrappers this replaced, along with the last static
 // PyTypeObject they served.

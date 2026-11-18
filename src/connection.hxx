@@ -199,7 +199,7 @@ private:
     }
 
     if (conversion_failed) {
-      Py_DECREF(streamed_res);
+      Py_DECREF(reinterpret_cast<PyObject*>(streamed_res));
       PyObject* conversion_error =
         get_exception_as_object("Failed to convert entry", __FILE__, __LINE__);
       return { true, conversion_error };
@@ -646,7 +646,7 @@ Connection::execute_streaming_op(PyObject* kwargs)
     }
     // Keep the streamed_result alive until the callback is done by INCREFing it here and DECREFing
     // in the callback
-    Py_INCREF(streamed_res);
+    Py_INCREF(reinterpret_cast<PyObject*>(streamed_res));
 
     // TODO: When C++ SDK supports row_callback, set it here:
     // req.row_callback = [rows = streamed_res->rows](std::string&& row) {
@@ -742,7 +742,7 @@ Connection::execute_streaming_op(PyObject* kwargs)
             Py_XDECREF(result);
           }
 
-          Py_DECREF(streamed_res);
+          Py_DECREF(reinterpret_cast<PyObject*>(streamed_res));
           Py_XDECREF(callback);
           Py_XDECREF(errback);
           PyGILState_Release(state);

@@ -523,7 +523,7 @@ PyObject*
 get_exception_as_object(const char* default_message, const char* file, int line)
 {
 // PyErr_GetRaisedException is 3.12+ only and unavailable at runtime on our abi3 floor
-// (3.10), even though the limited-API headers declare it unconditionally. Only take this
+// (3.11), even though the limited-API headers declare it unconditionally. Only take this
 // path in a non-limited, version-specific build actually compiled against 3.12+.
 #if !defined(Py_LIMITED_API) && PY_VERSION_HEX >= 0x030c0000
   PyObject* exc_value = PyErr_GetRaisedException();

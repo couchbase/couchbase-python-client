@@ -65,7 +65,7 @@ def use_py_limited_api() -> bool:
 # Lowest CPython version pycbc's C extension supports under the stable ABI.
 # Raising this floor frees up symbols (e.g. Py_T_OBJECT_EX is limited-API only
 # from 3.12), but invalidates wheels for older CPython releases.
-DEFAULT_PY_LIMITED_API_VERSION = '3.10'
+DEFAULT_PY_LIMITED_API_VERSION = '3.11'
 
 
 def _parse_py_limited_api_version(value: str) -> tuple:
@@ -74,13 +74,12 @@ def _parse_py_limited_api_version(value: str) -> tuple:
         major, minor = int(major_str), int(minor_str)
     except (ValueError, AttributeError) as e:
         raise OptionError(
-            f'PYCBC_PY_LIMITED_API_VERSION must be in MAJOR.MINOR form (e.g. "3.10"); got {value!r}'
+            f'PYCBC_PY_LIMITED_API_VERSION must be in MAJOR.MINOR form (e.g. "3.11"); got {value!r}'
         ) from e
-    if major != 3 or minor < 10:
+    if major != 3 or minor < 11:
         raise OptionError(
-            f'PYCBC_PY_LIMITED_API_VERSION must be 3.10 or newer; got {value!r}. '
-            'pycbc relies on stable-ABI symbols (PyType_FromSpec, PyUnicode_AsUTF8, ...) '
-            'first exposed in 3.10.'
+            f'PYCBC_PY_LIMITED_API_VERSION must be 3.11 or newer; got {value!r}. '
+            'pycbc supports CPython 3.11 and newer.'
         )
     return major, minor
 
@@ -92,13 +91,13 @@ def py_limited_api_version() -> tuple:
 
 
 def py_limited_api_hex() -> str:
-    """Return the Py_LIMITED_API hex literal (e.g. '0x030A0000') passed to the C compiler."""
+    """Return the Py_LIMITED_API hex literal (e.g. '0x030B0000') passed to the C compiler."""
     major, minor = py_limited_api_version()
     return f'0x{major:02X}{minor:02X}0000'
 
 
 def py_limited_api_wheel_tag() -> str:
-    """Return the bdist_wheel --py-limited-api tag (e.g. 'cp310')."""
+    """Return the bdist_wheel --py-limited-api tag (e.g. 'cp311')."""
     major, minor = py_limited_api_version()
     return f'cp{major}{minor}'
 
@@ -205,7 +204,7 @@ def process_build_env_vars():  # noqa: C901
 
     # PYCBC_PY_LIMITED_API: build against the Python stable ABI (abi3).
     # Defaults to ON; opt out for a Python-version-specific binary.
-    # The hex value (e.g. 0x030A0000 == 3.10) is the lowest CPython the resulting
+    # The hex value (e.g. 0x030B0000 == 3.11) is the lowest CPython the resulting
     # binary will load against, and must match the wheel tag set in BdistWheelCommand.
     if use_py_limited_api():
         cmake_extra_args += [
@@ -468,7 +467,7 @@ class BdistWheelCommand(_bdist_wheel):
     `pip wheel .` invokes bdist_wheel without flags, so even if Extension
     declares py_limited_api=True the wheel still gets a CPython-specific tag.
     Default --py-limited-api here so the produced wheel is named
-    `<dist>-<ver>-cp310-abi3-<platform>.whl` and installs onto any CPython >=3.10.
+    `<dist>-<ver>-cp311-abi3-<platform>.whl` and installs onto any CPython >=3.11.
 
     Both the wheel tag and the C-level Py_LIMITED_API hex come from
     py_limited_api_version() so they cannot drift apart.

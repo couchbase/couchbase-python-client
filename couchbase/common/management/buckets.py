@@ -43,7 +43,7 @@ from couchbase.common.durability import DurabilityLevel
 from couchbase.common.exceptions import InvalidArgumentException
 
 if TYPE_CHECKING:
-    from typing_extensions import Required, Unpack
+    from typing import Required, Unpack
 
 
 class EvictionPolicyType(Enum):

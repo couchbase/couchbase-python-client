@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 import contextlib
-import sys
 import traceback
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -25,12 +24,8 @@ from typing import (TYPE_CHECKING,
                     Any,
                     Literal,
                     TypedDict,
+                    Unpack,
                     cast)
-
-if sys.version_info >= (3, 11):
-    from typing import Unpack
-else:
-    from typing_extensions import Unpack
 
 from couchbase.common._observability._clock import now_ns
 from couchbase.common._observability.no_op import NoOpMeter, NoOpTracer
