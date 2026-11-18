@@ -55,6 +55,7 @@ from couchbase.options import (ClusterOptions,
                                TransactionQueryOptions,
                                TransactionReplaceOptions,
                                UpsertOptions)
+from couchbase.serializer import DefaultJsonSerializer
 from couchbase.transactions import (AttemptContext,
                                     TransactionGetMultiMode,
                                     TransactionGetMultiReplicasFromPreferredServerGroupMode,
@@ -63,6 +64,7 @@ from couchbase.transactions import (AttemptContext,
                                     TransactionGetMultiResult,
                                     TransactionGetMultiSpec,
                                     TransactionKeyspace,
+                                    TransactionQueryResults,
                                     TransactionResult)
 from couchbase.transcoder import RawBinaryTranscoder, RawJSONTranscoder
 from tests.assert_helpers import cb_assert_eq, cb_assert_isinstance
@@ -84,6 +86,17 @@ from tests.untyped import untyped_kwargs
 # What the _assert_option_* helpers accept.  The three classes share no base but `dict`,
 # and each goes to a different core type, so the union is the type.
 TxnOptionLike = TransactionConfig | TransactionOptions | TransactionQueryOptions
+
+
+class _TaggedDict(dict[str, Any]):
+    pass
+
+
+class _TaggingSerializer(DefaultJsonSerializer):
+    """Decodes every JSON object as a `_TaggedDict`, so a row shows which serializer read it."""
+
+    def deserialize(self, value: bytes) -> Any:
+        return json.loads(value.decode('utf-8'), object_hook=_TaggedDict)
 
 
 class TransactionTestSuite(TopologySuite):
@@ -140,6 +153,7 @@ class TransactionTestSuite(TopologySuite):
         'test_query_lambda_raises_parsing_failure',
         'test_query_mode_insert',
         'test_query_mode_remove',
+        'test_query_uses_cluster_serializer',
         'test_remove',
         'test_remove_fail_bad_cas',
         'test_replace',
@@ -831,6 +845,31 @@ class TransactionTestSuite(TopologySuite):
         assert get_res is not None, 'The doc inserted after a query must be readable.'
         cb_assert_eq(get_res.content_as[dict], value1, what='committed content')
 
+    # Creates a new connection, so allow retries.
+    @pytest.mark.flaky(reruns=5, reruns_delay=1)
+    @pytest.mark.usefixtures('check_txn_queries_supported')
+    def test_query_uses_cluster_serializer(self, cb_env: SyncTestEnvironment) -> None:
+        conn_string = cb_env.config.get_connection_string()
+        username, pw = cb_env.config.get_username_and_pw()
+        cluster_opts = ClusterOptions(PasswordAuthenticator(username, pw),
+                                      serializer=_TaggingSerializer(),
+                                      tracing_options=ClusterTracingOptions(enable_tracing=False))
+        cluster = Cluster.connect(conn_string, cluster_opts)
+        try:
+            # Open a bucket as the suite's own cluster has, so only the serializer differs.
+            cluster.bucket(cb_env.bucket.name)
+            rows: list[Any] = []
+
+            def txn_logic(ctx: AttemptContext) -> None:
+                rows.extend(ctx.query('SELECT {"a": 1} AS doc').rows())
+
+            cluster.transactions.run(txn_logic)
+            cb_assert_eq(len(rows), 1, what='row count')
+            cb_assert_isinstance(rows[0], _TaggedDict, what='row')
+            cb_assert_eq(rows[0], {'doc': {'a': 1}}, what='row content')
+        finally:
+            cluster.close()
+
     @pytest.mark.usefixtures('check_txn_queries_supported')
     def test_query_mode_remove(self, cb_env: SyncTestEnvironment) -> None:
         coll = cb_env.collection
@@ -1130,6 +1169,19 @@ class TransactionKeyspaceUnitTests:
         with pytest.raises(InvalidArgumentException) as exc_info:
             TransactionKeyspace(bucket, scope, collection)
         assert exc_info.value.message == f'A TransactionKeyspace needs {missing}.'
+
+
+class TransactionQueryResultsUnitTests:
+
+    def test_default_serializer(self) -> None:
+        res = TransactionQueryResults(b'{"results": [{"a": 1}]}')
+        cb_assert_eq(res.rows(), [{'a': 1}], what='rows')
+        assert type(res.rows()[0]) is dict, 'Rows default to plain dicts.'
+
+    def test_given_serializer(self) -> None:
+        res = TransactionQueryResults(b'{"results": [{"a": 1}]}', _TaggingSerializer())
+        cb_assert_eq(res.rows(), [{'a': 1}], what='rows')
+        cb_assert_isinstance(res.rows()[0], _TaggedDict, what='row')
 
 
 @pytest.mark.unsupported_protocol(TestProtocol.COUCHBASE2)

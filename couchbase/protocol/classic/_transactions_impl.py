@@ -163,9 +163,10 @@ class TransactionsImpl:
     def __init__(self, cluster: ClusterImpl) -> None:
         self._client_adapter = cluster.client_adapter
         settings = cluster.cluster_settings
+        self._serializer = settings.default_serializer
         self._txns, self._transcoder = open_transactions(cluster.connection,
                                                          settings.transaction_config,
-                                                         settings.default_serializer)
+                                                         self._serializer)
 
     @property
     def couchbase_protocol(self) -> CouchbaseProtocol:
@@ -178,7 +179,11 @@ class TransactionsImpl:
     def begin_transaction(self,
                           transaction_options: TransactionOptions | None = None,
                           **kwargs: Any) -> AttemptContextImpl:
-        return AttemptContextImpl(self._client_adapter, self._txns, self._transcoder, transaction_options)
+        return AttemptContextImpl(self._client_adapter,
+                                  self._txns,
+                                  self._transcoder,
+                                  self._serializer,
+                                  transaction_options)
 
 
 class AttemptContextImpl:
@@ -190,9 +195,11 @@ class AttemptContextImpl:
                  client_adapter: ClientAdapter,
                  txns: TransactionsCapsuleType,
                  transcoder: Transcoder,
+                 serializer: Serializer,
                  opts: TransactionOptions | None) -> None:
         self._client_adapter = client_adapter
         self._transcoder = transcoder
+        self._serializer = serializer
         self._request_builder = TransactionsRequestBuilder(open_transaction_context(txns, opts))
 
     @property
@@ -282,4 +289,4 @@ class AttemptContextImpl:
               query: str,
               options: TransactionQueryOptions | None = None) -> TransactionQueryResults:
         req = self._request_builder.build_query_request(query, options)
-        return TransactionQueryResults(_execute(transaction_query_op, req))
+        return TransactionQueryResults(_execute(transaction_query_op, req), self._serializer)

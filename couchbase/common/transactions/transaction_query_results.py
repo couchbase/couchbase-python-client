@@ -13,20 +13,25 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from __future__ import annotations
+
 __all__ = [
     'TransactionQueryResults',
 ]
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from couchbase.common.transcoder import DefaultJsonSerializer
+
+if TYPE_CHECKING:
+    from couchbase.serializer import Serializer
 
 
 class TransactionQueryResults:
     """The result of a query run inside a transaction."""
 
-    def __init__(self, res: bytes) -> None:
-        self._res = DefaultJsonSerializer().deserialize(res)
+    def __init__(self, res: bytes, serializer: Serializer | None = None) -> None:
+        self._res = (serializer or DefaultJsonSerializer()).deserialize(res)
 
     def rows(self) -> list[Any]:
         """Get the query's rows.

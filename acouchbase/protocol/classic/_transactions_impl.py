@@ -61,6 +61,7 @@ if TYPE_CHECKING:
                                           TransactionReplaceOptions)
     from couchbase.common.protocol import CouchbaseProtocol
     from couchbase.protocol.classic._pycbc_core.pycbc_core_types import TransactionsCapsuleType, _CompletionCallbacks
+    from couchbase.serializer import Serializer
     from couchbase.transactions import TransactionGetMultiReplicasFromPreferredServerGroupSpec, TransactionGetMultiSpec
     from couchbase.transcoder import Transcoder
 
@@ -80,9 +81,10 @@ class AsyncTransactionsImpl:
         self._client_adapter = cluster.client_adapter
         self._loop = cluster.loop
         settings = cluster.cluster_settings
+        self._serializer = settings.default_serializer
         self._txns, self._transcoder = open_transactions(cluster.connection,
                                                          settings.transaction_config,
-                                                         settings.default_serializer)
+                                                         self._serializer)
 
     @property
     def couchbase_protocol(self) -> CouchbaseProtocol:
@@ -99,6 +101,7 @@ class AsyncTransactionsImpl:
                                        self._txns,
                                        self._loop,
                                        self._transcoder,
+                                       self._serializer,
                                        transaction_options)
 
 
@@ -112,10 +115,12 @@ class AsyncAttemptContextImpl:
                  txns: TransactionsCapsuleType,
                  loop: AbstractEventLoop,
                  transcoder: Transcoder,
+                 serializer: Serializer,
                  opts: TransactionOptions | None) -> None:
         self._client_adapter = client_adapter
         self._loop = loop
         self._transcoder = transcoder
+        self._serializer = serializer
         self._request_builder = TransactionsRequestBuilder(open_transaction_context(txns, opts))
 
     @property
@@ -246,4 +251,4 @@ class AsyncAttemptContextImpl:
               query: str,
               options: TransactionQueryOptions | None = None) -> Future[TransactionQueryResults]:
         req = self._request_builder.build_query_request(query, options)
-        return self._execute(transaction_query_op, req, TransactionQueryResults)
+        return self._execute(transaction_query_op, req, lambda res: TransactionQueryResults(res, self._serializer))
