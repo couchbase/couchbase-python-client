@@ -454,7 +454,10 @@ class SearchQueryBuilder:
                                          **kwargs: Any) -> SearchQueryBuilder:
         """The builder for `search()`, which takes a request, or a bare query with a deprecation warning."""
         search_query, vector_search = _search_args.search_argument(request)
-        return cls._create(index_name, search_query, vector_search, _search_args.search_args(*options, **kwargs))
+        args = _search_args.search_args(*options, **kwargs)
+        # Without showrequest false the service echoes the whole request, vectors included.
+        args.setdefault('show_request', False)
+        return cls._create(index_name, search_query, vector_search, args)
 
     @classmethod
     def _create(cls,

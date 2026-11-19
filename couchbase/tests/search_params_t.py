@@ -1095,6 +1095,7 @@ class VectorSearchParamsUnitTests:
         return {'query': {'match_none': None},
                 'index_name': INDEX_NAME,
                 'metrics': True,
+                'show_request': False,
                 'vector_search': list(vector_queries),
                 **overrides}
 
@@ -1184,6 +1185,15 @@ class VectorSearchParamsUnitTests:
         # The conflict is checked on the request path as well as the query path.
         _rejects(SearchQueryBuilder.create_search_query_from_request,
                  INDEX_NAME, request, SearchOptions(scoring=ScoringNone(), disable_scoring=True))
+
+    def test_request_show_request_default(self) -> None:
+        # Regression guard (PYCBC-2087): the request path sends showrequest false unless asked.
+        request = SearchRequest.create(search.MatchQuery('salty beers'))
+        assert SearchQueryBuilder.create_search_query_from_request(INDEX_NAME, request).show_request is False
+        builder = SearchQueryBuilder.create_search_query_from_request(
+            INDEX_NAME, request, SearchOptions(show_request=True))
+        assert builder.show_request is True
+        assert _encode(builder)['show_request'] is True
 
     def test_vector_query_combination_reads_back(self) -> None:
         # PYCBC-1929: the getter read another option's key.  The encoded request always
